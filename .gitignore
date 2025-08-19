@@ -1,0 +1,110 @@
+# Flutter/Dart/Pub related
+.dart_tool/
+.packages
+.pub/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+.flutter-versions
+.melos_tool/
+
+# Generated files
+pubspec.lock
+coverage/
+gen/
+lib/generated_plugin_registrant.dart
+
+# iOS/Xcode related
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/build/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/ephemeral/
+**/ios/.generated/
+*.xcworkspace
+*.xcuserstate
+*.xcuserdatad
+*.xcscmblueprint
+*.xcodeproj/project.xcworkspace
+*.xcodeproj/xcuserdata/
+
+# Android related
+**/android/.gradle/
+**/android/local.properties
+**/android/app/build/
+**/android/captures/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/gradle/wrapper/gradle-wrapper.jar
+**/android/gradle/wrapper/gradle-wrapper.properties
+**/android/.idea/
+
+# Web related
+**/web/.dart_tool/
+**/web/.firebase/
+**/web/.flutter/
+
+# Windows related
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugin_registrant.h
+**/windows/flutter/generated_plugins.cmake
+**/windows/.vs/
+**/windows/x64/
+**/windows/Debug/
+**/windows/Release/
+
+# macOS related
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/Flutter/ephemeral/
+**/macos/build/
+
+# Linux related
+**/linux/flutter/generated_plugin_registrant.cc
+**/linux/flutter/generated_plugin_registrant.h
+**/linux/flutter/generated_plugins.cmake
+**/linux/build/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Other system files
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.swo
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+fastlane/readme.md
+
+# Firebase/Crashlytics
+google-services.json
+GoogleService-Info.plist
+.crashlytics/
+.firebase/
+
+# Symbolication / profiling
+*.symbols
+*.dSYM.zip
+*.dSYM
+
+# Temporary files
+*.tmp
+*.temp
+
+# Coverage reports
+coverage/

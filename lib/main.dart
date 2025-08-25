@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'carrier_signup.dart';
 import 'choose_role.dart';
 import 'splash.dart'; // Import the SplashScreen
 import 'welcome.dart'; // Import the WelcomeScreen
 import 'joiningoption.dart'; // Import the JoiningOption screen
 import 'login_screen.dart'; // Import the new LoginScreen
+import 'carrier_signup.dart'; // Import the CarrierSignUpScreen
 
 void main() {
   // This is the single, correct entry point for your entire application.
@@ -25,12 +27,17 @@ class MyApp extends StatelessWidget {
       home: SplashScreen(
         nextScreen: WelcomeScreen(
           // The WelcomeScreen's button will navigate to the JoiningOption screen.
-          nextScreen: JoiningOption(
+          nextScreen: SignScreen(
             // The JoiningOption's "Log In" button will navigate to the LoginScreen.
             nextScreen: const LoginScreen(),
           ),
         ),
       ),
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/signup/carrier': (context) => const CarrierSignUpScreen(),
+        '/roleselection': (context) => const RoleSelectionScreen(),
+      },
     );
   }
 }

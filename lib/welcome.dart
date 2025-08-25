@@ -1,4 +1,7 @@
+import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'joiningoption.dart'; // Import the JoiningOption screen
 
 class WelcomeScreen extends StatefulWidget {
   final Widget nextScreen;
@@ -9,8 +12,63 @@ class WelcomeScreen extends StatefulWidget {
   WelcomeScreenState createState() => WelcomeScreenState();
 }
 
-class WelcomeScreenState extends State<WelcomeScreen> {
+class WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProviderStateMixin {
   double _scale = 1.0;
+  late final AnimationController _waveController;
+  late final Animation<double> _waveAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize the AnimationController for the waving animation
+    _waveController = AnimationController(
+      duration: const Duration(milliseconds: 1000), // 1 second for one wave cycle
+      vsync: this,
+    );
+
+    // Define the animation. The wave effect will be a slight rotation.
+    _waveAnimation = Tween<double>(begin: 0, end: 0.1).animate(
+      CurvedAnimation(
+        parent: _waveController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    // Start the animation and make it repeat for a duration of 2 seconds
+    _waveController.repeat(reverse: true);
+    Timer(const Duration(milliseconds: 2000), () {
+      _waveController.stop();
+    });
+  }
+
+  @override
+  void dispose() {
+    _waveController.dispose();
+    super.dispose();
+  }
+
+  // A custom page route to handle the slide transition
+  PageRouteBuilder _createSlidePageRoute() {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => widget.nextScreen,
+      transitionDuration: const Duration(milliseconds: 500),
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(1.0, 0.0);
+        const end = Offset.zero;
+        const curve = Curves.easeOutCubic;
+
+        var tween = Tween(begin: begin, end: end).chain(
+          CurveTween(curve: curve),
+        );
+
+        return SlideTransition(
+          position: animation.drive(tween),
+          child: child,
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,133 +79,128 @@ class WelcomeScreenState extends State<WelcomeScreen> {
     return Scaffold(
       body: SafeArea(
         top: false,
-
         child: Container(
           color: const Color(0xFFFFFEF6),
-
           width: double.infinity,
           height: double.infinity,
           child: SingleChildScrollView(
             child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: screenHeight - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  SizedBox(height: screenHeight * 0.05),
-
-                  // Logo image with responsive sizing
-                  Container(
-                    width: screenWidth * 0.3,
-                    height: screenWidth * 0.3,
-                    constraints: const BoxConstraints(
-                      minWidth: 100,
-                      maxWidth: 150,
-                      minHeight: 100,
-                      maxHeight: 150,
-                    ),
-                    child: Image.network(
-                      "https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/61276312-ff6a-4cb3-82f8-e125853c72cf",
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-
-                  SizedBox(height: screenHeight * 0.03),
-
-                  // Welcome text with responsive sizing
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.1),
-                    child: Text(
-                      "Welcome\n to Re-Miles",
-                      style: TextStyle(
-                        color: const Color(0xFF000000),
-                        fontSize: screenWidth * 0.075,
-                        fontWeight: FontWeight.bold,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-
-                  SizedBox(height: screenHeight * 0.03),
-
-                  // Description text with responsive padding
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
-                    child: Text(
-                      "Your all-in-one freight matching solution that connects carriers and shippers seamlessly optimizing routes, maximizing earnings, and boosting efficiency in the freight industry.",
-                      style: TextStyle(
-                        color: const Color(0xFF113F29),
-                        fontSize: screenWidth * 0.035,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-
-                  SizedBox(height: screenHeight * 0.05),
-
-                  // Get Started button with responsive sizing
-                  GestureDetector(
-                    onTapDown: (details) {
-                      setState(() {
-                        _scale = 0.95;
-                      });
-                    },
-                    onTapUp: (details) {
-                      setState(() {
-                        _scale = 1.0;
-                      });
-                    },
-                    onTap: () {
-                      print("Get Started tapped!");
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => widget.nextScreen),
-                      );
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      curve: Curves.easeInOut,
-                      transform: Matrix4.identity()..scale(_scale),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: screenWidth * 0.15,
-                        vertical: screenHeight * 0.018,
-                      ),
-                      decoration: const BoxDecoration(
-                        borderRadius: BorderRadius.all(Radius.circular(10)),
-                        image: DecorationImage(
-                          image: NetworkImage("https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/dfac1ec1-15d0-4ecf-bd23-d8d3b1ad2ce6"),
-                          fit: BoxFit.cover,
+                constraints: BoxConstraints(minHeight: screenHeight - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center, // Aligns content vertically
+                  children: [
+                    // Top Image (Wave) with fixed sizing
+                    AnimatedBuilder(
+                      animation: _waveAnimation,
+                      builder: (context, child) {
+                        return Transform.rotate(
+                          angle: _waveAnimation.value * math.pi, // Rotate in radians
+                          child: child,
+                        );
+                      },
+                      child: Container(
+                        width: 123,
+                        height: 123,
+                        child: Image.asset(
+                          "assets/welcome_wave.png",
+                          fit: BoxFit.contain,
                         ),
                       ),
-                      child: Text(
-                        "Get Started",
+                    ),
+
+                    SizedBox(height: screenHeight * 0.03),
+
+                    // Welcome text with responsive sizing.
+                    // The 'fontFamily' has been updated to use the new font.
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.1),
+                      child: const Text(
+                        "Welcome\n to Re-Miles",
                         style: TextStyle(
-                          color: const Color(0xFFFFFFFF),
-                          fontSize: screenWidth * 0.04,
-                          fontWeight: FontWeight.bold,
+                          color: Colors.black, // Black fill
+                          fontSize: 48,
+                          fontFamily: "RobotoFlex", // Using the specified font
+                          letterSpacing: -1,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w900,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+
+                    SizedBox(height: screenHeight * 0.05),
+
+                    // Description text with responsive padding
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08),
+                      child: const Text(
+                        "Your all-in-one freight matching solution that connects carriers and shippers while seamlessly optimizing routes, maximizing earnings, and boosting efficiency in the freight industry.",
+                        style: TextStyle(
+                          color: Color(0xFF000000),
+                          fontSize: 14,
+                          fontWeight: FontWeight.normal,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+
+                    SizedBox(height: screenHeight * 0.05),
+
+                    // Get Started button with responsive sizing and local image
+                    GestureDetector(
+                      onTapDown: (details) {
+                        setState(() {
+                          _scale = 0.95;
+                        });
+                      },
+                      onTapUp: (details) {
+                        setState(() {
+                          _scale = 1.0;
+                        });
+                      },
+                      onTap: () {
+                        // Navigate to the next screen with the custom slide transition.
+                        Navigator.push(
+                          context,
+                          _createSlidePageRoute(),
+                        );
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        curve: Curves.easeInOut,
+                        transform: Matrix4.identity()..scale(_scale),
+                        width: 240,
+                        height: 55,
+                        decoration: const BoxDecoration(
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                          image: DecorationImage(
+                            image: AssetImage("assets/welcome_button.png"),
+                            // The `BoxFit.fill` property ensures the image stretches to fit the container's specified
+                            // width and height exactly, preventing any parts of the image from being cut off.
+                            fit: BoxFit.fill,
+                          ),
+
+                        ),
+                        child: const Align(
+                          // Shift the text up by a small amount
+                          alignment: Alignment(0, -0.2),
+                          child: Text(
+                            "Get Started",
+                            style: TextStyle(
+                              color: Color(0xFFFFFFFF),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: "Keep Calm",
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  SizedBox(height: screenHeight * 0.03),
+                    SizedBox(height: screenHeight * 0.03),
+                  ],
 
-                  // Bottom image with responsive sizing and positioning
-                  Align(
-                    alignment: Alignment.bottomLeft,
-                    child: Container(
-                      padding: EdgeInsets.only(left: screenWidth * 0.05),
-                      width: screenWidth * 0.6,
-                      height: screenHeight * 0.25,
-                      child: Image.network(
-                        "https://figma-alpha-api.s3.us-west-2.amazonaws.com/images/443f2ec2-92ba-466b-b868-e6509a160835",
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                )
             ),
           ),
         ),

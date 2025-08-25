@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'carrier_signup.dart'; // Assuming the file path for CarrierSignUpScreen
+import 'joiningoption.dart';
+import 'shipper_signup.dart'; // Import the new ShipperSignUpScreen
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -12,6 +15,19 @@ class RoleSelectionScreen extends StatelessWidget {
   double sx(double val, double scale) => val * scale;
   double sy(double val, double scale) => val * scale;
 
+  // A custom page route to handle the fade transition
+  PageRouteBuilder _createFadePageRoute(Widget page) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => page,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Size size = MediaQuery.of(context).size;
@@ -22,14 +38,15 @@ class RoleSelectionScreen extends StatelessWidget {
     final double scale = (w / _designW < h / _designH) ? (w / _designW) : (h / _designH);
 
     // Panel (rectangle_6) — Figma width is 376dp, full height
-    final double panelW = sx(_designW, scale);
+    // Increased width for the white rectangle
+    final double panelW = sx(_designW * 1.12, scale);
     final double panelH = h; // span full device height
 
     // Horizontally center the panel like layout_centerHorizontal="true"
     final double panelLeft = (w - panelW) / 2.0;
 
     // Cards (rectangle_8 & rectangle_9): 314×304 at Y=529dp and Y=199dp
-    const double cardDW = 314.0;
+    const double cardDW = 284.0;
     const double cardDH = 304.0;
     final double cardW = sx(cardDW, scale);
     final double cardH = sy(cardDH, scale);
@@ -55,121 +72,120 @@ class RoleSelectionScreen extends StatelessWidget {
 
     void onRoleTap(String role) {
       HapticFeedback.selectionClick();
-      // TODO: Navigate or set state for selected role
-      // Navigator.push(...);
+      // Navigate to the CarrierSignUpScreen when the "Carrier" role is tapped.
+      if (role == 'Carrier') {
+        Navigator.of(context).push(
+          _createFadePageRoute(const CarrierSignUpScreen()),
+        );
+      } else if (role == 'Shipper') {
+        Navigator.of(context).push(
+          _createFadePageRoute(const ShipperSignUpScreen()),
+        );
+      }
       debugPrint('Tapped role: $role');
     }
 
     return Scaffold(
-      body: SafeArea(
-        top: false, // flush to the very top (no white gap)
-        bottom: false, // flush to the very bottom (no white gap)
-        child: Stack(
-          children: [
-            // Background leather texture — full bleed
-            Positioned.fill(
-              child: Image.network(
-                'https://c.animaapp.com/meh13sdt7ZzbdV/img/leather-texture-fin.png',
-                fit: BoxFit.cover,
-              ),
-            ),
-
-            // White panel (rectangle_6) centered horizontally
-            Positioned(
-              left: panelLeft,
-              top: 0,
-              width: panelW,
-              height: panelH,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFEF6),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.35),
-                      offset: const Offset(0, -5),
-                      blurRadius: 9.2,
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.47),
-                      offset: const Offset(0, 4),
-                      blurRadius: 4.4,
-                      spreadRadius: -2,
-                    ),
-                  ],
-                  // Uncomment if you want rounded external corners like your clip-path:
-                  // borderRadius: BorderRadius.circular(sx(20, scale)),
+      body: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle.dark, // This makes status bar icons black
+        child: SafeArea(
+          top: false, // flush to the very top (no white gap)
+          bottom: false, // flush to the very bottom (no white gap)
+          child: Stack(
+            children: [
+              // Background leather texture — full bleed
+              Positioned.fill(
+                child: Image.asset(
+                  'assets/leather_rectangle.png',
+                  fit: BoxFit.cover,
                 ),
               ),
-            ),
 
-            // Back button with press animation
-            Positioned(
-              left: backLeft,
-              top: backTop,
-              child: PressableScale(
-                scaleAmount: 0.92,
-                duration: const Duration(milliseconds: 120),
-                onTap: onBackTap,
-                child: Icon(
-                  Icons.arrow_back,
-                  color: Colors.black,
-                  size: sx(29, scale),
+              // White panel (rectangle_6) centered horizontally
+              Positioned(
+                left: panelLeft,
+                top: 0,
+                width: panelW,
+                height: panelH,
+                child: Image.asset(
+                  'assets/white_rectangle.png',
+                  fit: BoxFit.fill,
                 ),
               ),
-            ),
 
-            // Title centered at ~120dp from the top
-            Positioned(
-              top: titleTop,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Text(
-                  'Choose your role',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: sx(32, scale),
-                    fontWeight: FontWeight.w600,
+              // Back button with press animation
+              Positioned(
+                top: 50 * scale,
+                left: 10 * scale,
+                child: IconButton(
+                  icon: Icon(
+                    Icons.arrow_back_rounded,
                     color: Colors.black,
-                    height: 38 / 32, // line height mapping
+                    size: 40 * scale,
+                  ),
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      _createFadePageRoute(const SignScreen(nextScreen: Text("Login Screen Placeholder"))),
+                    );
+                  },
+                ),
+              ),
+
+              // Title centered at ~120dp from the top
+              Positioned(
+                top: titleTop,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: Text(
+                    'Choose your role',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: sx(29, scale),
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                      height: 38 / 32, // line height mapping
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // Top card (Carrier)
-            Positioned(
-              left: cardX,
-              top: card1Top,
-              width: cardW,
-              height: cardH,
-              child: _RoleCard(
-                title: 'Carrier',
-                imageUrl: 'https://c.animaapp.com/meh13sdt7ZzbdV/img/untitled-design-123-1.png',
-                scale: scale,
-                imgSize: imgBox,
-                imgTop: imgTopPadding,
-                onTap: () => onRoleTap('Carrier'),
-              ),
-            ),
+              // Top card (Carrier)
+              Positioned(
+                left: cardX,
 
-            // Bottom card (Shipper)
-            Positioned(
-              left: cardX,
-              top: card2Top,
-              width: cardW,
-              height: cardH,
-              child: _RoleCard(
-                title: 'Shipper',
-                imageUrl: 'https://c.animaapp.com/meh13sdt7ZzbdV/img/trolley-full-1.png',
-                scale: scale,
-                imgSize: imgBox,
-                imgTop: imgTopPadding,
-                onTap: () => onRoleTap('Shipper'),
+                top: card1Top,
+                width: cardW+40,
+                height: cardH,
+                child: _RoleCard(
+                  title: 'Carrier',
+                  imageUrl: 'assets/carrier_icon.png',
+                  scale: scale,
+                  imgSize: imgBox,
+                  imgTop: imgTopPadding + sy(15.0, scale), // Pushed down for spacing
+                  onTap: () => onRoleTap('Carrier'),
+                ),
               ),
-            ),
-          ],
+
+              // Bottom card (Shipper)
+              Positioned(
+                left: cardX,
+                top: card2Top,
+                width: cardW+40,
+                height: cardH,
+                child: _RoleCard(
+                  title: 'Shipper',
+                  imageUrl: 'assets/shipper_icon.png',
+                  scale: scale,
+                  imgSize: imgBox,
+                  imgTop: imgTopPadding + sy(-15.0, scale), // Pushed down for spacing
+                  onTap: () => onRoleTap('Shipper'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -279,7 +295,7 @@ class _RoleCard extends StatelessWidget {
         elevation: 4, // <-- matches your XML android:elevation="4dp"
         color: Colors.white,
         borderRadius: cardRadius,
-        shadowColor: Colors.black.withOpacity(0.25), // subtle Material shadow
+        shadowColor: Colors.green.withOpacity(0.95), // subtle Material shadow
         child: Ink(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -301,7 +317,7 @@ class _RoleCard extends StatelessWidget {
                       duration: const Duration(milliseconds: 100),
                       curve: Curves.easeOut,
                       onTap: onTap,
-                      child: Image.network(
+                      child: Image.asset(
                         imageUrl,
                         fit: BoxFit.contain,
                       ),
@@ -313,13 +329,13 @@ class _RoleCard extends StatelessWidget {
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 25 * scale,
+                bottom: title == 'Shipper' ? 15 * scale : 25 * scale,
                 child: Center(
                   child: Text(
                     title,
                     style: TextStyle(
                       fontFamily: 'Roboto',
-                      fontSize: 28 * scale,
+                      fontSize: 23 * scale,
                       fontWeight: FontWeight.w600,
                       color: Colors.black,
                     ),
@@ -333,4 +349,3 @@ class _RoleCard extends StatelessWidget {
     );
   }
 }
-

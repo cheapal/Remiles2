@@ -1,7 +1,8 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'choose_role.dart';
-import 'shipper_onboarding_1.dart'; // Import the new onboarding screen
+import 'shipper_onboarding/shipper_onboarding_1.dart';
 
 class ShipperSignUpScreen extends StatefulWidget {
   const ShipperSignUpScreen({Key? key}) : super(key: key);
@@ -11,12 +12,11 @@ class ShipperSignUpScreen extends StatefulWidget {
 }
 
 class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
-  // State for password visibility
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
+  bool _isLoading = false;
 
-  // A custom page route to handle the fade transition
   PageRouteBuilder _createFadePageRoute(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
@@ -31,7 +31,50 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Get screen dimensions to apply proportional scaling
+    return Scaffold(
+      backgroundColor: const Color(0xFFFBFBF6), // Consistent background
+      resizeToAvoidBottomInset: false,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Use a threshold to switch between mobile and web layouts
+          if (constraints.maxWidth > 900) {
+            return _buildWebView(context);
+          } else {
+            return _buildMobileView(context);
+          }
+        },
+      ),
+    );
+  }
+
+  // Builds the split-screen UI for web/large screens
+  Widget _buildWebView(BuildContext context) {
+    return Row(
+      children: [
+        // Left side: Branding and inspirational content
+        Expanded(
+          flex: 1,
+          child: _buildBrandingPanel(),
+        ),
+        // Right side: The sign-up form
+        Expanded(
+          flex: 1,
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(40.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 450),
+                child: _buildSignUpForm(1.0, isWeb: true),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Builds the UI for mobile/small screens
+  Widget _buildMobileView(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     const double designW = 456.0;
@@ -40,385 +83,454 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
         ? screenWidth / designW
         : screenHeight / designH;
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false, // Prevents screen from resizing
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.dark, // Changed to dark to make icons black
-        child: SafeArea(
-          top: false,
-          bottom: false,
-          child: Stack(
-            children: [
-              // Main background and content
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-                color: const Color(0xFFFEFEF6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: SafeArea(
+        top: false,
+        bottom: false,
+        child: Stack(
+          children: [
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: const Color(0xFFFEFEF6),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 24 * scale),
+                child: _buildSignUpForm(scale, isWeb: false),
+              ),
+            ),
+            // The leather image is only shown on mobile
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Image.asset(
+                'assets/leather_up.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Left branding panel for the web view
+  Widget _buildBrandingPanel() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF047857), Color(0xFF059669)],
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Decorative background circles
+          Positioned(top: 100, right: 50, child: _buildCircle(60, Colors.white.withOpacity(0.05))),
+          Positioned(bottom: 150, left: 40, child: _buildCircle(40, Colors.white.withOpacity(0.05))),
+          Positioned(top: 300, left: 100, child: _buildCircle(25, Colors.white.withOpacity(0.05))),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 60.0, vertical: 40.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top content
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Remiles Logo at the top
-                    SizedBox(height: 40 * scale), // Top padding for the header
-                    SizedBox(
-                      width: 150 * scale,
-                      height: 150 * scale,
-                      child: Image.asset(
-                        'assets/remiles.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    SizedBox(height: 10 * scale),
-                    Text(
-                      'Shipper Sign up',
+                    // Logo
+                    const Text(
+                      'Re-Miles',
                       style: TextStyle(
-                        fontSize: 24 * scale,
+                        fontSize: 64,
+                        fontWeight: FontWeight.w900,
+                        fontStyle: FontStyle.italic,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 60),
+                    // Hero Text
+                    const Text(
+                      'Join Thousands of',
+                      style: TextStyle(
+                        fontSize: 42,
                         fontWeight: FontWeight.bold,
-                        color: const Color(0xFF000000),
+                        color: Colors.white,
+                        height: 1.1,
                       ),
                     ),
-                    SizedBox(height: 31 * scale),
-
-                    Container(
-                      width: 330 * scale, // From XML: 330dp width
-                      // Removed fixed height to allow content to dictate height
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFEF6),
-                        // Background color from XML
-                        borderRadius: BorderRadius.circular(
-                            37 * scale), // Rounded corners like XML
-                      ),
-                      // Removed ScrollbarTheme and SingleChildScrollView
-                      child: Column(
-                        children: [
-                          // 1. Company Name or Full Name
-                          _buildInputField(
-                            scale: scale,
-                            hintText: "Company name or Full name",
-                            iconAsset: 'assets/user.png',
-                          ),
-                          SizedBox(height: 25 * scale),
-
-                          // 2. Email Address
-                          _buildInputField(
-                            scale: scale,
-                            hintText: "Email Address",
-                            iconAsset: 'assets/email.png',
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                          SizedBox(height: 25 * scale),
-
-                          // 3. Contact Number
-                          _buildPhoneInputField(
-                            scale: scale,
-                            hintText: "Contact Number",
-                          ),
-                          SizedBox(height: 25 * scale),
-
-                          // 4. Password
-                          _buildInputField(
-                            scale: scale,
-                            hintText: "Password",
-                            iconAsset: 'assets/password.png',
-                            obscureText: _obscurePassword,
-                            onSuffixIconPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                          SizedBox(height: 25 * scale),
-
-                          // 5. Confirm Password
-                          _buildInputField(
-                            scale: scale,
-                            hintText: "Confirm Password",
-                            iconAsset: 'assets/password.png',
-                            obscureText: _obscureConfirmPassword,
-                            onSuffixIconPressed: () {
-                              setState(() {
-                                _obscureConfirmPassword =
-                                !_obscureConfirmPassword;
-                              });
-                            },
-                          ),
-                          SizedBox(height: 20 * scale),
-
-                          // Terms and conditions
-                          Container(
-                            width: 294 * scale,
-                            height: 45 * scale,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _agreeToTerms = !_agreeToTerms;
-                                    });
-                                  },
-                                  child: Container(
-                                    width: 20 * scale,
-                                    height: 20 * scale,
-                                    margin: EdgeInsets.only(
-                                        right: 8 * scale, top: 2 * scale),
-                                    decoration: BoxDecoration(
-                                      color: _agreeToTerms
-                                          ? const Color(0xFF4B744F)
-                                          : Colors.white,
-                                      borderRadius:
-                                      BorderRadius.circular(4 * scale),
-                                      boxShadow: const [
-                                        BoxShadow(
-                                          color: Color.fromRGBO(0, 0, 0, 0.25),
-                                          blurRadius: 4,
-                                          offset: Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: _agreeToTerms
-                                        ? Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 14 * scale,
-                                    )
-                                        : null,
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12 * scale,
-                                      height: 14 / 12,
-                                      color: const Color(0xFF7D8AB0),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    const Text(
+                      'Successful Shippers',
+                      style: TextStyle(
+                        fontSize: 42,
+                        fontWeight: FontWeight.w300,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFFA7F3D0),
+                        height: 1.1,
                       ),
                     ),
-
-                    Spacer(),
+                    const SizedBox(height: 24),
+                    Text(
+                      'Connect with reliable carriers, streamline your logistics, and grow your shipping business with our platform.',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white.withOpacity(0.9),
+                        height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    // Feature points
+                    _buildFeaturePoint(Icons.shield_outlined, 'Secure & Reliable', 'End-to-end encrypted transactions'),
+                    const SizedBox(height: 20),
+                    _buildFeaturePoint(Icons.auto_awesome, 'Smart Matching', 'AI-powered carrier recommendations'),
                   ],
                 ),
-              ),
-              // Back button positioned at the top left
-              Positioned(
-                top: 50 * scale,
-                left: 10 * scale,
-                child: IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.black,
-                    size: 40 * scale,
-                  ),
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      _createFadePageRoute(const RoleSelectionScreen()),
-                    );
-                  },
+                const Spacer(), // Pushes the icon to the bottom
+                // Carrier Icon
+                Image.asset(
+                  'assets/shipper_icon.png',
+                  height: 320,
+                  width: 320,
                 ),
-              ),
-              // Bottom image positioned to touch the bottom and side edges
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Image.asset(
-                  'assets/leather_up.png',
-                  fit: BoxFit.cover,
-                ),
-              ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-              // Next Button - Fixed at the bottom right
-              Positioned(
-                bottom: 190 * scale,
-                right: 30 * scale,
-                child: GestureDetector(
-                  onTap: () {
-                    // Navigate to the shipper onboarding screen
-                    Navigator.push(
-                      context,
-                      _createFadePageRoute(const ShipperOnboarding1Screen()),
-                    );
-                  },
-                  child: Container(
-                    width: 110 * scale,
-                    height: 55 * scale,
-                    decoration: const BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage('assets/signup_button.png'),
-                        fit: BoxFit.fill,
-                      ),
-                      borderRadius: BorderRadius.all(Radius.circular(24.5)),
-                    ),
-                    // Use Align to fine-tune the text position
-                    child: Align(
-                      // Shift the text up by a small amount
-                      alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                              color: const Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: const Offset(0, 2),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+  // Helper for decorative circles in branding panel
+  Widget _buildCircle(double size, Color color) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  // Helper for feature points in branding panel
+  Widget _buildFeaturePoint(IconData icon, String title, String subtitle) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: const Color(0xFF6EE7B7), size: 20),
+        ),
+        const SizedBox(width: 16),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14)),
+            const SizedBox(height: 2),
+            Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // The main sign-up form, adapted for both web and mobile
+  Widget _buildSignUpForm(double scale, {required bool isWeb}) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!isWeb) SizedBox(height: 40 * scale),
+
+        // Back Button for Web
+        if (isWeb)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => Navigator.pushReplacement(context, _createFadePageRoute(const RoleSelectionScreen())),
+              icon: const Icon(Icons.arrow_back, size: 16),
+              label: const Text('Back'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.grey[700],
+                padding: const EdgeInsets.symmetric(horizontal: 0),
+              ),
+            ),
+          ),
+        if (isWeb) const SizedBox(height: 24),
+
+        // Header
+        Align(
+          alignment: isWeb ? Alignment.centerLeft : Alignment.center,
+          child: Column(
+            crossAxisAlignment: isWeb ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+            children: [
+              if (!isWeb)
+                Image.asset(
+                  'assets/remiles.png',
+                  width: 120 * scale,
+                  height: 120 * scale,
+                  fit: BoxFit.contain,
+                ),
+              Text(
+                'Shipper Signup',
+                style: TextStyle(
+                  fontSize: isWeb ? 32 : 24 * scale,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF000000),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Start your shipping journey with us today',
+                style: TextStyle(
+                  fontSize: isWeb ? 16 : 14 * scale,
+                  color: Colors.grey[600],
                 ),
               ),
             ],
           ),
         ),
-      ),
+        SizedBox(height: 40 * scale),
+
+        // Form Fields
+        _buildInputField(
+          scale: scale,
+          hintText: "Company name or Full name",
+          icon: Icons.person_outline,
+        ),
+        SizedBox(height: 25 * scale),
+        _buildInputField(
+          scale: scale,
+          hintText: "Email Address",
+          icon: Icons.mail_outline,
+          keyboardType: TextInputType.emailAddress,
+        ),
+        SizedBox(height: 25 * scale),
+        _buildPhoneInputField(scale: scale),
+        SizedBox(height: 25 * scale),
+        _buildInputField(
+          scale: scale,
+          hintText: "Password",
+          icon: Icons.lock_outline,
+          obscureText: _obscurePassword,
+          isPassword: true,
+          onSuffixIconPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+        ),
+        SizedBox(height: 25 * scale),
+        _buildInputField(
+          scale: scale,
+          hintText: "Confirm Password",
+          icon: Icons.lock_outline,
+          obscureText: _obscureConfirmPassword,
+          isPassword: true,
+          onSuffixIconPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+        ),
+        SizedBox(height: 25 * scale),
+
+        // Terms and Conditions
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: Checkbox(
+                value: _agreeToTerms,
+                onChanged: (value) => setState(() => _agreeToTerms = value!),
+                activeColor: const Color(0xFF059669),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: 12 * scale,
+                    color: Colors.grey[600],
+                    height: 1.5,
+                  ),
+                  children: [
+                    const TextSpan(text: 'I have read and agree to the '),
+                    _buildClickableTextSpan('Re-Miles Terms of Service'),
+                    const TextSpan(text: ', '),
+                    _buildClickableTextSpan('User Agreement'),
+                    const TextSpan(text: ', and '),
+                    _buildClickableTextSpan('Privacy Policy'),
+                    const TextSpan(text: '.'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 40 * scale),
+
+        // Submit Button
+        ElevatedButton(
+          onPressed: _agreeToTerms && !_isLoading ? () {
+            setState(() => _isLoading = true);
+            Future.delayed(const Duration(seconds: 2), () {
+              setState(() => _isLoading = false);
+              Navigator.push(context, _createFadePageRoute(const ShipperOnboarding1Screen()));
+            });
+          } : null,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF059669),
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            elevation: 2,
+          ).copyWith(
+            backgroundColor: MaterialStateProperty.resolveWith<Color>(
+                  (Set<MaterialState> states) {
+                if (states.contains(MaterialState.disabled)) return Colors.grey;
+                return const Color(0xFF059669);
+              },
+            ),
+          ),
+          child: _isLoading
+              ? const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+          )
+              : const Text("Create Account"),
+        ),
+        const SizedBox(height: 24),
+
+        // Already have an account link
+        Center(
+          child: Text.rich(
+            TextSpan(
+              text: 'Already have an account? ',
+              style: TextStyle(color: Colors.grey[600]),
+              children: [
+                TextSpan(
+                  text: 'Contact support to sign in',
+                  style: const TextStyle(
+                    color: Color(0xFF059669),
+                    fontWeight: FontWeight.bold,
+                  ),
+                  recognizer: TapGestureRecognizer()..onTap = () {
+                    // Handle tap
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        if (!isWeb) SizedBox(height: 220 * scale), // Padding for bottom image on mobile
+      ],
     );
   }
 
-  // Helper method to build a standardized input field
+  // Helper for clickable text in terms
+  TextSpan _buildClickableTextSpan(String text) {
+    return TextSpan(
+      text: text,
+      style: const TextStyle(
+        color: Color(0xFF059669),
+        fontWeight: FontWeight.w600,
+      ),
+      recognizer: TapGestureRecognizer()..onTap = () {
+        // Handle navigation to terms/policy pages
+      },
+    );
+  }
+
+  // Updated input field with modern styling
   Widget _buildInputField({
     required double scale,
     required String hintText,
-    required String iconAsset,
+    required IconData icon,
     bool obscureText = false,
+    bool isPassword = false,
     TextInputType keyboardType = TextInputType.text,
     VoidCallback? onSuffixIconPressed,
-    List<TextInputFormatter>? inputFormatters,
   }) {
-    return Container(
-      width: 314 * scale,
-      height: 60 * scale, // Increased height
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(10 * scale),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.25), // Changed color to black
-            blurRadius: 3,
-            offset: Offset(0, 4),
+    return TextFormField(
+      obscureText: obscureText,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        hintText: hintText,
+        prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
+        suffixIcon: isPassword
+            ? IconButton(
+          icon: Icon(
+            obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+            color: Colors.grey,
+            size: 20,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10 * scale),
-        child: Row(
-          children: [
-            // Left icon
-            Image.asset(
-              iconAsset,
-              width: 15.71 * scale,
-              height: 18 * scale,
-              color: Colors.grey.withOpacity(0.5), // Changed color to faded grey
-            ),
-            SizedBox(width: 10 * scale),
-            Expanded(
-              child: TextField(
-                obscureText: obscureText,
-                keyboardType: keyboardType,
-                inputFormatters: inputFormatters,
-                decoration: InputDecoration(
-                  hintText: hintText,
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(
-                    fontSize: 16 * scale,
-                    color: const Color(0x40000000), // Changed color to faded grey
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: 16 * scale,
-                  color: const Color(0xFF000000),
-                ),
-              ),
-            ),
-            // Suffix icon for password fields
-            if (onSuffixIconPressed != null)
-              IconButton(
-                icon: Icon(
-                  obscureText ? Icons.visibility_off : Icons.visibility,
-                  color: Colors.grey, // Changed color to faded grey
-                  size: 24 * scale,
-                ),
-                onPressed: onSuffixIconPressed,
-              ),
-          ],
+          onPressed: onSuffixIconPressed,
+        )
+            : null,
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
         ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF059669), width: 2),
+        ),
+        hintStyle: TextStyle(fontSize: 14 * scale, color: Colors.grey[400]),
       ),
+      style: TextStyle(fontSize: 14 * scale, color: Colors.black),
     );
   }
 
-  // Helper method for the phone number field with flag and country code
-  Widget _buildPhoneInputField({required double scale, required String hintText}) {
-    return Container(
-      width: 314 * scale,
-      height: 60 * scale, // Increased height
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFFFFF),
-        borderRadius: BorderRadius.circular(10 * scale), // Rounded corners
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.25), // Changed color to black
-            blurRadius: 3,
-            offset: Offset(0, 4),
+  // Updated phone input field
+  Widget _buildPhoneInputField({required double scale}) {
+    return TextFormField(
+      keyboardType: TextInputType.phone,
+      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+      decoration: InputDecoration(
+        hintText: "(555) 123-4567",
+        prefixIcon: Padding(
+          padding: const EdgeInsets.only(left: 12.0, right: 8.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset('assets/canada_flag.png', width: 24, height: 16),
+              const SizedBox(width: 8),
+              const Text('+1', style: TextStyle(fontSize: 14, color: Colors.black)),
+              const SizedBox(width: 8),
+              Container(width: 1, height: 20, color: Colors.grey[300]),
+            ],
           ),
-        ],
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 10 * scale),
-        child: Row(
-          children: [
-            // Canadian flag image
-            Image.asset(
-              'assets/canada_flag.png',
-              width: 30 * scale,
-              height: 20 * scale,
-              fit: BoxFit.contain,
-            ),
-            SizedBox(width: 8 * scale),
-            // Country code
-            Text(
-              '+1',
-              style: TextStyle(
-                fontSize: 16 * scale,
-                color: const Color(0xFF000000),
-              ),
-            ),
-            SizedBox(width: 10 * scale),
-            Expanded(
-              child: TextField(
-                keyboardType: TextInputType.phone,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly // Allows only numbers
-                ],
-                decoration: InputDecoration(
-                  hintText: hintText,
-                  border: InputBorder.none,
-                  hintStyle: TextStyle(
-                    fontSize: 16 * scale,
-                    color: const Color(0x40000000), // Changed color to faded grey
-                  ),
-                ),
-                style: TextStyle(
-                  fontSize: 16 * scale,
-                  color: const Color(0xFF000000),
-                ),
-              ),
-            ),
-          ],
         ),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.grey[300]!),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Color(0xFF059669), width: 2),
+        ),
+        hintStyle: TextStyle(fontSize: 14 * scale, color: Colors.grey[400]),
       ),
+      style: TextStyle(fontSize: 14 * scale, color: Colors.black),
     );
   }
 }

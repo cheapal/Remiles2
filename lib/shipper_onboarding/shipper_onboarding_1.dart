@@ -1,26 +1,44 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'carrier_onboarding_3.dart'; // Import the next screen
-import 'other_carrier_onboarding_2.dart'; // Import the "other" screen
+import 'shipper_onboarding_2.dart';
+import 'other_shipper_onboarding_1.dart'; // Import the new other screen
+import '../shipper_signup.dart'; // Import the shipper signup screen
 
-class CarrierOnboarding2Screen extends StatefulWidget {
-  const CarrierOnboarding2Screen({super.key});
+class ShipperOnboarding1Screen extends StatefulWidget {
+  const ShipperOnboarding1Screen({super.key});
 
   @override
-  State<CarrierOnboarding2Screen> createState() => _CarrierOnboarding2ScreenState();
+  State<ShipperOnboarding1Screen> createState() => _ShipperOnboarding1ScreenState();
 }
 
-class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
-  // State variable to hold the currently selected option
-  String? _selectedOption;
+class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
+  // State variable to hold the currently selected vehicle types
+  Set<String> _selectedFreightTypes = {};
 
-  // Custom page route for a smooth fade transition
-  PageRouteBuilder _createFadePageRoute(Widget nextScreen) {
+  // A custom page route to handle the fade transition
+  PageRouteBuilder _createFadePageRoute(Widget page) {
     return PageRouteBuilder(
-      pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+      pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         return FadeTransition(
           opacity: animation,
+          child: child,
+        );
+      },
+    );
+  }
+
+  // A custom page route for smooth transitions
+  PageRouteBuilder _createRoute(Widget nextScreen) {
+    return PageRouteBuilder(
+      pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        const begin = Offset(1.0, 0.0);
+        const end = Offset.zero;
+        const curve = Curves.ease;
+        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+        return SlideTransition(
+          position: animation.drive(tween),
           child: child,
         );
       },
@@ -59,10 +77,6 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
         ? screenWidth / designW
         : screenHeight / designH;
 
-    // Define the beginning and ending width of the loading bar fill
-    final double startWidth = 46.5 * scale;
-    final double endWidth = 104 * scale;
-
     return Scaffold(
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark,
@@ -89,16 +103,18 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                     size: 40 * scale,
                   ),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    Navigator.pushReplacement(
+                      context,
+                      _createFadePageRoute(const ShipperSignUpScreen()),
+                    );
                   },
                 ),
               ),
 
-              // Loading bar with animation
+              // Loading bar
               Positioned(
-                top: 141.5 * scale,
-                left: 48.5 * scale,
-                right: 48.5 * scale,
+                top: 137 * scale,
+                left: 52.5 * scale,
                 child: Container(
                   width: 322.5 * scale,
                   height: 6 * scale,
@@ -107,7 +123,7 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                     borderRadius: BorderRadius.circular(6 * scale),
                   ),
                   child: TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: startWidth, end: endWidth),
+                    tween: Tween<double>(begin: 0.0, end: 46.5 * scale),
                     duration: const Duration(milliseconds: 500),
                     builder: (context, width, child) {
                       return Align(
@@ -126,43 +142,49 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                 ),
               ),
 
-              // Title text aligned with the options
+              // Title text
               Positioned(
-                top: 194 * scale,
-                left: 46 * scale, // Aligned with the checkboxes
-                child: Text(
-                  'How often are you looking to accept \nloads through the app?',
-                  textAlign: TextAlign.left,
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 20 * scale,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF000000),
+                top: 183.5 * scale,
+                left: 0,
+                right: 20,
+                child: Center(
+                  child: Text(
+                    'What type of freight do you typically \nship?',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
                   ),
                 ),
               ),
 
-              // Options
-              _buildOption(scale, 'full-time carrier/owner-operator — this is my primary work', 293 * scale),
-              _buildOption(scale, 'I drive part-time or when I’m available', 360 * scale),
-              _buildOption(scale, 'I’m just exploring the app right now', 427 * scale),
+              // Freight Type Options
+              _buildFreightOption(scale, 'General freight', 262.5 * scale),
+              _buildFreightOption(scale, 'Refrigerated goods', 329.5 * scale),
+              _buildFreightOption(scale, 'Construction materials', 396.5 * scale),
+              _buildFreightOption(scale, 'Agriculture products', 463.5 * scale),
+              _buildFreightOption(scale, 'Retail or packaged goods', 529.5 * scale),
+              _buildFreightOption(scale, 'Hazardous materials', 592 * scale),
 
               // Other option as a button
-              _buildOtherButton(scale, 'Other', 514 * scale, context),
+              _buildOtherButton(scale, 'Other', 664 * scale, context),
 
               // Next button
               Positioned(
-                top: 602 * scale,
+                top: 714 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
                   onTap: () {
-                    if (_selectedOption != null) {
+                    if (_selectedFreightTypes.isNotEmpty) {
                       Navigator.push(
                         context,
-                        _createFadePageRoute(const CarrierOnboarding3Screen()),
+                        _createFadePageRoute(const ShipperOnboarding2Screen()),
                       );
                     } else {
-                      _showAlertDialog(context, 'Please select an option to proceed.');
+                      _showAlertDialog(context, 'Please select at least one option to proceed.');
                     }
                   },
                   child: Container(
@@ -183,10 +205,10 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                           color: Colors.white,
                           fontSize: 18 * scale,
                           fontWeight: FontWeight.bold,
-                          shadows: const [
+                          shadows: [
                             Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
+                              color: const Color.fromRGBO(0, 0, 0, 0.3),
+                              offset: const Offset(0, 2),
                               blurRadius: 4,
                             ),
                           ],
@@ -214,25 +236,32 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
     );
   }
 
-  Widget _buildOption(double scale, String text, double top) {
-    final isSelected = _selectedOption == text;
+  // Helper method to build a vehicle option
+  Widget _buildFreightOption(double scale, String text, double top) {
+    final isSelected = _selectedFreightTypes.contains(text);
     return Positioned(
       top: top,
-      left: 46 * scale,
+      left: 50 * scale,
       child: GestureDetector(
         onTap: () {
           setState(() {
-            _selectedOption = text;
+            // Toggle selection
+            if (isSelected) {
+              _selectedFreightTypes.remove(text);
+            } else {
+              _selectedFreightTypes.add(text);
+            }
           });
         },
         child: Row(
           children: [
+            // The checkbox container
             Container(
               width: 34 * scale,
               height: 36 * scale,
               decoration: BoxDecoration(
                 color: isSelected ? const Color(0xFF4B744F) : const Color(0xFFF8F8F8),
-                borderRadius: BorderRadius.circular(20 * scale),
+                borderRadius: BorderRadius.circular(5 * scale),
                 boxShadow: const [
                   BoxShadow(
                     color: Color.fromRGBO(0, 0, 0, 0.25),
@@ -250,16 +279,13 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                   : null,
             ),
             SizedBox(width: 20 * scale),
-            SizedBox(
-              width: 301 * scale,
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 18 * scale,
-                  fontWeight: FontWeight.bold,
-                  color: const Color(0xFF000000),
-                ),
+            Text(
+              text,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 18 * scale,
+                fontWeight: FontWeight.bold,
+                color: const Color(0xFF000000),
               ),
             ),
           ],
@@ -268,15 +294,17 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
     );
   }
 
+  // Helper method to build the "Other" option as a button
   Widget _buildOtherButton(double scale, String text, double top, BuildContext context) {
     return Positioned(
       top: top,
       left: 50 * scale,
       child: GestureDetector(
         onTap: () {
+          // Navigate to the new screen when "Other" is tapped
           Navigator.push(
             context,
-            _createFadePageRoute(const OtherCarrierOnboarding2()),
+            _createFadePageRoute(const OtherShipperOnboardingScreen()),
           );
         },
         child: Container(

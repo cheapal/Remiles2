@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'carrier_signup.dart'; // Assuming the file path for CarrierSignUpScreen
+import 'carrier_onboarding/carrier_signup.dart'; // Assuming the file path for CarrierSignUpScreen
 import 'joiningoption.dart';
 import 'shipper_signup.dart'; // Import the new ShipperSignUpScreen
 

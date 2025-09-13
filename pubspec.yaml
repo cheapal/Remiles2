@@ -1,4 +1,4 @@
-name: majh
+name: Remiles
 description: "A new Flutter project."
 publish_to: 'none'
 
@@ -14,6 +14,7 @@ dependencies:
   flutter_screenutil: ^5.9.3
   font_awesome_flutter: ^10.9.0
   flutter_svg: ^2.2.0
+  webview_flutter: ^4.13.0
 
 dev_dependencies:
   flutter_test:
@@ -49,11 +50,32 @@ flutter:
     - assets/welcome_button.png
     - assets/welcometext.png
     - assets/remileswithtag.png
-    # The assets section must include the font directory.
+    - assets/split_background.png
+    - assets/top_leather.png
+    - assets/profile_icon.png
+    - assets/green_trolly.png
+    - assets/orange_tick.png
+    - assets/yellow_truck.png
+    - assets/miley_icon.png
+    - assets/nav_leather.png
+    - assets/home_icon.png
+    - assets/trolly_icon.png
+    - assets/marketplace.png
+    - assets/user_icon.png
+    - assets/more_icon.png
+    - assets/top_leather_2.png
+    - assets/upload_icon.png
+    - assets/academy_icon.png
+    - assets/support_icon.png
+    - assets/messages_icon.png
+    - assets/notifications_icon.png
+    - assets/remileswhite.png
+    - assets/yellow_trolly.png
+    - assets/carvon_screen_bg.png
+    - assets/green_box.png
 
   fonts:
     - family: RobotoFlex
       fonts:
         # Correct path as per your file structure.
         - asset: assets/Roboto.ttf
-

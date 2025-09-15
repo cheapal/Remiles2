@@ -73,6 +73,7 @@ flutter:
     - assets/yellow_trolly.png
     - assets/carvon_screen_bg.png
     - assets/green_box.png
+    - assets/notifications.png
 
   fonts:
     - family: RobotoFlex

@@ -12,7 +12,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData.light().copyWith(
-        scaffoldBackgroundColor: const Color(0xFFFFFFFF),
+        scaffoldBackgroundColor: const Color(0xFFFFF6E1),
         textTheme: ThemeData.light().textTheme.apply(fontFamily: 'Roboto'),
       ),
       home: const ShipperDashboard1(),
@@ -20,8 +20,11 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// Define the dark color for the side navigation.
+// Define the dark color for the side navigation and bottom bar.
 const Color webColor = Color(0xFF064232);
+const Color darkGreen = Color(0xFF386544);
+const Color yellow = Color(0xFFFFCA4D);
+const Color offWhite = Color(0xFFFFF6E1);
 
 class ShipperDashboard1 extends StatefulWidget {
   const ShipperDashboard1({super.key});
@@ -96,19 +99,14 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
       child: Scaffold(
         key: _scaffoldKey, // Assign the key to the Scaffold
         // Use a conditional AppBar for mobile and a persistent sidebar for web
-        drawer: isWide ? null : const SideNavDrawer(),
+        drawer: isWide ? const SideNavDrawer() : null,
         // Add a conditional AppBar
-        appBar: !isWide
-            ? AppBar(
+        appBar: isWide
+            ? null
+            : AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.menu, color: Colors.white, size: 30.0),
-            onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-            tooltip: 'Open navigation menu',
-          ),
-        )
-            : null,
+        ),
         extendBodyBehindAppBar: true,
         body: Row(
           children: [
@@ -123,38 +121,37 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Top section with progress bar
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: horizontalPadding),
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(
-                                20, 100, 20, 20), // Adjust top padding for AppBar
-                            decoration: BoxDecoration(
-                              color: isWide ? webColor : null,
-                              image: isWide
-                                  ? null
-                                  : const DecorationImage(
-                                image: AssetImage('assets/top_leather.png'),
-                                fit: BoxFit.cover,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  spreadRadius: 2,
-                                  blurRadius: 5,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(20),
-                                bottomRight: Radius.circular(20),
-                              ),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.fromLTRB(
+                              20, 70, 20, 20), // Adjust top padding for AppBar
+                          decoration: BoxDecoration(
+                            color: isWide ? webColor : null,
+                            image: isWide
+                                ? null
+                                : const DecorationImage(
+                              image: AssetImage('assets/top_leather.png'),
+                              fit: BoxFit.cover,
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Stack(
+                            borderRadius: const BorderRadius.only(
+                              bottomLeft: Radius.circular(26),
+                              bottomRight: Radius.circular(26),
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.6),
+                                spreadRadius: -3,
+                                blurRadius: 1,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 15.0),
+                                child: Stack(
                                   children: [
                                     Container(
                                       height: 6,
@@ -172,7 +169,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                           width: 153.0 *
                                               _progressController1.value,
                                           decoration: BoxDecoration(
-                                            color: const Color(0xFFFFCA4D),
+                                            color: yellow,
                                             borderRadius:
                                             BorderRadius.circular(6),
                                           ),
@@ -181,25 +178,24 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 8),
-                                Center(
-                                  child: ConstrainedBox(
-                                    constraints:
-                                    const BoxConstraints(maxWidth: 353),
-                                    child: const Text(
-                                      'Complete your sign up to start\nposting loads',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w800,
-                                        height: 1.2,
-                                      ),
+                              ),
+                              Center(
+                                child: ConstrainedBox(
+                                  constraints:
+                                  const BoxConstraints(maxWidth: 353),
+                                  child: const Text(
+                                    'Complete your sign up to start\nposting loads',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      height: 1.2,
                                     ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                         SizedBox(height: isWide ? 50.0 : 16.0),
@@ -222,8 +218,8 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: Colors.black,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.w900,
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w800,
                                         height: 1.2,
                                       ),
                                     ),
@@ -235,7 +231,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       border: Border.all(
-                                          color: const Color(0xFF386544),
+                                          color: darkGreen,
                                           width: 2),
                                     ),
                                     clipBehavior: Clip.antiAlias,
@@ -252,14 +248,14 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                 children: [
                                   Expanded(
                                     child: Container(
-                                      height: 50,
+                                      height: 49,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFFFCA4D),
-                                        borderRadius: BorderRadius.circular(25),
+                                        color: yellow,
+                                        borderRadius: BorderRadius.circular(26),
                                         boxShadow: [
                                           BoxShadow(
                                             color:
-                                            Colors.black.withOpacity(0.6),
+                                            Colors.black.withOpacity(0.66),
                                             spreadRadius: -1,
                                             blurRadius: 3.5,
                                             offset: const Offset(0, 2),
@@ -278,7 +274,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                               'Post new load',
                                               style: TextStyle(
                                                 color: Colors.black,
-                                                fontWeight: FontWeight.w900,
+                                                fontWeight: FontWeight.w800,
                                               ),
                                             ),
                                           ],
@@ -289,14 +285,14 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                   const SizedBox(width: 15),
                                   Expanded(
                                     child: Container(
-                                      height: 50,
+                                      height: 51,
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF386544),
-                                        borderRadius: BorderRadius.circular(25),
+                                        color: darkGreen,
+                                        borderRadius: BorderRadius.circular(26),
                                         boxShadow: [
                                           BoxShadow(
                                             color:
-                                            Colors.black.withOpacity(0.6),
+                                            Colors.black.withOpacity(0.66),
                                             spreadRadius: -1,
                                             blurRadius: 3.5,
                                             offset: const Offset(0, 2),
@@ -339,7 +335,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                 style: TextStyle(
                                   color: Colors.black,
                                   fontSize: 20,
-                                  fontWeight: FontWeight.w900,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
                               const SizedBox(height: 10),
@@ -348,7 +344,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                 padding: const EdgeInsets.all(16.0),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFFFFFF),
-                                  borderRadius: BorderRadius.circular(15),
+                                  borderRadius: BorderRadius.circular(26),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.green.withOpacity(0.36),
@@ -374,7 +370,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                                   vertical: 8),
                                               decoration: BoxDecoration(
                                                 color: _selectedTab == 0
-                                                    ? const Color(0xFF386544)
+                                                    ? darkGreen
                                                     : Colors.white,
                                                 borderRadius:
                                                 BorderRadius.circular(20),
@@ -397,7 +393,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                                         ? Colors.white
                                                         : Colors.black,
                                                     fontWeight:
-                                                    FontWeight.w900,
+                                                    FontWeight.w600,
                                                   ),
                                                 ),
                                               ),
@@ -415,7 +411,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                                   vertical: 8),
                                               decoration: BoxDecoration(
                                                 color: _selectedTab == 1
-                                                    ? const Color(0xFF386544)
+                                                    ? darkGreen
                                                     : Colors.white,
                                                 borderRadius:
                                                 BorderRadius.circular(20),
@@ -438,7 +434,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                                         ? Colors.white
                                                         : Colors.black,
                                                     fontWeight:
-                                                    FontWeight.w900,
+                                                    FontWeight.w600,
                                                   ),
                                                 ),
                                               ),
@@ -456,7 +452,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                                   vertical: 8),
                                               decoration: BoxDecoration(
                                                 color: _selectedTab == 2
-                                                    ? const Color(0xFF386544)
+                                                    ? darkGreen
                                                     : Colors.white,
                                                 borderRadius:
                                                 BorderRadius.circular(20),
@@ -479,7 +475,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                                         ? Colors.white
                                                         : Colors.black,
                                                     fontWeight:
-                                                    FontWeight.w900,
+                                                    FontWeight.w600,
                                                   ),
                                                 ),
                                               ),
@@ -648,7 +644,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                                 height: 46,
                                                 decoration: const BoxDecoration(
                                                   shape: BoxShape.circle,
-                                                  color: Color(0xFFBFF497),
+                                                  color: offWhite,
                                                 ),
                                                 child: const Center(
                                                   child: Image(
@@ -699,7 +695,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                 decoration: const BoxDecoration(
                                   color: Color(0xFFFFFFFF),
                                   borderRadius:
-                                  BorderRadius.all(Radius.circular(15)),
+                                  BorderRadius.all(Radius.circular(26)),
                                   boxShadow: [
                                     BoxShadow(
                                       color:
@@ -729,7 +725,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                               borderRadius:
                                               BorderRadius.circular(10),
                                               child: LinearProgressIndicator(
-                                                value: 0.7,
+                                                value: 0.87,
                                                 backgroundColor:
                                                 Colors.grey[300],
                                                 valueColor:
@@ -813,10 +809,13 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
           child: Container(
             height: bottomNavHeight,
             decoration: const BoxDecoration(
-              color: webColor,
+              image: DecorationImage(
+                image: AssetImage('assets/nav_leather.png'),
+                fit: BoxFit.cover,
+              ),
               borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(65),
-                topRight: Radius.circular(65),
+                topLeft: Radius.circular(50),
+                topRight: Radius.circular(50),
               ),
             ),
             child: ClipRRect(
@@ -830,9 +829,9 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                 backgroundColor: Colors.transparent,
                 elevation: 0,
                 type: BottomNavigationBarType.fixed,
-                selectedItemColor: const Color(0xFFFFFBDF),
+                selectedItemColor: offWhite,
                 unselectedItemColor:
-                const Color(0xFFFFFBDF).withOpacity(0.6),
+                offWhite.withOpacity(0.6),
                 selectedLabelStyle: const TextStyle(fontSize: 11),
                 unselectedLabelStyle: const TextStyle(fontSize: 11),
                 items: const [

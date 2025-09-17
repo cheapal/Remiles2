@@ -44,7 +44,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.green, // You can customize your app's theme here
       ),
-      home: const ManageLoadsScreen(), // Sets the CarrierSignUpScreen as the initial screen
+      home: const ShipperDashboard1(), // Sets the CarrierSignUpScreen as the initial screen
     );
   }
 }

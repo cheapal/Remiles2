@@ -1,0 +1,59 @@
+name: majh
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.8.1 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_screenutil: ^5.9.3
+  font_awesome_flutter: ^10.9.0
+  flutter_svg: ^2.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/monogram.png
+    - assets/remiles.png
+    - assets/leather.png
+    - assets/remileswithtagline.svg
+    - assets/white_rectangle.png
+    - assets/leather_rectangle.png
+    - assets/carrier_icon.png
+    - assets/shipper_icon.png
+    - assets/google.png
+    - assets/apple.png
+    - assets/login_button.png
+    - assets/leather_up.png
+    - assets/user.png
+    - assets/map.png
+    - assets/flag.png
+    - assets/phone.png
+    - assets/email.png
+    - assets/password.png
+    - assets/signup_button.png
+    - assets/canada_flag.png
+    - assets/other_screen_background.png
+    - assets/welcome_wave.png
+    - assets/welcome_button.png
+    - assets/welcometext.png
+    - assets/remileswithtag.png
+    # The assets section must include the font directory.
+
+  fonts:
+    - family: RobotoFlex
+      fonts:
+        # Correct path as per your file structure.
+        - asset: assets/Roboto.ttf
+

@@ -14,16 +14,20 @@ import 'package:Remiles/shipper_dashboard/shipper_more_options.dart';
 import 'package:Remiles/shipper_dashboard/shipper_notifications.dart';
 import 'package:Remiles/shipper_dashboard/shipper_profile.dart';
 import 'package:Remiles/shipper_signup.dart';
+import 'package:Remiles/splash.dart';
+import 'package:Remiles/welcome.dart';
 
+import 'choose_role.dart';
+import 'joiningoption.dart';
 import 'login_screen.dart';
 import 'shipper_dashboard/shipper_dashboard_3.dart';
 
 import 'shipper_dashboard/shipper_dashboard_2.dart';
 import 'package:flutter/material.dart';
-// import 'shipper_dashboard/shipper_dashboard_1.dart';
-// import '/shipper_signup.dart';
-// import 'carrier_onboarding/carrier_onboarding_1.dart'; // Make sure this path is correct
-// import 'carrier_onboarding/carrier_signup.dart';
+import 'shipper_dashboard/shipper_dashboard_1.dart';
+import '/shipper_signup.dart';
+import 'carrier_onboarding/carrier_onboarding_1.dart'; // Make sure this path is correct
+import 'carrier_onboarding/carrier_signup.dart';
 
 
 void main() {
@@ -39,12 +43,25 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      debugShowCheckedModeBanner: false, // Hides the debug banner
-      title: 'Remiles App',
-      theme: ThemeData(
-        primarySwatch: Colors.green, // You can customize your app's theme here
+      debugShowCheckedModeBanner: false,
+      // The home property sets the first screen of the app.
+      // The SplashScreen is now the entry point and is passed the WelcomeScreen as its next destination.
+      // home:RoleSelectionScreen()
+      home: SplashScreen(
+        nextScreen: WelcomeScreen(
+          // The WelcomeScreen's button will navigate to the JoiningOption screen.
+          nextScreen: SignScreen(
+            // The JoiningOption's "Log In" button will navigate to the LoginScreen.
+            nextScreen: const LoginScreen(),
+          ),
+        ),
       ),
-      home: const ShipperDashboard1(), // Sets the CarrierSignUpScreen as the initial screen
+      routes: {
+        '/login': (context) => const LoginScreen(),
+        '/signup/carrier': (context) => const CarrierSignUpScreen(),
+        '/roleselection': (context) => const RoleSelectionScreen(),
+      },
     );
   }
 }
+

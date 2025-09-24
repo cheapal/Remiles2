@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'other_carrier_onboarding_2.dart';
-import 'carrier_onboarding_3.dart'; // Import the next screen
-import 'other_carrier_onboarding_2.dart'; // Import the "other" screen
+import 'carrier_onboarding_3.dart';
 
 class CarrierOnboarding2Screen extends StatefulWidget {
   const CarrierOnboarding2Screen({super.key});

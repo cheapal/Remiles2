@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../shipper_dashboard/shipper_dashboard_1.dart';
 
 class ShipperOnboarding7Screen extends StatelessWidget {
   const ShipperOnboarding7Screen({super.key});
@@ -129,7 +130,8 @@ class ShipperOnboarding7Screen extends StatelessWidget {
                 child: Center( // Centered horizontally
                   child: GestureDetector(
                     onTap: () {
-                      // TODO: Add navigation to the next screen (e.g., home screen)
+                      // Navigate to the next onboarding screen with a fade transition
+                      Navigator.of(context).push(_createFadeRoute(const ShipperDashboard1()));
                     },
                     child: Container(
                       width: 290 * scale, // Increased dimensions

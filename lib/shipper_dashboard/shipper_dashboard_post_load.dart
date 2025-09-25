@@ -34,6 +34,13 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
     const topPanelColor = Color(0xFF386544);
 
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: topPanelColor,
+        elevation: 0,
+        toolbarHeight: 60,
+        title:Text('Post Load',
+        ),
+      ),
       backgroundColor: const Color(0xFFFFFEF6),
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
@@ -41,51 +48,6 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Top section with background image and text
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: isTabletOrDesktop ? sidePadding : 0.0),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                  decoration: BoxDecoration(
-                    color: topPanelColor,
-                    image: const DecorationImage(
-                      image: AssetImage('assets/top_leather.png'),
-                      fit: BoxFit.fill,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        spreadRadius: 2,
-                        blurRadius: 5,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                    borderRadius: const BorderRadius.only(
-                      bottomLeft: Radius.circular(20),
-                      bottomRight: Radius.circular(20),
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Image.asset('assets/remileswhite.png', height: 60),
-                            const Spacer(),
-                            _buildTopIconWithLabel(Icons.school, 'Academy'),
-                            _buildTopIconWithLabel(Icons.help_outline, 'Support'),
-                            _buildTopIconWithLabel(Icons.message, 'Messages'),
-                            _buildTopIconWithLabel(Icons.notifications, 'Notifications'),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
 
               // Form fields
               Padding(
@@ -187,66 +149,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
           ),
         ),
       ),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.symmetric(horizontal: isTabletOrDesktop ? sidePadding : 0.0),
-        child: Container(
-          height: 100,
-          decoration: const BoxDecoration(
-            color: Color(0xFF064232),
-            image: DecorationImage(
-              image: AssetImage('assets/nav_leather.png'),
-              fit: BoxFit.cover,
-            ),
-            borderRadius: BorderRadius.only(
-              topLeft: Radius.circular(65),
-              topRight: Radius.circular(65),
-            ),
-          ),
-          child: ClipRRect(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(50),
-              topRight: Radius.circular(50),
-            ),
-            child: BottomNavigationBar(
-              currentIndex: _selectedTab,
-              onTap: (index) {
-                setState(() {
-                  _selectedTab = index;
-                });
-              },
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              type: BottomNavigationBarType.fixed,
-              selectedItemColor: const Color(0xFFFFFBDF),
-              unselectedItemColor: const Color(0xFFFFFBDF).withOpacity(0.6),
-              selectedLabelStyle: const TextStyle(fontSize: 11),
-              unselectedLabelStyle: const TextStyle(fontSize: 11),
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.home, size: 26),
-                  label: 'Home',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.shopping_cart, size: 29),
-                  label: 'Manage Loads',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.storefront, size: 30.82),
-                  label: 'Marketplace',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.person, size: 31.37),
-                  label: 'Profile',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.more_horiz, size: 25),
-                  label: 'More',
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
+
     );
   }
 

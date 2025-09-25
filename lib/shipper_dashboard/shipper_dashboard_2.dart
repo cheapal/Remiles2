@@ -1,3 +1,4 @@
+import 'package:Remiles/shipper_dashboard/shipper_dashboard_3.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -299,7 +300,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                           alignment: Alignment.centerRight,
                           child: GestureDetector(
                             onTap: () {
-                              // TODO: Navigate to next screen
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => ShipperDashboard3()));
                             },
                             child: Container(
                               width: 110,

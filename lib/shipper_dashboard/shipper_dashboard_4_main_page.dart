@@ -1,8 +1,12 @@
 import 'package:Remiles/shipper_dashboard/shipper_dashboard_2.dart';
 import 'package:Remiles/shipper_dashboard/shipper_dashboard_post_load.dart';
+import 'package:Remiles/shipper_dashboard/shipper_load_ai_match.dart';
+import 'package:Remiles/shipper_dashboard/widgets/load_card.dart';
+import 'package:Remiles/theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'business_form_screen.dart';
 
 
@@ -12,13 +16,13 @@ const Color darkGreen = Color(0xFF386544);
 const Color yellow = Color(0xFFFFCA4D);
 const Color offWhite = Color(0xFFFFF6E1);
 
-class ShipperDashboard1 extends StatefulWidget {
-  const ShipperDashboard1({super.key});
+class ShipperDashboard_4_main_page extends StatefulWidget {
+  const ShipperDashboard_4_main_page({super.key});
   @override
-  State<ShipperDashboard1> createState() => _ShipperDashboard1State();
+  State<ShipperDashboard_4_main_page> createState() => _ShipperDashboard_4_main_pageState();
 }
 
-class _ShipperDashboard1State extends State<ShipperDashboard1>
+class _ShipperDashboard_4_main_pageState extends State<ShipperDashboard_4_main_page>
     with TickerProviderStateMixin {
   late AnimationController _progressController1;
   late AnimationController _progressController2;
@@ -87,12 +91,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
         // Use a conditional AppBar for mobile and a persistent sidebar for web
         drawer: isWide ? const SideNavDrawer() : null,
         // Add a conditional AppBar
-        appBar: isWide
-            ? null
-            : AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-        ),
+
         extendBodyBehindAppBar: true,
         body: Row(
           children: [
@@ -107,101 +106,9 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Top section with progress bar
-                        GestureDetector(
-                          onTap: () {
-                            if (!isWide) {
-                              _scaffoldKey.currentState?.openDrawer();
-
-                              ///navigate to business form screen
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                    // const BusinessFormScreen()
-                                    ShipperDashboard2()
-                                ),
-                              );
-
-                            }
-                          },
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.fromLTRB(
-                                20, 70, 20, 20), // Adjust top padding for AppBar
-                            decoration: BoxDecoration(
-                              color: isWide ? webColor : null,
-                              image: isWide
-                                  ? null
-                                  : const DecorationImage(
-                                image: AssetImage('assets/top_leather.png'),
-                                fit: BoxFit.cover,
-                              ),
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(26),
-                                bottomRight: Radius.circular(26),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.6),
-                                  spreadRadius: -3,
-                                  blurRadius: 1,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 15.0),
-                                  child: Stack(
-                                    children: [
-                                      Container(
-                                        height: 6,
-                                        width: double.infinity,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFE9E9E9),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                      ),
-                                      AnimatedBuilder(
-                                        animation: _progressController1,
-                                        builder: (context, _) {
-                                          return Container(
-                                            height: 6,
-                                            width: 153.0 *
-                                                _progressController1.value,
-                                            decoration: BoxDecoration(
-                                              color: yellow,
-                                              borderRadius:
-                                              BorderRadius.circular(6),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Center(
-                                  child: ConstrainedBox(
-                                    constraints:
-                                    const BoxConstraints(maxWidth: 353),
-                                    child: const Text(
-                                      'Complete your sign up to start\nposting loads',
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w800,
-                                        height: 1.2,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        // ================= Top section =================
+                        /// Top Navigation Bar
+                        TopNavigationBar(context),
                         SizedBox(height: isWide ? 50.0 : 16.0),
                         // Main content
                         Padding(
@@ -251,37 +158,48 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                               Row(
                                 children: [
                                   Expanded(
-                                    child: Container(
-                                      height: 49,
-                                      decoration: BoxDecoration(
-                                        color: yellow,
-                                        borderRadius: BorderRadius.circular(26),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color:
-                                            Colors.black.withOpacity(0.66),
-                                            spreadRadius: -1,
-                                            blurRadius: 3.5,
-                                            offset: const Offset(0, 2),
-                                          ),
-                                        ],
-                                      ),
-                                      child: const Center(
-                                        child: Row(
-                                          mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(Icons.add, color: Colors.black),
-                                            SizedBox(width: 6),
-                                            Text(
-                                              'Post new load',
-                                              style: TextStyle(
-                                                color: Colors.black,
-                                                fontWeight: FontWeight.w800,
-                                              ),
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        //show dialog
+                                        showDialog(
+                                          context: context,
+                                          builder: (context) {
+                                            return  ShipperDashboardPostLoad();
+                                          },
+                                        );
+                                      },
+                                      child: Container(
+                                        height: 49,
+                                        decoration: BoxDecoration(
+                                          color: yellow,
+                                          borderRadius: BorderRadius.circular(26),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color:
+                                              Colors.black.withOpacity(0.66),
+                                              spreadRadius: -1,
+                                              blurRadius: 3.5,
+                                              offset: const Offset(0, 2),
                                             ),
                                           ],
+                                        ),
+                                        child: const Center(
+                                          child: Row(
+                                            mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.add, color: Colors.black),
+                                              SizedBox(width: 6),
+                                              Text(
+                                                'Post new load',
+                                                style: TextStyle(
+                                                  color: Colors.black,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -489,54 +407,25 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                       ],
                                     ),
                                     const SizedBox(height: 24),
-                                    // Origin -> Destination line
-                                    Row(
-                                      children: const [
-                                        Flexible(
-                                          flex: 0,
-                                          child: Text(
-                                            'Origin',
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: Colors.black,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                        SizedBox(width: 8),
-                                        Expanded(
-                                            child: Divider(
-                                                thickness: 2,
-                                                height: 2,
-                                                color: Colors.black)),
-                                        SizedBox(width: 8),
-                                        Icon(Icons.arrow_forward,
-                                            color: Colors.black, size: 16),
-                                        SizedBox(width: 8),
-                                        Expanded(
-                                            child: Divider(
-                                                thickness: 2,
-                                                height: 2,
-                                                color: Colors.black)),
-                                        SizedBox(width: 8),
-                                        Flexible(
-                                          flex: 0,
-                                          child: Text(
-                                            'Destination',
-                                            overflow: TextOverflow.ellipsis,
-                                            style: TextStyle(
-                                              color: Colors.black,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                    aiMatchCard(
+                                      context,
+                                      recommended: true,
+                                      matchPercent: 97,
+                                      loadId: '#1234',
+                                      from: 'Toronto, ON',
+                                      to: 'Montreal. QC',
+                                      pickup: 'Sep 1st, 2025',
+                                      delivery: 'Sep 3rd, 2025',
+                                      weight: '15,000 lb',
+                                      docs: '2 Docs',
+                                      equipment: 'Flatbed',
                                     ),
-                                    const SizedBox(height: 80),
+
                                   ],
                                 ),
                               ),
                               const SizedBox(height: 20),
+
                               // Stat cards row
                               Row(
                                 children: [
@@ -872,6 +761,60 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
       ),
     );
   }
+  // ================= Top bar builder =================
+  Widget _buildTopBar(bool isWide) {
+    if (isWide) {
+      // WEB/DESKTOP: inline in a single Row with logo at left and icons at right
+      return Row(
+        children: [
+          Image.asset('assets/remileswhite.png', height: 60),
+          const Spacer(),
+          _buildTopIconWithLabel(Icons.school, 'Academy'),
+          const SizedBox(width: 16),
+          _buildTopIconWithLabel(Icons.help_outline, 'Support'),
+          const SizedBox(width: 16),
+          _buildTopIconWithLabel(Icons.message, 'Messages'),
+          const SizedBox(width: 16),
+          _buildTopIconWithLabel(Icons.notifications, 'Notifications'),
+        ],
+      );
+    } else {
+      // MOBILE/TABLET: wrap looks nicer when narrow
+      return Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Image.asset('assets/remileswhite.png', height: 60),
+          _buildTopIconWithLabel(Icons.school, 'Academy'),
+          _buildTopIconWithLabel(Icons.help_outline, 'Support'),
+          _buildTopIconWithLabel(Icons.message, 'Messages'),
+          _buildTopIconWithLabel(Icons.notifications, 'Notifications'),
+        ],
+      );
+    }
+  }
+
+  // ================= Widgets =================
+
+  Widget _buildTopIconWithLabel(IconData icon, String label) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white, size: 25),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
 }
 
 /// A stateful Drawer widget with a custom header for the Re-Miles app.
@@ -993,6 +936,10 @@ class _SideNavDrawerState extends State<SideNavDrawer> {
       ),
     );
   }
+
+
+
+
 
   // Helper widget for drawer list items
   Widget _buildDrawerItem(

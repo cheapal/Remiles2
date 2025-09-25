@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../theme/colors.dart';
+// Identity colors (same as other Manage Loads screens)
+ const Color topPanelColor = Color(0xFF386544);
+ const Color brandGreen = Color(0xFF195529);
+ const Color aiGradientEnd = Color(0xFF0B7B29);
 void main() {
   runApp(const MaterialApp(
     debugShowCheckedModeBanner: false,
@@ -17,10 +22,7 @@ class ShipperLoadAiMatch extends StatefulWidget {
 
 class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
     with TickerProviderStateMixin {
-  // Identity colors (same as other Manage Loads screens)
-  static const Color topPanelColor = Color(0xFF386544);
-  static const Color brandGreen = Color(0xFF195529);
-  static const Color aiGradientEnd = Color(0xFF0B7B29);
+
 
   int _selectedTab = 1; // Manage Loads
   int _statusIndex = 0; // 0: In-Transit (active), 1: Cancelled Loads, 2: Completed Loads
@@ -122,7 +124,7 @@ class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
                     const SizedBox(height: 16),
 
                     // ===== AI-Matched Load Cards =====
-                    _aiMatchCard(
+                    aiMatchCard(
                       context,
                       recommended: true,
                       matchPercent: 97,
@@ -136,7 +138,7 @@ class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
                       equipment: 'Flatbed',
                     ),
                     const SizedBox(height: 16),
-                    _aiMatchCard(
+                    aiMatchCard(
                       context,
                       recommended: false,
                       matchPercent: 92,
@@ -350,199 +352,200 @@ class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
     );
   }
 
-  // ===== AI Match Load Card =====
-  Widget _aiMatchCard(
-      BuildContext context, {
-        required bool recommended,
-        required int matchPercent,
-        required String loadId,
-        required String from,
-        required String to,
-        required String pickup,
-        required String delivery,
-        required String weight,
-        required String docs,
-        required String equipment,
-      }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.symmetric(horizontal: 2), // prevent shadow clip
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF6CA78A).withOpacity(0.20),
-            blurRadius: 13.4,
-            spreadRadius: 2,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Top row: left details, right status/ID/match score
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left details
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (recommended) ...[
-                      const Text(
-                        'Recommended Load',
-                        style: TextStyle(
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14.3,
-                          height: 1.05,
-                          color: Colors.black,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                    ],
-                    _detail(icon: Icons.location_on, text: 'From : $from'),
-                    const SizedBox(height: 6),
-                    _detail(icon: Icons.location_on, text: 'To : $to'),
-                    const SizedBox(height: 6),
-                    _detail(icon: Icons.calendar_today, text: 'Pickup : $pickup'),
-                    const SizedBox(height: 6),
-                    _detail(icon: Icons.calendar_today, text: 'Delivery : $delivery'),
-                  ],
-                ),
-              ),
+}
 
-              // Right: Available gradient pill, ID, match %
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _availablePill(),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Load ID $loadId',
-                    style: const TextStyle(
-                      fontSize: 14.4,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '$matchPercent% Match',
-                    style: const TextStyle(
-                      color: Color(0xFF0D7729),
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18.59,
-                      height: 1.05,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-          const Divider(height: 20, color: Color(0xFFD9D9D9)),
-
-          // Bottom stats row to reflect design
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  weight,
-                  textAlign: TextAlign.left,
-                  style: const TextStyle(
-                    fontSize: 14.3,
-                    fontWeight: FontWeight.w600,
-                    color: brandGreen,
-                    height: 1.05,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  'Equipment Needed: $equipment',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 9.8,
-                    fontWeight: FontWeight.w600,
-                    color: brandGreen,
-                    height: 1.05,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  docs,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(
-                    fontSize: 14.3,
-                    fontWeight: FontWeight.w600,
-                    color: brandGreen,
-                    height: 1.05,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _availablePill() {
-    return Container(
-      width: 110.45,
-      height: 38.37,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [brandGreen, aiGradientEnd],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
-        borderRadius: BorderRadius.circular(10),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(25, 85, 41, 0.36),
-            blurRadius: 2.8,
-            spreadRadius: 0,
-            offset: Offset(0, 2.8),
-          ),
-        ],
-      ),
-      child: const Text(
-        'Available',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          height: 1.05,
-        ),
-      ),
-    );
-  }
-
-  Widget _detail({required IconData icon, required String text}) {
-    return Row(
-      children: [
-        Icon(icon, size: 16, color: brandGreen),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: brandGreen,
-              height: 1.05,
-            ),
-          ),
+// ===== AI Match Load Card =====
+Widget aiMatchCard(
+    BuildContext context, {
+      required bool recommended,
+      required int matchPercent,
+      required String loadId,
+      required String from,
+      required String to,
+      required String pickup,
+      required String delivery,
+      required String weight,
+      required String docs,
+      required String equipment,
+    }) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    margin: const EdgeInsets.symmetric(horizontal: 2), // prevent shadow clip
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(26),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFF6CA78A).withOpacity(0.20),
+          blurRadius: 13.4,
+          spreadRadius: 2,
+          offset: const Offset(0, 3),
         ),
       ],
-    );
-  }
+    ),
+    child: Column(
+      children: [
+        // Top row: left details, right status/ID/match score
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Left details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (recommended) ...[
+                    const Text(
+                      'Recommended Load',
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.3,
+                        height: 1.05,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  detail(icon: Icons.location_on, text: 'From : $from'),
+                  const SizedBox(height: 6),
+                  detail(icon: Icons.location_on, text: 'To : $to'),
+                  const SizedBox(height: 6),
+                  detail(icon: Icons.calendar_today, text: 'Pickup : $pickup'),
+                  const SizedBox(height: 6),
+                  detail(icon: Icons.calendar_today, text: 'Delivery : $delivery'),
+                ],
+              ),
+            ),
+
+            // Right: Available gradient pill, ID, match %
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                availablePill(),
+                const SizedBox(height: 8),
+                Text(
+                  'Load ID $loadId',
+                  style: const TextStyle(
+                    fontSize: 14.4,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '$matchPercent% Match',
+                  style: const TextStyle(
+                    color: Color(0xFF0D7729),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 18.59,
+                    height: 1.05,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 12),
+        const Divider(height: 20, color: Color(0xFFD9D9D9)),
+
+        // Bottom stats row to reflect design
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                weight,
+                textAlign: TextAlign.left,
+                style:  TextStyle(
+                  fontSize: 14.3,
+                  fontWeight: FontWeight.w600,
+                  color: primaryColor,
+                  height: 1.05,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                'Equipment Needed: $equipment',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 9.8,
+                  fontWeight: FontWeight.w600,
+                  color: brandGreen,
+                  height: 1.05,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                docs,
+                textAlign: TextAlign.right,
+                style:  TextStyle(
+                  fontSize: 14.3,
+                  fontWeight: FontWeight.w600,
+                  color: primaryColor,
+                  height: 1.05,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
+}
+
+Widget availablePill() {
+  return Container(
+    width: 110.45,
+    height: 38.37,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      gradient:  LinearGradient(
+        colors: [primaryColor, aiGradientEnd],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ),
+      borderRadius: BorderRadius.circular(10),
+      boxShadow: const [
+        BoxShadow(
+          color: Color.fromRGBO(25, 85, 41, 0.36),
+          blurRadius: 2.8,
+          spreadRadius: 0,
+          offset: Offset(0, 2.8),
+        ),
+      ],
+    ),
+    child: const Text(
+      'Available',
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        height: 1.05,
+      ),
+    ),
+  );
+}
+
+Widget detail({required IconData icon, required String text}) {
+  return Row(
+    children: [
+      Icon(icon, size: 16, color: primaryColor),
+      const SizedBox(width: 6),
+      Expanded(
+        child: Text(
+          text,
+          style:  TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: primaryColor,
+            height: 1.05,
+          ),
+        ),
+      ),
+    ],
+  );
 }

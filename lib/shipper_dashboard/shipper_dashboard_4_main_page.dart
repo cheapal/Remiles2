@@ -106,7 +106,7 @@ class _ShipperDashboard_4_main_pageState extends State<ShipperDashboard_4_main_p
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Top section with progress bar
-                        // ================= Top section =================
+                        // ================= Top section ==========
                         /// Top Navigation Bar
                         TopNavigationBar(context),
                         SizedBox(height: isWide ? 50.0 : 16.0),

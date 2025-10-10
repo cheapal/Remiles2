@@ -1,36 +1,35 @@
-import 'package:Remiles/shipper_dashboard/MarketPlace_Screen.dart';
-import 'package:Remiles/shipper_dashboard/carvon_screen.dart';
-import 'package:Remiles/shipper_dashboard/manage_loads.dart';
-import 'package:Remiles/shipper_dashboard/manage_loads_2.dart';
-import 'package:Remiles/shipper_dashboard/manage_loads_3.dart';
-import 'package:Remiles/shipper_dashboard/shipper_booked_loads.dart';
-import 'package:Remiles/shipper_dashboard/shipper_cancelled_orders.dart';
-import 'package:Remiles/shipper_dashboard/shipper_completed_loads.dart';
-import 'package:Remiles/shipper_dashboard/shipper_dashboard_1.dart';
-import 'package:Remiles/shipper_dashboard/shipper_dashboard_post_load.dart';
-import 'package:Remiles/shipper_dashboard/shipper_intransit_orders.dart';
-import 'package:Remiles/shipper_dashboard/shipper_load_ai_match.dart';
-import 'package:Remiles/shipper_dashboard/shipper_more_options.dart';
-import 'package:Remiles/shipper_dashboard/shipper_notifications.dart';
-import 'package:Remiles/shipper_dashboard/shipper_profile.dart';
-import 'package:Remiles/shipper_signup.dart';
-import 'package:Remiles/splash.dart';
-import 'package:Remiles/welcome.dart';
-
-import 'choose_role.dart';
-import 'joiningoption.dart';
-import 'login_screen.dart';
-import 'shipper_dashboard/shipper_dashboard_3.dart';
-
-import 'shipper_dashboard/shipper_dashboard_2.dart';
+import 'package:Remiles/modules/auth/pages/login_screen.dart';
+import 'package:Remiles/modules/carrier_onboarding/carrier_signup.dart';
+import 'package:Remiles/modules/auth/pages/splash.dart';
+import 'package:Remiles/modules/auth/pages/welcome.dart';
 import 'package:flutter/material.dart';
-import 'shipper_dashboard/shipper_dashboard_1.dart';
-import '/shipper_signup.dart';
-import 'carrier_onboarding/carrier_onboarding_1.dart'; // Make sure this path is correct
-import 'carrier_onboarding/carrier_signup.dart';
+import 'dart:ui';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'modules/auth/pages/choose_role.dart';
+import 'modules/auth/pages/joiningoption.dart';
+import 'firebase_options.dart';
 
-
-void main() {
+void main() async {
+  // Ensure that plugin services are initialized
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  // Initialize Firebase Crashlytics
+  FlutterError.onError = (errorDetails) {
+    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+  };
+  
+  // Pass all uncaught asynchronous errors to Crashlytics
+  PlatformDispatcher.instance.onError = (error, stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+  
   // The main function is the entry point for all Flutter apps.
   // It calls the runApp() function, which takes the root widget of the app.
   runApp(const MyApp());
@@ -44,9 +43,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      // The home property sets the first screen of the app.
+       // The home property sets the first screen of the app.
       // The SplashScreen is now the entry point and is passed the WelcomeScreen as its next destination.
-      // home:RoleSelectionScreen()
+     // home:RoleSelectionScreen()
       home: SplashScreen(
         nextScreen: WelcomeScreen(
           // The WelcomeScreen's button will navigate to the JoiningOption screen.
@@ -61,6 +60,12 @@ class MyApp extends StatelessWidget {
         '/signup/carrier': (context) => const CarrierSignUpScreen(),
         '/roleselection': (context) => const RoleSelectionScreen(),
       },
+      title: 'Remiles App',
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        useMaterial3: true,
+      ),
+    //  home: const ShipperDashboardMainPage(),
     );
   }
 }

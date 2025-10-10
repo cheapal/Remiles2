@@ -1,8 +1,6 @@
-import 'package:Remiles/theme/colors.dart';
+import 'package:Remiles/core/theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-
-import '../../common/widgets/bottom_navigation_bar.dart';
 import '../../common/widgets/recommended_load.dart';
 import '../../common/widgets/top_navigation_bar.dart';
 
@@ -46,11 +44,11 @@ class CarrierDashboardScreen extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children:  [
                       SvgPicture.asset('assets/eco.svg',
-                          width: 60, height: 60, color:primaryColor),
+                          width: 50, height: 50,),
 
                       SizedBox(width: 20),
                       SvgPicture.asset('assets/person.svg',
-                          width: 60, height: 60,),
+                          width: 75, height: 65,),
                       SizedBox(width: 20),
                     ],
                   ),
@@ -62,15 +60,15 @@ class CarrierDashboardScreen extends StatelessWidget {
 
             /// Action Buttons
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.only(left:15, right: 32),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: yellowColor,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 14),
+                          horizontal: 42, vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -85,7 +83,7 @@ class CarrierDashboardScreen extends StatelessWidget {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 14),
+                          horizontal: 42, vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -113,7 +111,7 @@ class CarrierDashboardScreen extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.black,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                   SvgPicture.asset('assets/filter.svg',
@@ -122,7 +120,7 @@ class CarrierDashboardScreen extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
             /// Recommended Load Caimport 'package:flutter/material.dart';
             // import 'package:flutter_svg/flutter_svg.dart';
@@ -265,23 +263,51 @@ class CarrierDashboardScreen extends StatelessWidget {
             //   }
             // }rd
             RecommendedLoad(),
-
+            // Padding(
+            //   padding: const EdgeInsets.all(23.0),
+            //   child: aiMatchCard(
+            //     context,
+            //     recommended: true,
+            //     matchPercent: 97,
+            //     loadId: '#1234',
+            //     from: 'Toronto, ON',
+            //     to: 'Montreal. QC',
+            //     pickup: 'Sep 1st, 2025',
+            //     delivery: 'Sep 3rd, 2025',
+            //     weight: '15,000 lb',
+            //     docs: '2 Docs',
+            //     equipment: 'Flatbed',
+            //   ),
+            // ),
             const SizedBox(height: 20),
 
             /// View All Button
             Align(
               alignment: Alignment.centerRight,
               child: Padding(
-                padding: const EdgeInsets.only(right: 16),
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1CAFFF),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
+                padding: const EdgeInsets.only(right: 26),
+                child: GestureDetector(
+                  onTap: () {},
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1CAFFF),
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 3),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
+                    child: const Text("View All", style: TextStyle(color: Colors.black,fontSize: 14, fontWeight: FontWeight.bold)),
                   ),
-                  onPressed: () {},
-                  child: const Text("View All", style: TextStyle(color: Colors.black,fontSize: 14, fontWeight: FontWeight.bold)),
                 ),
               ),
             ),
@@ -299,10 +325,218 @@ class CarrierDashboardScreen extends StatelessWidget {
                 mainAxisSpacing: 12,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _statCard(Icons.attach_money, "\$2000", "Total Revenue"),
-                  _statCard(Icons.check, "50", "Loads Delivered"),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFFFF),
+                        borderRadius: const BorderRadius.all(
+                            Radius.circular(26)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6CA78A)
+                                .withOpacity(0.5),
+                            spreadRadius: 0,
+                            blurRadius: 10,
+                            offset: const Offset(0, 7),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.center,
+                        mainAxisAlignment:
+                        MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment:
+                            MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFBFF497),
+                                ),
+                                child:  Center(
+                                  child:Icon(Icons.attach_money_outlined),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    '2000',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight
+                                          .bold, // Updated font weight
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Total Revenue',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight
+                                  .bold, // Updated font weight
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFFFF),
+                        borderRadius: const BorderRadius.all(
+                            Radius.circular(26)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6CA78A)
+                                .withOpacity(0.5),
+                            spreadRadius: 0,
+                            blurRadius: 10,
+                            offset: const Offset(0, 7),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.center,
+                        mainAxisAlignment:
+                        MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment:
+                            MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 46,
+                                height: 46,
+                                decoration:  BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFFFFE0B3),
+                                ),
+                                child:  Center(
+                                  child: Icon(Icons.check),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              const Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    '50',
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight
+                                          .bold, // Updated font weight
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Loads Delivered',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight
+                                  .bold, // Updated font weight
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                   _statCard(Icons.card_giftcard, "", "Special Offers"),
-                  _statCard(Icons.star, "3.8/5", "Carrier Ratings"),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFFFFF),
+                        borderRadius: const BorderRadius.all(
+                            Radius.circular(26)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF6CA78A)
+                                .withOpacity(0.5),
+                            spreadRadius: 0,
+                            blurRadius: 10,
+                            offset: const Offset(0, 7),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment:
+                        CrossAxisAlignment.center,
+                        mainAxisAlignment:
+                        MainAxisAlignment.center,
+                        children: [
+                          Row(
+                            mainAxisAlignment:
+                            MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                child:  Center(
+                                  child:Icon(Icons.star, color: Colors.amber, ),
+                                ),
+                              ),
+                              const SizedBox(width: 0),
+                              const Flexible(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    "3.8/5",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight
+                                          .bold, // Updated font weight
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            "Carrier Ratings",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight
+                                  .bold, // Updated font weight
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                 ],
               ),
             ),
@@ -320,13 +554,15 @@ class CarrierDashboardScreen extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 6,
-            offset: const Offset(0, 3),
+            color: const Color(0xFF6CA78A)
+                .withOpacity(0.5),
+            spreadRadius: 0,
+            blurRadius: 10,
+            offset: const Offset(0, 7),
           ),
         ],
       ),
@@ -337,7 +573,7 @@ class CarrierDashboardScreen extends StatelessWidget {
           CircleAvatar(
 
               child: Icon(icon, color: Colors.green, size: 28)),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           if (value.isNotEmpty)
             Text(
               value,
@@ -346,10 +582,11 @@ class CarrierDashboardScreen extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
+          const SizedBox(height: 4),
           Text(
             label,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
+            style: const TextStyle(fontSize: 14,  fontWeight: FontWeight.bold,color: Colors.black87),
           ),
         ],
       ),

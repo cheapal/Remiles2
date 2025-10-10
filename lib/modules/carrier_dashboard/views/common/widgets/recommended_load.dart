@@ -1,4 +1,4 @@
-import 'package:Remiles/theme/colors.dart';
+import 'package:Remiles/core/theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 
@@ -70,14 +70,14 @@ Widget RecommendedLoad() {
             children: [
               Icon(Icons.location_on, size: 18, color: primaryColor),
               const SizedBox(width: 6),
-              const Text("From : Toronto, ON"),
+              Text("From : Toronto, ON", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
             ],
           ),
           Row(
             children: [
               Icon(Icons.location_on, size: 18, color: primaryColor),
               const SizedBox(width: 6),
-              const Text("To : Montreal, QC"),
+               Text("To : Montreal, QC", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
             ],
           ),
           Row(
@@ -85,7 +85,7 @@ Widget RecommendedLoad() {
              SvgPicture.asset("assets/calender.svg",
                   width: 18, height: 18, color: primaryColor),
               const SizedBox(width: 6),
-              const Text("Pickup : Sep 1st, 2025"),
+               Text("Pickup : Sep 1st, 2025", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
             ],
           ),
           Row(
@@ -93,7 +93,7 @@ Widget RecommendedLoad() {
               SvgPicture.asset("assets/calender.svg",
                   width: 18, height: 18, color: primaryColor),
               SizedBox(width: 6),
-              Text("Delivery : Sep 3rd, 2025"),
+              Text("Delivery : Sep 3rd, 2025", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
             ],
           ),
           const SizedBox(height: 12),
@@ -121,13 +121,17 @@ Widget RecommendedLoad() {
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFFFCA4D),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(10),
                 ),
+                shadowColor: Colors.black.withOpacity(1),
+                elevation: 1,
+                padding:
+                  const EdgeInsets.symmetric(horizontal: 22, vertical: 0),
               ),
               onPressed: () {},
               child: const Text(
                 "Instant Booking",
-                style: TextStyle(color: Colors.black),
+                style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold,fontSize: 14),
               ),
             ),
           ),

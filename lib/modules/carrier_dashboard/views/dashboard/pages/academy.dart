@@ -1,5 +1,7 @@
 
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.dart';
 import 'package:flutter/material.dart';
+
 
 
 class AcademyScreen extends StatefulWidget {
@@ -80,7 +82,7 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
         children: [
           // Search Bar
           _buildSearchBar(),
-          const SizedBox(height: 20),
+          const SizedBox(height: 40),
           // Video Grid
           Expanded(
             child: _buildVideoGrid(),
@@ -92,22 +94,9 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
 
   /// Builds the styled search bar widget.
   Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(30.0),
-        border: Border.all(color: Colors.green, width: 2),
-      ),
-      child: const TextField(
-        style: TextStyle(color: Colors.black),
-        decoration: InputDecoration(
-          hintText: 'Search',
-          hintStyle: TextStyle(color: Colors.grey),
-          border: InputBorder.none,
-          prefixIcon: Icon(Icons.search, color: Colors.grey),
-          contentPadding: EdgeInsets.symmetric(vertical: 15.0),
-        ),
-      ),
+    return   Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: searchBar(hint: 'Search My Loads',showTrail: false),
     );
   }
 
@@ -120,7 +109,7 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
         crossAxisCount: 2,        // 2 columns
         crossAxisSpacing: 16.0,   // Horizontal space
         mainAxisSpacing: 16.0,    // Vertical space
-        childAspectRatio: 16 / 10,
+        childAspectRatio: 0.75,   // Adjusted for title and caption space
       ),
       itemBuilder: (context, index) {
         return _buildVideoThumbnail();
@@ -130,18 +119,68 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
 
   /// Builds a single video thumbnail placeholder.
   Widget _buildVideoThumbnail() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey.shade400,
-        borderRadius: BorderRadius.circular(15.0),
-      ),
-      child: const Center(
-        child: Icon(
-          Icons.play_arrow,
-          color: Colors.white,
-          size: 50,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Video thumbnail container
+        Expanded(
+          flex: 2,
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(15.0),
+            ),
+            child:  Center(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.9),
+                  shape: BoxShape.circle,
+                ),
+                padding: const EdgeInsets.all(4.0),
+                child: Icon(
+                  Icons.play_arrow,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+            ),
+          ),
         ),
-      ),
+        const SizedBox(height: 8),
+        // Title and caption section
+        Expanded(
+          flex: 1,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Getting Started',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Introduction to the app',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

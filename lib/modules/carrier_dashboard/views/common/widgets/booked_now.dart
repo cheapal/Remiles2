@@ -1,4 +1,4 @@
-import 'package:Remiles/theme/colors.dart';
+import 'package:Remiles/core/theme/colors.dart';
 import 'package:flutter/material.dart';
 
 class BookedNow extends StatelessWidget {
@@ -142,7 +142,7 @@ class BookedNow extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.red,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.red.withOpacity(0.4),
@@ -162,7 +162,7 @@ class BookedNow extends StatelessWidget {
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade700,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(14),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.blue.withOpacity(0.4),
@@ -200,6 +200,12 @@ class BookedNow extends StatelessWidget {
                     style: TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold),
                   ),
+                ),
+
+                const SizedBox(width: 70),
+                 Text(
+                  "Open Docs",
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.red),
                 ),
               ],
             ),
@@ -239,7 +245,7 @@ class BookedNow extends StatelessWidget {
                   Navigator.of(context).pop();
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.tealAccent.shade700 ,
+                  backgroundColor: Colors.greenAccent.shade200 ,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),

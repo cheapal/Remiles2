@@ -1,3 +1,4 @@
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -8,61 +9,41 @@ class LoadsFilterSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Search Bar
-        Container(
-          margin: const EdgeInsets.all(12),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.green, width: 2),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.green.withOpacity(0.2),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-            color: Colors.white,
-          ),
-          child: Row(
-            children: [
-              const Expanded(
-                child: TextField(
-                  decoration: InputDecoration(
-                    border: InputBorder.none,
-                    hintText: "Search My Loads",
-                    hintStyle: TextStyle(color: Colors.grey),
-                  ),
-                ),
-              ),
-              IconButton(
-                icon: SvgPicture.asset(
-                  "assets/filter.svg", // your filter SVG
-                  width: 20,
-                  height: 20,
-                  color: Colors.black,
-                ),
-                onPressed: () {},
-              )
-            ],
-          ),
+
+        // Search bar (Search My Loads)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: searchBar(hint: 'Search My Loads',showTrail: true),
         ),
 
+
+        // Big buttons row: Available Loads | My Bookings
         const SizedBox(height: 16),
 
-        // Category Buttons
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          alignment: WrapAlignment.center,
-          children: [
-            _buildCategoryButton("Available Loads", isPrimary: true),
-            _buildCategoryButton("My Bookings", isPrimary: true),
-            _buildCategoryButton("In-Transit"),
-            _buildCategoryButton("Cancelled Loads"),
-            _buildCategoryButton("Completed Loads"),
-          ],
+        // Status row: In-Transit (active), Cancelled Loads, Completed Loads
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14.0),
+          child: Row(
+            children: [
+              mediumPills("Available Loads",0, active: true),
+              mediumPills("My Bookings",2),
+
+            ],
+          ),
         ),
+        const SizedBox(height: 3),
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              mediumPills("In-Transit",1),
+              mediumPills("Cancelled Loads",1),
+              mediumPills("Completed Loads",1),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
       ],
     );
   }
@@ -92,4 +73,38 @@ class LoadsFilterSection extends StatelessWidget {
       ),
     );
   }
+}
+
+Widget mediumPills(String text, int index, {bool active = false}) {
+  return Expanded(
+    child: Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4.03),
+      child: Container(
+        height: 40,
+        width: 29,
+        decoration: BoxDecoration(
+          color: active ? brandGreen : Colors.white,
+          borderRadius: BorderRadius.circular(40),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromRGBO(25, 85, 41, 0.36),
+              blurRadius: 2.0412,
+              spreadRadius: 1,
+              offset: Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: active ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }

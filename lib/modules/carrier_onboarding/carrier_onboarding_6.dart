@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../core/firebase_service.dart';
 import 'carrier_onboarding_5.dart';
 import 'carrier_onboarding_7.dart'; // Import the next screen
 
 class CarrierOnboarding6Screen extends StatefulWidget {
-  const CarrierOnboarding6Screen({super.key});
+  final VoidCallback? onOnboardingComplete;
+  const CarrierOnboarding6Screen({super.key, this.onOnboardingComplete});
 
   @override
   State<CarrierOnboarding6Screen> createState() => _CarrierOnboarding6ScreenState();
@@ -13,6 +17,40 @@ class CarrierOnboarding6Screen extends StatefulWidget {
 class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
   // Controller for the text field
   final TextEditingController _incomeController = TextEditingController();
+  bool _isLoading = true;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedResponses();
+  }
+
+  // Load saved responses for this screen
+  Future<void> _loadSavedResponses() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        if (onboardingData != null) {
+          final response = onboardingData.getResponse('onboarding_6_income');
+          if (response != null && response['incomeAmount'] != null) {
+            setState(() {
+              _incomeController.text = response['incomeAmount'];
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading saved responses for onboarding 6: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   // A custom page route to handle the fade transition
   PageRouteBuilder _createFadePageRoute(Widget page) {
@@ -48,8 +86,65 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
     );
   }
 
+  // Save onboarding response for this screen
+  Future<void> _saveOnboardingResponse() async {
+    setState(() {
+      _isSaving = true;
+    });
+    
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final response = {
+          'incomeAmount': _incomeController.text.trim(),
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        
+        await FirebaseService.saveCarrierOnboardingResponse(
+          carrier.uid,
+          'onboarding_6_income',
+          response,
+        );
+        
+        print('Onboarding 6 response saved: ${_incomeController.text.trim()}');
+      }
+    } catch (e) {
+      print('Error saving onboarding 6 response: $e');
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFFEFEF6),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B744F)),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Loading...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF666666),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // Get screen dimensions to apply proportional scaling
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -207,6 +302,12 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
                                         isDense: true,
                                         contentPadding: EdgeInsets.symmetric(vertical: 1 * scale),
                                         border: InputBorder.none,
+                                        hintText: 'Enter amount (e.g., 0)',
+                                        hintStyle: TextStyle(
+                                          fontSize: 24 * scale,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey[400],
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -226,11 +327,32 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
                 top: 626 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      _createFadePageRoute(const CarrierOnboarding7Screen()),
-                    );
+                  onTap: _isSaving ? null : () async {
+                    // Validate that user has entered an amount (including 0)
+                    final incomeText = _incomeController.text.trim();
+                    if (incomeText.isEmpty) {
+                      _showAlertDialog(context, 'Please enter an income amount to proceed.');
+                      return;
+                    }
+                    
+                    // Validate that it's a valid number
+                    final incomeValue = int.tryParse(incomeText);
+                    if (incomeValue == null) {
+                      _showAlertDialog(context, 'Please enter a valid number.');
+                      return;
+                    }
+                    
+                    // Save the response before proceeding
+                    await _saveOnboardingResponse();
+                    
+                    if (mounted) {
+                      Navigator.push(
+                        context,
+                        _createFadePageRoute(CarrierOnboarding7Screen(
+                          onOnboardingComplete: widget.onOnboardingComplete,
+                        )),
+                      );
+                    }
                   },
                   child: Container(
                     width: 110 * scale,
@@ -244,21 +366,30 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
+                      child: _isSaving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

@@ -262,6 +262,7 @@ class AuthProvider with ChangeNotifier {
         createdAt: DateTime.now(),
         companyName: companyName,
         additionalData: additionalData,
+        isOnboardingComplete: false, // Mark onboarding as incomplete
       );
 
       final userCredential = await FirebaseService.signUpCarrier(

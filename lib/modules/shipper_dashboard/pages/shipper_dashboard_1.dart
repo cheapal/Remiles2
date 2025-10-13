@@ -1,6 +1,8 @@
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
 
 import 'business_form_screen.dart';
 
@@ -215,9 +217,9 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                                 mainAxisAlignment:
                                 MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Flexible(
+                                  Flexible(
                                     child: Text(
-                                      'Welcome\nJohn Doe',
+                                      'Welcome\n${Provider.of<AuthProvider>(context, listen: false).currentUser?.displayName ?? 'User'}',
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(

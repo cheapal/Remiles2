@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'user_model.dart';
+import 'carrier_onboarding_data.dart';
 
 class CarrierModel extends UserModel {
   final String? companyName;
@@ -21,6 +22,8 @@ class CarrierModel extends UserModel {
   final DateTime? verificationDate;
   final bool isAvailable;
   final String? currentLocation;
+  final bool isOnboardingComplete;
+  final CarrierOnboardingData? onboardingData;
 
   CarrierModel({
     required String uid,
@@ -50,6 +53,8 @@ class CarrierModel extends UserModel {
     this.verificationDate,
     this.isAvailable = true,
     this.currentLocation,
+    this.isOnboardingComplete = false,
+    this.onboardingData,
   }) : super(
           uid: uid,
           email: email,
@@ -102,6 +107,10 @@ class CarrierModel extends UserModel {
           : null,
       isAvailable: data['isAvailable'] ?? true,
       currentLocation: data['currentLocation'],
+      isOnboardingComplete: data['isOnboardingComplete'] ?? false,
+      onboardingData: data['onboardingData'] != null
+          ? CarrierOnboardingData.fromFirestore(data['onboardingData'])
+          : null,
     );
   }
 
@@ -143,6 +152,10 @@ class CarrierModel extends UserModel {
           : null,
       isAvailable: json['isAvailable'] ?? true,
       currentLocation: json['currentLocation'],
+      isOnboardingComplete: json['isOnboardingComplete'] ?? false,
+      onboardingData: json['onboardingData'] != null
+          ? CarrierOnboardingData.fromJson(json['onboardingData'])
+          : null,
     );
   }
 
@@ -169,6 +182,8 @@ class CarrierModel extends UserModel {
       'verificationDate': verificationDate?.toIso8601String(),
       'isAvailable': isAvailable,
       'currentLocation': currentLocation,
+      'isOnboardingComplete': isOnboardingComplete,
+      'onboardingData': onboardingData?.toJson(),
     });
     return json;
   }
@@ -198,6 +213,8 @@ class CarrierModel extends UserModel {
           : null,
       'isAvailable': isAvailable,
       'currentLocation': currentLocation,
+      'isOnboardingComplete': isOnboardingComplete,
+      'onboardingData': onboardingData?.toFirestore(),
     });
     return firestore;
   }
@@ -231,6 +248,8 @@ class CarrierModel extends UserModel {
     DateTime? verificationDate,
     bool? isAvailable,
     String? currentLocation,
+    bool? isOnboardingComplete,
+    CarrierOnboardingData? onboardingData,
   }) {
     return CarrierModel(
       uid: uid ?? this.uid,
@@ -260,6 +279,8 @@ class CarrierModel extends UserModel {
       verificationDate: verificationDate ?? this.verificationDate,
       isAvailable: isAvailable ?? this.isAvailable,
       currentLocation: currentLocation ?? this.currentLocation,
+      isOnboardingComplete: isOnboardingComplete ?? this.isOnboardingComplete,
+      onboardingData: onboardingData ?? this.onboardingData,
     );
   }
 

@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../core/firebase_service.dart';
 import 'carrier_onboarding_4.dart';
 import 'carrier_onboarding_6.dart'; // Import the next screen
 import 'carrier_onboarding_7.dart'; // Import the new screen
 
 class CarrierOnboarding5Screen extends StatefulWidget {
-  const CarrierOnboarding5Screen({super.key});
+  final VoidCallback? onOnboardingComplete;
+  const CarrierOnboarding5Screen({super.key, this.onOnboardingComplete});
 
   @override
   State<CarrierOnboarding5Screen> createState() => _CarrierOnboarding5ScreenState();
@@ -14,6 +18,39 @@ class CarrierOnboarding5Screen extends StatefulWidget {
 class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
   // State variable to hold the currently selected option
   String? _selectedOption;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedResponses();
+  }
+
+  // Load saved responses for this screen
+  Future<void> _loadSavedResponses() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        if (onboardingData != null) {
+          final response = onboardingData.getResponse('onboarding_5_experience');
+          if (response != null && response['selectedOption'] != null) {
+            setState(() {
+              _selectedOption = response['selectedOption'];
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading saved responses for onboarding 5: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   // A custom page route to handle the fade transition
   PageRouteBuilder _createFadePageRoute(Widget page) {
@@ -49,8 +86,57 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
     );
   }
 
+  // Save onboarding response for this screen
+  Future<void> _saveOnboardingResponse() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final response = {
+          'selectedOption': _selectedOption,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        
+        await FirebaseService.saveCarrierOnboardingResponse(
+          carrier.uid,
+          'onboarding_5_experience',
+          response,
+        );
+        
+        print('Onboarding 5 response saved: $_selectedOption');
+      }
+    } catch (e) {
+      print('Error saving onboarding 5 response: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFFEFEF6),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B744F)),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Loading...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF666666),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // Get screen dimensions to apply proportional scaling
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -161,16 +247,26 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
                 top: 625 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
+                  onTap: () async {
                     if (_selectedOption == 'Never') {
+                      // Save the response before proceeding
+                      await _saveOnboardingResponse();
+                      
                       Navigator.push(
                         context,
-                        _createFadePageRoute(const CarrierOnboarding7Screen()),
+                        _createFadePageRoute(CarrierOnboarding7Screen(
+                          onOnboardingComplete: widget.onOnboardingComplete,
+                        )),
                       );
                     } else if (_selectedOption != null) {
+                      // Save the response before proceeding
+                      await _saveOnboardingResponse();
+                      
                       Navigator.push(
                         context,
-                        _createFadePageRoute(const CarrierOnboarding6Screen()),
+                        _createFadePageRoute(CarrierOnboarding6Screen(
+                          onOnboardingComplete: widget.onOnboardingComplete,
+                        )),
                       );
                     } else {
                       _showAlertDialog(context, 'Please select an option to proceed.');

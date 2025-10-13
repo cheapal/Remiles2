@@ -6,8 +6,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/app_state_provider.dart';
 import '../../core/auth_wrapper.dart';
 import '../../models/user_model.dart';
-import '../carrier_dashboard/views/dashboard/pages/main_page.dart';
 import '../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import 'carrier_onboarding_wrapper.dart';
 
 class CarrierSignUpScreen extends StatefulWidget {
   final VoidCallback? onOnboardingComplete;
@@ -131,9 +131,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
         (route) => false,
       );
     } else if (userRole == UserRole.carrier) {
-      print('Carrier Signup: Navigating to Carrier Dashboard');
+      print('Carrier Signup: Navigating to Carrier Onboarding Wrapper');
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainPage()),
+        MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
         (route) => false,
       );
     } else {

@@ -5,8 +5,8 @@ import '../providers/user_provider.dart';
 import '../modules/auth/pages/login_screen.dart';
 import '../modules/auth/pages/welcome.dart';
 import '../modules/auth/pages/joiningoption.dart';
-import '../modules/carrier_dashboard/views/dashboard/pages/main_page.dart';
 import '../modules/shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import '../modules/carrier_onboarding/carrier_onboarding_wrapper.dart';
 import '../models/user_model.dart';
 
 class AuthWrapper extends StatefulWidget {
@@ -80,10 +80,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
       } else if (_authProvider.currentUser?.role == UserRole.carrier) {
-        print('AuthWrapper: Navigating to Carrier Dashboard');
+        print('AuthWrapper: Navigating to Carrier Onboarding Wrapper');
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const MainPage()),
+            MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
             (route) => false,
           );
         }

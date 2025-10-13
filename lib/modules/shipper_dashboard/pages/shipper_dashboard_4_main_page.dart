@@ -8,6 +8,8 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.da
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
 
 import '../../carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 
@@ -1076,6 +1078,22 @@ class ShipperDashboardHomePage extends StatefulWidget {
 class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
   @override
   Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final user = authProvider.currentUser;
+        final shipper = authProvider.shipperUser;
+        
+        // Use company name if available, otherwise use display name, otherwise fallback to 'User'
+        final displayName = shipper?.companyName ?? 
+                           user?.displayName ?? 
+                           'User';
+        
+        return _buildHomePage(context, displayName);
+      },
+    );
+  }
+  
+  Widget _buildHomePage(BuildContext context, String displayName) {
     return  // Main content start
       SingleChildScrollView(
         child: Column(
@@ -1093,9 +1111,9 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
             mainAxisAlignment:
             MainAxisAlignment.spaceBetween,
             children: [
-              const Flexible(
+              Flexible(
                 child: Text(
-                  'Welcome\nJohn Doe',
+                  'Welcome\n$displayName',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

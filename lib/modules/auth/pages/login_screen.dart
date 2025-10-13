@@ -7,6 +7,7 @@ import '../../../core/auth_wrapper.dart';
 import '../../../models/user_model.dart';
 import '../../carrier_dashboard/views/dashboard/pages/main_page.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import '../../carrier_onboarding/carrier_onboarding_wrapper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -83,9 +84,9 @@ class _LoginScreenState extends State<LoginScreen> {
         (route) => false,
       );
     } else if (userRole == UserRole.carrier) {
-      print('Login: Navigating to Carrier Dashboard');
+      print('Login: Navigating to Carrier Onboarding Wrapper');
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainPage()),
+        MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
         (route) => false,
       );
     } else {

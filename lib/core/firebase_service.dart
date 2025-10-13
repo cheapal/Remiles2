@@ -5,6 +5,7 @@ import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import '../models/user_model.dart';
 import '../models/shipper_model.dart';
 import '../models/carrier_model.dart';
+import '../models/carrier_onboarding_data.dart';
 
 /// Firebase service class to handle all Firebase operations
 class FirebaseService {
@@ -284,6 +285,106 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Get current user data failed');
       rethrow;
+    }
+  }
+
+  // Carrier Onboarding Data Methods
+  static Future<void> saveCarrierOnboardingResponse(
+    String carrierId,
+    String screenName,
+    Map<String, dynamic> response,
+  ) async {
+    try {
+      final carrierRef = carriers.doc(carrierId);
+      final carrierDoc = await carrierRef.get();
+      
+      if (!carrierDoc.exists) {
+        throw Exception('Carrier document not found');
+      }
+      
+      final carrierData = carrierDoc.data() as Map<String, dynamic>;
+      final currentOnboardingData = carrierData['onboardingData'] != null
+          ? CarrierOnboardingData.fromFirestore(carrierData['onboardingData'])
+          : CarrierOnboardingData();
+      
+      final updatedOnboardingData = currentOnboardingData.addResponse(screenName, response);
+      
+      await carrierRef.update({
+        'onboardingData': updatedOnboardingData.toFirestore(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      print('Onboarding response saved for screen: $screenName');
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Save carrier onboarding response failed');
+      rethrow;
+    }
+  }
+
+  static Future<void> markCarrierOnboardingComplete(String carrierId) async {
+    try {
+      final carrierRef = carriers.doc(carrierId);
+      final carrierDoc = await carrierRef.get();
+      
+      if (!carrierDoc.exists) {
+        throw Exception('Carrier document not found');
+      }
+      
+      final carrierData = carrierDoc.data() as Map<String, dynamic>;
+      final currentOnboardingData = carrierData['onboardingData'] != null
+          ? CarrierOnboardingData.fromFirestore(carrierData['onboardingData'])
+          : CarrierOnboardingData();
+      
+      final completedOnboardingData = currentOnboardingData.markComplete();
+      
+      await carrierRef.update({
+        'onboardingData': completedOnboardingData.toFirestore(),
+        'isOnboardingComplete': true,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      
+      print('Carrier onboarding marked as complete');
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Mark carrier onboarding complete failed');
+      rethrow;
+    }
+  }
+
+  static Future<CarrierOnboardingData?> getCarrierOnboardingData(String carrierId) async {
+    try {
+      final carrierDoc = await carriers.doc(carrierId).get();
+      
+      if (!carrierDoc.exists) {
+        return null;
+      }
+      
+      final carrierData = carrierDoc.data() as Map<String, dynamic>;
+      return carrierData['onboardingData'] != null
+          ? CarrierOnboardingData.fromFirestore(carrierData['onboardingData'])
+          : null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Get carrier onboarding data failed');
+      rethrow;
+    }
+  }
+
+  static Future<bool> isCarrierOnboardingComplete(String carrierId) async {
+    try {
+      final onboardingData = await getCarrierOnboardingData(carrierId);
+      return onboardingData?.isCompleted ?? false;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Check carrier onboarding complete failed');
+      return false;
+    }
+  }
+
+  static Future<List<String>> getCompletedOnboardingScreens(String carrierId) async {
+    try {
+      final onboardingData = await getCarrierOnboardingData(carrierId);
+      return onboardingData?.completedScreens ?? [];
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Get completed onboarding screens failed');
+      return [];
     }
   }
 }

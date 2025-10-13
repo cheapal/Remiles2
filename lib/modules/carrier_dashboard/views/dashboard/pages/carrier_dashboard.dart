@@ -1,6 +1,8 @@
 import 'package:Remiles/core/theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
+import '../../../../../providers/auth_provider.dart';
 import '../../common/widgets/recommended_load.dart';
 import '../../common/widgets/top_navigation_bar.dart';
 
@@ -9,8 +11,25 @@ class CarrierDashboardScreen extends StatelessWidget {
    CarrierDashboardScreen({super.key});
 
   final primaryColor = Color(0xFF1C6B4A);
+  
   @override
   Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final user = authProvider.currentUser;
+        final carrier = authProvider.carrierUser;
+        
+        // Use company name if available, otherwise use display name, otherwise fallback to 'User'
+        final displayName = carrier?.companyName ?? 
+                           user?.displayName ?? 
+                           'User';
+        
+        return _buildDashboard(context, displayName);
+      },
+    );
+  }
+  
+  Widget _buildDashboard(BuildContext context, String displayName) {
     return Scaffold(
       backgroundColor: Colors.white,
       body:
@@ -29,10 +48,10 @@ class CarrierDashboardScreen extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      "Welcome\nChriss ann",
-                      style: TextStyle(
+                      "Welcome\n$displayName",
+                      style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,

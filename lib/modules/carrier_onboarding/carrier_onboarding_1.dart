@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../core/firebase_service.dart';
 
 import 'other_button_screen.dart';
 import 'carrier_onboarding_2.dart';
 // Import the next screen
 
 class CarrierOnboarding1Screen extends StatefulWidget {
-  const CarrierOnboarding1Screen({super.key});
+  final VoidCallback? onOnboardingComplete;
+  const CarrierOnboarding1Screen({super.key, this.onOnboardingComplete});
 
   @override
   State<CarrierOnboarding1Screen> createState() => _CarrierOnboarding1ScreenState();
@@ -15,6 +19,39 @@ class CarrierOnboarding1Screen extends StatefulWidget {
 class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
   // State variable to hold the currently selected vehicle types
   Set<String> _selectedVehicleTypes = {};
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedResponses();
+  }
+
+  // Load saved responses for this screen
+  Future<void> _loadSavedResponses() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        if (onboardingData != null) {
+          final response = onboardingData.getResponse('onboarding_1_vehicle_types');
+          if (response != null && response['selectedVehicleTypes'] != null) {
+            setState(() {
+              _selectedVehicleTypes = Set<String>.from(response['selectedVehicleTypes']);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading saved responses for onboarding 1: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   // A custom page route to handle the fade transition
   PageRouteBuilder _createFadePageRoute(Widget page) {
@@ -50,8 +87,57 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
     );
   }
 
+  // Save onboarding response for this screen
+  Future<void> _saveOnboardingResponse() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final response = {
+          'selectedVehicleTypes': _selectedVehicleTypes.toList(),
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        
+        await FirebaseService.saveCarrierOnboardingResponse(
+          carrier.uid,
+          'onboarding_1_vehicle_types',
+          response,
+        );
+        
+        print('Onboarding 1 response saved: ${_selectedVehicleTypes.toList()}');
+      }
+    } catch (e) {
+      print('Error saving onboarding 1 response: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFFEFEF6),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B744F)),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Loading...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF666666),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // Get screen dimensions to apply proportional scaling
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -90,7 +176,13 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
                     size: 40 * scale,
                   ),
                   onPressed: () {
-                    Navigator.of(context).pop();
+                    // Go back to previous screen or exit onboarding
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      // If this is the first screen, go back to welcome/login
+                      Navigator.of(context).pushReplacementNamed('/welcome');
+                    }
                   },
                 ),
               ),
@@ -161,11 +253,16 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
                 top: 644 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
+                  onTap: () async {
                     if (_selectedVehicleTypes.isNotEmpty) {
+                      // Save the response before proceeding
+                      await _saveOnboardingResponse();
+                      
                       Navigator.push(
                         context,
-                        _createFadePageRoute(const CarrierOnboarding2Screen()),
+                        _createFadePageRoute(CarrierOnboarding2Screen(
+                          onOnboardingComplete: widget.onOnboardingComplete,
+                        )),
                       );
                     } else {
                       _showAlertDialog(context, 'Please select at least one option to proceed.');

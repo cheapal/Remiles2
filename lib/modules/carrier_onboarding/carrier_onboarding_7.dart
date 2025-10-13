@@ -1,9 +1,13 @@
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/main_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../core/firebase_service.dart';
 
 class CarrierOnboarding7Screen extends StatelessWidget {
-  const CarrierOnboarding7Screen({super.key});
+  final VoidCallback? onOnboardingComplete;
+  const CarrierOnboarding7Screen({super.key, this.onOnboardingComplete});
   PageRouteBuilder _createFadePageRoute(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
@@ -168,12 +172,7 @@ class CarrierOnboarding7Screen extends StatelessWidget {
                 top: 677 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      _createFadePageRoute( MainPage()),
-                    );
-                  },
+                  onTap: () => _handleOnboardingComplete(context),
                   child: Container(
                     width: 110 * scale,
                     height: 55 * scale,
@@ -221,6 +220,52 @@ class CarrierOnboarding7Screen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _handleOnboardingComplete(BuildContext context) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        // Save final onboarding response
+        final response = {
+          'completed': true,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        
+        await FirebaseService.saveCarrierOnboardingResponse(
+          carrier.uid,
+          'onboarding_7_completion',
+          response,
+        );
+        
+        // Mark onboarding as complete in Firebase
+        await FirebaseService.markCarrierOnboardingComplete(carrier.uid);
+        
+        print('Onboarding completed successfully');
+      }
+      
+      // Call the completion callback if provided
+      onOnboardingComplete?.call();
+      
+      // Navigate to the main dashboard and clear all previous screens
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainPage()),
+          (route) => false, // Remove all previous routes
+        );
+      }
+    } catch (e) {
+      print('Error completing onboarding: $e');
+      // Still navigate to dashboard even if there's an error
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainPage()),
+          (route) => false, // Remove all previous routes
+        );
+      }
+    }
   }
 
   Widget _buildFeaturePoint(double scale, List<TextSpan> spans, double top) {

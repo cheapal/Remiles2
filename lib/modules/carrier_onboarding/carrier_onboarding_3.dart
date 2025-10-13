@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../core/firebase_service.dart';
 import 'carrier_onboarding_2.dart';
 import 'carrier_onboarding_4.dart'; // Import the next screen
 import 'other_carrier_onboarding_3.dart'; // Import the "other" screen
 
 class CarrierOnboarding3Screen extends StatefulWidget {
-  const CarrierOnboarding3Screen({super.key});
+  final VoidCallback? onOnboardingComplete;
+  const CarrierOnboarding3Screen({super.key, this.onOnboardingComplete});
 
   @override
   State<CarrierOnboarding3Screen> createState() => _CarrierOnboarding3ScreenState();
@@ -14,6 +18,40 @@ class CarrierOnboarding3Screen extends StatefulWidget {
 class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
   // State variable to hold the currently selected options
   Set<String> _selectedOptions = {};
+  bool _isLoading = true;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedResponses();
+  }
+
+  // Load saved responses for this screen
+  Future<void> _loadSavedResponses() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        if (onboardingData != null) {
+          final response = onboardingData.getResponse('onboarding_3_service_areas');
+          if (response != null && response['selectedOptions'] != null) {
+            setState(() {
+              _selectedOptions = Set<String>.from(response['selectedOptions']);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading saved responses for onboarding 3: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   // A custom page route to handle the fade transition
   PageRouteBuilder _createFadePageRoute(Widget page) {
@@ -49,8 +87,65 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
     );
   }
 
+  // Save onboarding response for this screen
+  Future<void> _saveOnboardingResponse() async {
+    setState(() {
+      _isSaving = true;
+    });
+    
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final response = {
+          'selectedOptions': _selectedOptions.toList(),
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        
+        await FirebaseService.saveCarrierOnboardingResponse(
+          carrier.uid,
+          'onboarding_3_service_areas',
+          response,
+        );
+        
+        print('Onboarding 3 response saved: ${_selectedOptions.toList()}');
+      }
+    } catch (e) {
+      print('Error saving onboarding 3 response: $e');
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFFEFEF6),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B744F)),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Loading...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF666666),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // Get screen dimensions to apply proportional scaling
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -164,12 +259,19 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
                 top: 625 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
+                  onTap: _isSaving ? null : () async {
                     if (_selectedOptions.isNotEmpty) {
-                      Navigator.push(
-                        context,
-                        _createFadePageRoute(const CarrierOnboarding4Screen()),
-                      );
+                      // Save the response before proceeding
+                      await _saveOnboardingResponse();
+                      
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          _createFadePageRoute(CarrierOnboarding4Screen(
+                            onOnboardingComplete: widget.onOnboardingComplete,
+                          )),
+                        );
+                      }
                     } else {
                       _showAlertDialog(context, 'Please select at least one option to proceed.');
                     }
@@ -186,21 +288,30 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
+                      child: _isSaving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../core/firebase_service.dart';
 import 'other_carrier_onboarding_2.dart';
 import 'carrier_onboarding_3.dart';
 
 class CarrierOnboarding2Screen extends StatefulWidget {
-  const CarrierOnboarding2Screen({super.key});
+  final VoidCallback? onOnboardingComplete;
+  const CarrierOnboarding2Screen({super.key, this.onOnboardingComplete});
 
   @override
   State<CarrierOnboarding2Screen> createState() => _CarrierOnboarding2ScreenState();
@@ -13,6 +17,40 @@ class CarrierOnboarding2Screen extends StatefulWidget {
 class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
   // State variable to hold the currently selected option
   String? _selectedOption;
+  bool _isLoading = true;
+  bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedResponses();
+  }
+
+  // Load saved responses for this screen
+  Future<void> _loadSavedResponses() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        if (onboardingData != null) {
+          final response = onboardingData.getResponse('onboarding_2_business_type');
+          if (response != null && response['selectedOption'] != null) {
+            setState(() {
+              _selectedOption = response['selectedOption'];
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error loading saved responses for onboarding 2: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   // Custom page route for a smooth fade transition
   PageRouteBuilder _createFadePageRoute(Widget nextScreen) {
@@ -48,8 +86,65 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
     );
   }
 
+  // Save onboarding response for this screen
+  Future<void> _saveOnboardingResponse() async {
+    setState(() {
+      _isSaving = true;
+    });
+    
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      if (carrier != null) {
+        final response = {
+          'selectedOption': _selectedOption,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        
+        await FirebaseService.saveCarrierOnboardingResponse(
+          carrier.uid,
+          'onboarding_2_business_type',
+          response,
+        );
+        
+        print('Onboarding 2 response saved: $_selectedOption');
+      }
+    } catch (e) {
+      print('Error saving onboarding 2 response: $e');
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFFEFEF6),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B744F)),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Loading...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF666666),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     // Get screen dimensions to apply proportional scaling
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
@@ -155,12 +250,19 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                 top: 602 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
+                  onTap: _isSaving ? null : () async {
                     if (_selectedOption != null) {
-                      Navigator.push(
-                        context,
-                        _createFadePageRoute(const CarrierOnboarding3Screen()),
-                      );
+                      // Save the response before proceeding
+                      await _saveOnboardingResponse();
+                      
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          _createFadePageRoute(CarrierOnboarding3Screen(
+                            onOnboardingComplete: widget.onOnboardingComplete,
+                          )),
+                        );
+                      }
                     } else {
                       _showAlertDialog(context, 'Please select an option to proceed.');
                     }
@@ -177,21 +279,30 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
+                      child: _isSaving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

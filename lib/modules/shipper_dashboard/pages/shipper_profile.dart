@@ -5,6 +5,10 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_boost_my_page.da
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_my_preference.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_payment_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_document_management.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/app_state_provider.dart';
+import '../../../core/auth_wrapper.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -232,9 +236,7 @@ class _ShipperProfileState extends State<ShipperProfile>
                     const SizedBox(height: 16),
                     // Logout button
                     GestureDetector(
-                      onTap: () {
-
-                      },
+                      onTap: () => _showLogoutDialog(context),
                       child: Container(
                         width: 172,
                         height: 42,
@@ -410,5 +412,93 @@ class _ShipperProfileState extends State<ShipperProfile>
         ],
       ),
     );
+  }
+
+  // Show logout confirmation dialog
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Log Out',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF186230),
+            ),
+          ),
+          content: const Text(
+            'Are you sure you want to log out?',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF666666),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF666666),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _handleLogout(context);
+              },
+              child: const Text(
+                'Log Out',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF186230),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Handle logout functionality
+  void _handleLogout(BuildContext context) async {
+    final authProvider = context.read<AuthProvider>();
+    final appStateProvider = context.read<AppStateProvider>();
+
+    try {
+      appStateProvider.showLoadingWithMessage('Logging out...');
+      
+      await authProvider.signOut();
+      
+      appStateProvider.showSuccess();
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Logged out successfully'),
+          backgroundColor: Color(0xFF4B744F),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      print('Shipper logout successful, navigating to AuthWrapper');
+      
+      // Navigate directly to AuthWrapper which will handle the welcome screen
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthWrapper()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      appStateProvider.showError('Logout failed. Please try again.');
+      print('Shipper logout error: $e');
+    }
   }
 }

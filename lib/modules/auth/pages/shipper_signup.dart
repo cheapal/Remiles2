@@ -23,6 +23,11 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
   
+  // Country selection state
+  String _selectedCountryKey = 'canada'; // Use unique key instead of code
+  String _selectedCountryCode = '+1';
+  String _selectedCountryFlag = 'assets/canada_flag.png';
+  
   // Form controllers
   final _companyNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -30,6 +35,21 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+
+  // Country data with unique keys
+  final List<Map<String, String>> _countries = [
+    {'key': 'canada', 'code': '+1', 'flag': 'assets/canada_flag.png', 'name': 'Canada'},
+    {'key': 'usa', 'code': '+1', 'flag': 'assets/flag.png', 'name': 'United States'},
+    {'key': 'uk', 'code': '+44', 'flag': 'assets/flag.png', 'name': 'United Kingdom'},
+    {'key': 'france', 'code': '+33', 'flag': 'assets/flag.png', 'name': 'France'},
+    {'key': 'germany', 'code': '+49', 'flag': 'assets/flag.png', 'name': 'Germany'},
+    {'key': 'japan', 'code': '+81', 'flag': 'assets/flag.png', 'name': 'Japan'},
+    {'key': 'china', 'code': '+86', 'flag': 'assets/flag.png', 'name': 'China'},
+    {'key': 'india', 'code': '+91', 'flag': 'assets/flag.png', 'name': 'India'},
+    {'key': 'pakistan', 'code': '+92', 'flag': 'assets/flag.png', 'name': 'Pakistan'},
+    {'key': 'australia', 'code': '+61', 'flag': 'assets/flag.png', 'name': 'Australia'},
+    {'key': 'brazil', 'code': '+55', 'flag': 'assets/flag.png', 'name': 'Brazil'},
+  ];
 
   @override
   void dispose() {
@@ -61,7 +81,7 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
       password: _passwordController.text,
       companyName: _companyNameController.text.trim(),
       displayName: _companyNameController.text.trim(),
-      phoneNumber: _phoneController.text.trim(),
+      phoneNumber: '$_selectedCountryCode${_phoneController.text.trim()}',
     );
 
     if (success) {
@@ -683,50 +703,158 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
     );
   }
 
-  // Updated phone input field
+  // Updated phone input field with country code dropdown
   Widget _buildPhoneInputField({
     required double scale,
     TextEditingController? controller,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.phone,
-      validator: validator,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-      decoration: InputDecoration(
-        hintText: "(555) 123-4567",
-        prefixIcon: Padding(
-          padding: const EdgeInsets.only(left: 12.0, right: 8.0),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset('assets/canada_flag.png', width: 24, height: 16),
-              const SizedBox(width: 8),
-              const Text('+1', style: TextStyle(fontSize: 14, color: Colors.black)),
-              const SizedBox(width: 8),
-              Container(width: 1, height: 20, color: Colors.grey[300]),
-            ],
-          ),
-        ),
-        filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 18),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF059669), width: 2),
-        ),
-        hintStyle: TextStyle(fontSize: 14 * scale, color: Colors.grey[400]),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[300]!),
       ),
-      style: TextStyle(fontSize: 14 * scale, color: Colors.black),
+      child: Row(
+        children: [
+          // Country dropdown
+          _buildCountryDropdown(scale),
+          const SizedBox(width: 12),
+          // Phone number input
+          Expanded(
+            child: TextFormField(
+              controller: controller,
+              keyboardType: TextInputType.phone,
+              validator: validator,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                hintText: "Contact Number",
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 18),
+                errorStyle: const TextStyle(fontSize: 12),
+                hintStyle: TextStyle(fontSize: 14 * scale, color: Colors.grey[400]),
+              ),
+              style: TextStyle(fontSize: 14 * scale, color: Colors.black),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Country dropdown for shipper signup
+  Widget _buildCountryDropdown(double scale) {
+    return Container(
+      height: 40 * scale,
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(8 * scale),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedCountryKey,
+          isExpanded: false,
+          icon: Icon(
+            Icons.keyboard_arrow_down,
+            color: const Color(0xFF6B7280),
+            size: 20 * scale,
+          ),
+          style: TextStyle(
+            fontSize: 14 * scale,
+            color: const Color(0xFF111827),
+            fontWeight: FontWeight.w500,
+          ),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() {
+                _selectedCountryKey = newValue;
+                final selectedCountry = _countries.firstWhere(
+                  (country) => country['key'] == newValue,
+                );
+                _selectedCountryCode = selectedCountry['code']!;
+                _selectedCountryFlag = selectedCountry['flag']!;
+              });
+            }
+          },
+          items: _countries.map<DropdownMenuItem<String>>((Map<String, String> country) {
+            return DropdownMenuItem<String>(
+              value: country['key'],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    country['flag']!,
+                    width: 20 * scale,
+                    height: 14 * scale,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 20 * scale,
+                        height: 14 * scale,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2 * scale),
+                        ),
+                        child: Icon(
+                          Icons.flag,
+                          size: 12 * scale,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 6 * scale),
+                  Text(
+                    country['code']!,
+                    style: TextStyle(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          selectedItemBuilder: (BuildContext context) {
+            return _countries.map<Widget>((Map<String, String> country) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    _selectedCountryFlag,
+                    width: 20 * scale,
+                    height: 14 * scale,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 20 * scale,
+                        height: 14 * scale,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2 * scale),
+                        ),
+                        child: Icon(
+                          Icons.flag,
+                          size: 12 * scale,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 6 * scale),
+                  Text(
+                    _selectedCountryCode,
+                    style: TextStyle(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            }).toList();
+          },
+        ),
+      ),
     );
   }
 }

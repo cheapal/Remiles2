@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-
+import 'package:provider/provider.dart';
+import '../../../../../providers/auth_provider.dart';
+import '../../../../../providers/app_state_provider.dart';
+import '../../../../../core/auth_wrapper.dart';
 import '../../common/widgets/top_navigation_bar.dart';
 
 class Profile extends StatelessWidget {
@@ -138,29 +141,32 @@ class Profile extends StatelessWidget {
                 _buildProfileOption('Help & Legal', Icons.help_outline),
                 const SizedBox(height: 16),
                 // Logout button
-                Container(
-                  width: 172,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFF43975A), width: 2),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.25),
-                        blurRadius: 4,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(
-                    child: Text(
-                      'Log Out',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontWeight: FontWeight.w500,
-                        fontSize: 16,
-                        color: Color(0xFF186230),
+                GestureDetector(
+                  onTap: () => _showLogoutDialog(context),
+                  child: Container(
+                    width: 172,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF43975A), width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.25),
+                          blurRadius: 4,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Log Out',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontWeight: FontWeight.w500,
+                          fontSize: 16,
+                          color: Color(0xFF186230),
+                        ),
                       ),
                     ),
                   ),
@@ -171,6 +177,94 @@ class Profile extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Show logout confirmation dialog
+  void _showLogoutDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            'Log Out',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF186230),
+            ),
+          ),
+          content: const Text(
+            'Are you sure you want to log out?',
+            style: TextStyle(
+              fontSize: 16,
+              color: Color(0xFF666666),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF666666),
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _handleLogout(context);
+              },
+              child: const Text(
+                'Log Out',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF186230),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Handle logout functionality
+  void _handleLogout(BuildContext context) async {
+    final authProvider = context.read<AuthProvider>();
+    final appStateProvider = context.read<AppStateProvider>();
+
+    try {
+      appStateProvider.showLoadingWithMessage('Logging out...');
+      
+      await authProvider.signOut();
+      
+      appStateProvider.showSuccess();
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Logged out successfully'),
+          backgroundColor: Color(0xFF4B744F),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      print('Logout successful, navigating to AuthWrapper');
+      
+      // Navigate directly to AuthWrapper which will handle the welcome screen
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthWrapper()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      appStateProvider.showError('Logout failed. Please try again.');
+      print('Logout error: $e');
+    }
   }
 }
 

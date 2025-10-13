@@ -5,7 +5,8 @@ import 'joiningoption.dart';
 import 'shipper_signup.dart'; // Import the new ShipperSignUpScreen
 
 class RoleSelectionScreen extends StatelessWidget {
-  const RoleSelectionScreen({super.key});
+  final VoidCallback? onOnboardingComplete;
+  const RoleSelectionScreen({super.key, this.onOnboardingComplete});
 
   // Figma baseline (from your Android XML)
   static const double _designW = 376.0;
@@ -75,11 +76,11 @@ class RoleSelectionScreen extends StatelessWidget {
       // Navigate to the CarrierSignUpScreen when the "Carrier" role is tapped.
       if (role == 'Carrier') {
         Navigator.of(context).push(
-          _createFadePageRoute(const CarrierSignUpScreen()),
+          _createFadePageRoute(CarrierSignUpScreen(onOnboardingComplete: onOnboardingComplete)),
         );
       } else if (role == 'Shipper') {
         Navigator.of(context).push(
-          _createFadePageRoute(const ShipperSignUpScreen()),
+          _createFadePageRoute(ShipperSignUpScreen(onOnboardingComplete: onOnboardingComplete)),
         );
       }
       debugPrint('Tapped role: $role');

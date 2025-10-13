@@ -113,13 +113,19 @@ class _SplashScreenState extends State<SplashScreen>
   }
 
   void _startAnimationSequence() async {
+    if (!mounted) return;
+    
     _backgroundController.forward();
 
     await Future.delayed(const Duration(milliseconds: 300));
+    
+    if (!mounted) return;
     _logoController.forward();
 
     // Removed the particle and shimmer animations, so the delay is shorter
     Timer(const Duration(milliseconds: 2500), () async {
+      if (!mounted) return;
+      
       await _exitController.forward();
 
       if (mounted) {
@@ -162,6 +168,16 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    if (_logoController.isAnimating) {
+      _logoController.stop();
+    }
+    if (_backgroundController.isAnimating) {
+      _backgroundController.stop();
+    }
+    if (_exitController.isAnimating) {
+      _exitController.stop();
+    }
+    
     _logoController.dispose();
     _backgroundController.dispose();
     _exitController.dispose();

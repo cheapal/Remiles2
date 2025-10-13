@@ -1,11 +1,18 @@
-import 'package:Remiles/modules/shipper_onboarding/shipper_onboarding_1.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/app_state_provider.dart';
+import '../../../core/auth_wrapper.dart';
+import '../../../models/user_model.dart';
+import '../../carrier_dashboard/views/dashboard/pages/main_page.dart';
+import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import 'choose_role.dart';
 
 class ShipperSignUpScreen extends StatefulWidget {
-  const ShipperSignUpScreen({Key? key}) : super(key: key);
+  final VoidCallback? onOnboardingComplete;
+  const ShipperSignUpScreen({Key? key, this.onOnboardingComplete}) : super(key: key);
 
   @override
   State<ShipperSignUpScreen> createState() => _ShipperSignUpScreenState();
@@ -15,7 +22,103 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
-  bool _isLoading = false;
+  
+  // Form controllers
+  final _companyNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  @override
+  void dispose() {
+    _companyNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  // Handle shipper signup
+  Future<void> _handleSignup() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please agree to the terms and conditions')),
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final appStateProvider = context.read<AppStateProvider>();
+
+    appStateProvider.showLoadingWithMessage('Creating your account...');
+
+    final success = await authProvider.signUpShipper(
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      companyName: _companyNameController.text.trim(),
+      displayName: _companyNameController.text.trim(),
+      phoneNumber: _phoneController.text.trim(),
+    );
+
+    if (success) {
+      appStateProvider.showSuccess();
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account created successfully! Redirecting...'),
+          backgroundColor: Color(0xFF4B744F),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      print('Shipper signup successful, navigating based on user role');
+      
+      // Add a small delay to ensure user data is fully loaded
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Call onboarding completion callback if provided
+      widget.onOnboardingComplete?.call();
+      
+      // Direct navigation as fallback if AuthWrapper doesn't trigger
+      if (context.mounted) {
+        _navigateBasedOnRole(context, authProvider);
+      }
+    } else {
+      print('Shipper signup failed: ${authProvider.errorMessage}');
+      appStateProvider.showError(authProvider.errorMessage ?? 'Signup failed');
+    }
+  }
+
+  // Navigate based on user role
+  void _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) {
+    final userRole = authProvider.currentUser?.role;
+    print('Shipper Signup: Navigating based on role: $userRole');
+    
+    if (userRole == UserRole.shipper) {
+      print('Shipper Signup: Navigating to Shipper Dashboard');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+        (route) => false,
+      );
+    } else if (userRole == UserRole.carrier) {
+      print('Shipper Signup: Navigating to Carrier Dashboard');
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const MainPage()),
+        (route) => false,
+      );
+    } else {
+      print('Shipper Signup: Role not determined, navigating to AuthWrapper');
+      // If role is not determined, navigate to AuthWrapper
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AuthWrapper()),
+        (route) => false,
+      );
+    }
+  }
 
   PageRouteBuilder _createFadePageRoute(Widget page) {
     return PageRouteBuilder(
@@ -248,10 +351,12 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
 
   // The main sign-up form, adapted for both web and mobile
   Widget _buildSignUpForm(double scale, {required bool isWeb}) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
+    return Form(
+      key: _formKey,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
         if (!isWeb) SizedBox(height: 40 * scale),
 
         // Back Button for Web
@@ -309,6 +414,13 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
           scale: scale,
           hintText: "Company name or Full name",
           icon: Icons.person_outline,
+          controller: _companyNameController,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter company name';
+            }
+            return null;
+          },
         ),
         SizedBox(height: 25 * scale),
         _buildInputField(
@@ -316,9 +428,31 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
           hintText: "Email Address",
           icon: Icons.mail_outline,
           keyboardType: TextInputType.emailAddress,
+          controller: _emailController,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter email address';
+            }
+            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+              return 'Please enter a valid email';
+            }
+            return null;
+          },
         ),
         SizedBox(height: 25 * scale),
-        _buildPhoneInputField(scale: scale),
+        _buildPhoneInputField(
+          scale: scale,
+          controller: _phoneController,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter contact number';
+            }
+            if (value.length < 10) {
+              return 'Please enter a valid phone number';
+            }
+            return null;
+          },
+        ),
         SizedBox(height: 25 * scale),
         _buildInputField(
           scale: scale,
@@ -326,6 +460,16 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
           icon: Icons.lock_outline,
           obscureText: _obscurePassword,
           isPassword: true,
+          controller: _passwordController,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please enter password';
+            }
+            if (value.length < 6) {
+              return 'Password must be at least 6 characters';
+            }
+            return null;
+          },
           onSuffixIconPressed: () => setState(() => _obscurePassword = !_obscurePassword),
         ),
         SizedBox(height: 25 * scale),
@@ -335,6 +479,16 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
           icon: Icons.lock_outline,
           obscureText: _obscureConfirmPassword,
           isPassword: true,
+          controller: _confirmPasswordController,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Please confirm password';
+            }
+            if (value != _passwordController.text) {
+              return 'Passwords do not match';
+            }
+            return null;
+          },
           onSuffixIconPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
         ),
         SizedBox(height: 25 * scale),
@@ -379,14 +533,10 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
         SizedBox(height: 40 * scale),
 
         // Submit Button
-        ElevatedButton(
-          onPressed: _agreeToTerms && !_isLoading ? () {
-            setState(() => _isLoading = true);
-            Future.delayed(const Duration(seconds: 2), () {
-              setState(() => _isLoading = false);
-              Navigator.push(context, _createFadePageRoute(const ShipperOnboarding1Screen()));
-            });
-          } : null,
+        Consumer2<AuthProvider, AppStateProvider>(
+          builder: (context, authProvider, appStateProvider, child) {
+            return ElevatedButton(
+              onPressed: _agreeToTerms && !authProvider.isLoading ? _handleSignup : null,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF059669),
             foregroundColor: Colors.white,
@@ -402,15 +552,43 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
               },
             ),
           ),
-          child: _isLoading
-              ? const SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-          )
-              : const Text("Create Account"),
+              child: authProvider.isLoading
+                  ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+                  : const Text("Create Account"),
+            );
+          },
         ),
         const SizedBox(height: 24),
+
+        // Error message display
+        Consumer<AuthProvider>(
+          builder: (context, authProvider, child) {
+            if (authProvider.errorMessage != null) {
+              return Container(
+                padding: EdgeInsets.all(12 * scale),
+                margin: EdgeInsets.symmetric(vertical: 8 * scale),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8 * scale),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Text(
+                  authProvider.errorMessage!,
+                  style: TextStyle(
+                    color: Colors.red.shade700,
+                    fontSize: 14 * scale,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
 
         // Already have an account link
         Center(
@@ -435,7 +613,8 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
         ),
 
         if (!isWeb) SizedBox(height: 220 * scale), // Padding for bottom image on mobile
-      ],
+        ],
+      ),
     );
   }
 
@@ -462,10 +641,14 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
     bool isPassword = false,
     TextInputType keyboardType = TextInputType.text,
     VoidCallback? onSuffixIconPressed,
+    TextEditingController? controller,
+    String? Function(String?)? validator,
   }) {
     return TextFormField(
+      controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      validator: validator,
       decoration: InputDecoration(
         hintText: hintText,
         prefixIcon: Icon(icon, color: Colors.grey[400], size: 20),
@@ -501,9 +684,15 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
   }
 
   // Updated phone input field
-  Widget _buildPhoneInputField({required double scale}) {
+  Widget _buildPhoneInputField({
+    required double scale,
+    TextEditingController? controller,
+    String? Function(String?)? validator,
+  }) {
     return TextFormField(
+      controller: controller,
       keyboardType: TextInputType.phone,
+      validator: validator,
       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
       decoration: InputDecoration(
         hintText: "(555) 123-4567",

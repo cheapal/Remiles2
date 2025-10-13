@@ -3,34 +3,16 @@ import 'package:flutter/services.dart';
 import 'login_screen.dart';
 import 'choose_role.dart';
 
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      // We set SignScreen as the home screen to test it directly.
-      home: const SignScreen(
-        nextScreen: LoginScreen(),
-      ),
-    );
-  }
-}
-
 // -------------------------------------------------------------------
-// SIGN IN / SIGN UP SCREEN UI CODE (Moved here to fix the issue)
+// SIGN IN / SIGN UP SCREEN UI CODE
 // -------------------------------------------------------------------
 
 class SignScreen extends StatelessWidget {
   // This screen now requires a Widget to navigate to.
   final Widget nextScreen;
+  final VoidCallback? onOnboardingComplete;
 
-  const SignScreen({super.key, required this.nextScreen});
+  const SignScreen({super.key, required this.nextScreen, this.onOnboardingComplete});
 
   // A custom page route to handle the fade transition
   PageRouteBuilder _createFadePageRoute(Widget page) {
@@ -73,12 +55,13 @@ class SignScreen extends StatelessWidget {
                 left: 74,
                 right: 74,
                 top: 525,
-                child: AnimatedPressableContainer(
+                child: GestureDetector(
                   onTap: () {
-                    // This now correctly navigates to the screen we passed in.
-                    Navigator.of(context).push(
-                      _createFadePageRoute(const LoginScreen()),
-                    );
+                    if (context.mounted) {
+                      Navigator.of(context).push(
+                        _createFadePageRoute(const LoginScreen()),
+                      );
+                    }
                   },
                   child: Container(
                     width: 281,
@@ -113,13 +96,14 @@ class SignScreen extends StatelessWidget {
               Positioned(
                 left: 74,
                 right: 74,
-                top: 598,
-                child: AnimatedPressableContainer(
+                top: 590,
+                child: GestureDetector(
                   onTap: () {
-                    // This navigates to the RoleSelectionScreen.
-                    Navigator.of(context).push(
-                      _createFadePageRoute(const RoleSelectionScreen()),
-                    );
+                    if (context.mounted) {
+                      Navigator.of(context).push(
+                        _createFadePageRoute(RoleSelectionScreen(onOnboardingComplete: onOnboardingComplete)),
+                      );
+                    }
                   },
                   child: Container(
                     width: 281,
@@ -150,15 +134,16 @@ class SignScreen extends StatelessWidget {
                 ),
               ),
 
+
               /// Remiles logo image
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 320,
+                top: 100, // Positioned at the top instead of bottom   bottom: 320,
                 child: Center(
                   child: SizedBox(
-                    width: 230,
-                    height: 320,
+                    width: 200, // Smaller width
+                    height: 200, // Smaller height
                     child: Image.asset(
                       'assets/remiles.png',
                       fit: BoxFit.contain,
@@ -174,51 +159,3 @@ class SignScreen extends StatelessWidget {
   }
 }
 
-/// Reusable pressable container with tap animation
-class AnimatedPressableContainer extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onTap;
-
-  const AnimatedPressableContainer({
-    super.key,
-    required this.child,
-    required this.onTap,
-  });
-
-  @override
-  _AnimatedPressableContainerState createState() =>
-      _AnimatedPressableContainerState();
-}
-
-class _AnimatedPressableContainerState
-    extends State<AnimatedPressableContainer> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) {
-        setState(() {
-          _isPressed = true;
-        });
-      },
-      onTapUp: (_) {
-        setState(() {
-          _isPressed = false;
-        });
-        widget.onTap();
-      },
-      onTapCancel: () {
-        setState(() {
-          _isPressed = false;
-        });
-      },
-      child: AnimatedScale(
-        scale: _isPressed ? 0.95 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeInOut,
-        child: widget.child,
-      ),
-    );
-  }
-}

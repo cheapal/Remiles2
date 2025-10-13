@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
-import 'carrier_onboarding_1.dart'; // Import the new onboarding screen
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/app_state_provider.dart';
 
 class CarrierSignUpScreen extends StatefulWidget {
-  const CarrierSignUpScreen({Key? key}) : super(key: key);
+  final VoidCallback? onOnboardingComplete;
+  const CarrierSignUpScreen({Key? key, this.onOnboardingComplete}) : super(key: key);
 
   @override
   State<CarrierSignUpScreen> createState() => _CarrierSignUpScreenState();
@@ -15,18 +18,92 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
+  
+  // Country selection state
+  String _selectedCountryKey = 'canada'; // Use unique key instead of code
+  String _selectedCountryCode = '+1';
+  String _selectedCountryFlag = 'assets/canada_flag.png';
+  
+  // Form controllers
+  final _companyNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
 
-  // A custom page route to handle the fade transition
-  PageRouteBuilder _createFadePageRoute(Widget page) {
-    return PageRouteBuilder(
-      pageBuilder: (context, animation, secondaryAnimation) => page,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
+  // Country data with unique keys
+  final List<Map<String, String>> _countries = [
+    {'key': 'canada', 'code': '+1', 'flag': 'assets/canada_flag.png', 'name': 'Canada'},
+    {'key': 'usa', 'code': '+1', 'flag': 'assets/flag.png', 'name': 'United States'},
+    {'key': 'uk', 'code': '+44', 'flag': 'assets/flag.png', 'name': 'United Kingdom'},
+    {'key': 'france', 'code': '+33', 'flag': 'assets/flag.png', 'name': 'France'},
+    {'key': 'germany', 'code': '+49', 'flag': 'assets/flag.png', 'name': 'Germany'},
+    {'key': 'japan', 'code': '+81', 'flag': 'assets/flag.png', 'name': 'Japan'},
+    {'key': 'china', 'code': '+86', 'flag': 'assets/flag.png', 'name': 'China'},
+    {'key': 'india', 'code': '+91', 'flag': 'assets/flag.png', 'name': 'India'},
+    {'key': 'pakistan', 'code': '+92', 'flag': 'assets/flag.png', 'name': 'Pakistan'},
+    {'key': 'australia', 'code': '+61', 'flag': 'assets/flag.png', 'name': 'Australia'},
+    {'key': 'brazil', 'code': '+55', 'flag': 'assets/flag.png', 'name': 'Brazil'},
+  ];
+
+  @override
+  void dispose() {
+    _companyNameController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  // Handle carrier signup
+  Future<void> _handleSignup() async {
+    if (!_formKey.currentState!.validate()) return;
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please agree to the terms and conditions')),
+      );
+      return;
+    }
+
+    final authProvider = context.read<AuthProvider>();
+    final appStateProvider = context.read<AppStateProvider>();
+
+    try {
+      appStateProvider.showLoadingWithMessage('Creating your account...');
+
+      final success = await authProvider.signUpCarrier(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        companyName: _companyNameController.text.trim(),
+        displayName: _companyNameController.text.trim(),
+        phoneNumber: '$_selectedCountryCode${_phoneController.text.trim()}',
+      );
+
+      if (success) {
+        appStateProvider.showSuccess();
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully! Redirecting...'),
+            backgroundColor: Color(0xFF4B744F),
+            duration: Duration(seconds: 2),
+          ),
         );
-      },
-    );
+        // Call onboarding completion callback if provided
+        widget.onOnboardingComplete?.call();
+        // Navigation will be handled by AuthWrapper
+        print('Carrier signup successful, user should be redirected by AuthWrapper');
+      } else {
+        print('Carrier signup failed: ${authProvider.errorMessage}');
+        appStateProvider.showError(authProvider.errorMessage ?? 'Signup failed');
+      }
+    } catch (e) {
+      // Stop loading and show error for any unexpected errors
+      print('Carrier signup error: $e');
+      appStateProvider.showError('An unexpected error occurred. Please try again.');
+    }
   }
 
   @override
@@ -37,7 +114,6 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     final isWeb = kIsWeb;
     final isDesktop = screenWidth > 1024;
     final isTablet = screenWidth > 768 && screenWidth <= 1024;
-    final isMobile = screenWidth <= 768;
 
     if (isWeb && isDesktop) {
       return _buildWebDesktopLayout(context, screenWidth, screenHeight);
@@ -171,86 +247,136 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                   padding: const EdgeInsets.all(60.0),
                   child: Container(
                     constraints: const BoxConstraints(maxWidth: 400),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        // Back button
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back_rounded,
-                              color: Colors.black,
-                              size: 32,
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // Back button
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.arrow_back_rounded,
+                                color: Colors.black,
+                                size: 32,
+                              ),
+                              onPressed: () => Navigator.of(context).pop(),
                             ),
-                            onPressed: () => Navigator.of(context).pop(),
                           ),
-                        ),
-                        const SizedBox(height: 20),
-                        // Title
-                        const Text(
-                          'Create Account',
-                          style: TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF000000),
+                          const SizedBox(height: 20),
+                          // Title
+                          const Text(
+                            'Create Account',
+                            style: TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF000000),
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Sign up to get started',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Color(0xFF7D8AB0),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Sign up to get started',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFF7D8AB0),
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 40),
-                        // Form fields
-                        _buildWebInputField(
-                          hintText: "Company name or Full name",
-                          iconAsset: 'assets/user.png',
-                        ),
-                        const SizedBox(height: 20),
-                        _buildWebInputField(
-                          hintText: "Email Address",
-                          iconAsset: 'assets/email.png',
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        const SizedBox(height: 20),
-                        _buildWebPhoneInputField(
-                          hintText: "Contact Number",
-                        ),
-                        const SizedBox(height: 20),
-                        _buildWebInputField(
-                          hintText: "Password",
-                          iconAsset: 'assets/password.png',
-                          obscureText: _obscurePassword,
-                          onSuffixIconPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        _buildWebInputField(
-                          hintText: "Confirm Password",
-                          iconAsset: 'assets/password.png',
-                          obscureText: _obscureConfirmPassword,
-                          onSuffixIconPressed: () {
-                            setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 25),
-                        // Terms and conditions
-                        _buildWebTermsCheckbox(),
-                        const SizedBox(height: 30),
-                        // Sign up button
-                        _buildWebSignUpButton(),
-                      ],
+                          const SizedBox(height: 40),
+                          // Form fields
+                          _buildWebInputField(
+                            hintText: "Company name or Full name",
+                            iconAsset: 'assets/user.png',
+                            controller: _companyNameController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter company name';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildWebInputField(
+                            hintText: "Email Address",
+                            iconAsset: 'assets/email.png',
+                            keyboardType: TextInputType.emailAddress,
+                            controller: _emailController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter email address';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildWebPhoneInputField(
+                            hintText: "Contact Number",
+                            controller: _phoneController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter contact number';
+                              }
+                              if (value.length < 10) {
+                                return 'Please enter a valid phone number';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildWebInputField(
+                            hintText: "Password",
+                            iconAsset: 'assets/password.png',
+                            obscureText: _obscurePassword,
+                            controller: _passwordController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter password';
+                              }
+                              if (value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                            onSuffixIconPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildWebInputField(
+                            hintText: "Confirm Password",
+                            iconAsset: 'assets/password.png',
+                            obscureText: _obscureConfirmPassword,
+                            controller: _confirmPasswordController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please confirm password';
+                              }
+                              if (value != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                            onSuffixIconPressed: () {
+                              setState(() {
+                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                              });
+                            },
+                          ),
+                          const SizedBox(height: 25),
+                          // Terms and conditions
+                          _buildWebTermsCheckbox(),
+                          const SizedBox(height: 30),
+                          // Sign up button
+                          _buildWebSignUpButton(),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -336,58 +462,108 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                       ),
                     ],
                   ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Create Account',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF000000),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Create Account',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF000000),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 30),
-                      _buildWebInputField(
-                        hintText: "Company name or Full name",
-                        iconAsset: 'assets/user.png',
-                      ),
-                      const SizedBox(height: 20),
-                      _buildWebInputField(
-                        hintText: "Email Address",
-                        iconAsset: 'assets/email.png',
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 20),
-                      _buildWebPhoneInputField(
-                        hintText: "Contact Number",
-                      ),
-                      const SizedBox(height: 20),
-                      _buildWebInputField(
-                        hintText: "Password",
-                        iconAsset: 'assets/password.png',
-                        obscureText: _obscurePassword,
-                        onSuffixIconPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      _buildWebInputField(
-                        hintText: "Confirm Password",
-                        iconAsset: 'assets/password.png',
-                        obscureText: _obscureConfirmPassword,
-                        onSuffixIconPressed: () {
-                          setState(() {
-                            _obscureConfirmPassword = !_obscureConfirmPassword;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 25),
-                      _buildWebTermsCheckbox(),
-                      const SizedBox(height: 30),
-                      _buildWebSignUpButton(),
-                    ],
+                        const SizedBox(height: 30),
+                        _buildWebInputField(
+                          hintText: "Company name or Full name",
+                          iconAsset: 'assets/user.png',
+                          controller: _companyNameController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter company name';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _buildWebInputField(
+                          hintText: "Email Address",
+                          iconAsset: 'assets/email.png',
+                          keyboardType: TextInputType.emailAddress,
+                          controller: _emailController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter email address';
+                            }
+                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                              return 'Please enter a valid email';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _buildWebPhoneInputField(
+                          hintText: "Contact Number",
+                          controller: _phoneController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter contact number';
+                            }
+                            if (value.length < 10) {
+                              return 'Please enter a valid phone number';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _buildWebInputField(
+                          hintText: "Password",
+                          iconAsset: 'assets/password.png',
+                          obscureText: _obscurePassword,
+                          controller: _passwordController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter password';
+                            }
+                            if (value.length < 6) {
+                              return 'Password must be at least 6 characters';
+                            }
+                            return null;
+                          },
+                          onSuffixIconPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _buildWebInputField(
+                          hintText: "Confirm Password",
+                          iconAsset: 'assets/password.png',
+                          obscureText: _obscureConfirmPassword,
+                          controller: _confirmPasswordController,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please confirm password';
+                            }
+                            if (value != _passwordController.text) {
+                              return 'Passwords do not match';
+                            }
+                            return null;
+                          },
+                          onSuffixIconPressed: () {
+                            setState(() {
+                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 25),
+                        _buildWebTermsCheckbox(),
+                        const SizedBox(height: 30),
+                        _buildWebSignUpButton(),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -446,109 +622,158 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                         color: const Color(0xFFFFFEF6),
                         borderRadius: BorderRadius.circular(37 * scale),
                       ),
-                      child: Column(
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          children: [
+                            _buildInputField(
+                              scale: scale,
+                              hintText: "Company name or Full name",
+                              iconAsset: 'assets/user.png',
+                              controller: _companyNameController,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter company name';
+                                }
+                                return null;
+                              },
+                            ),
+                            SizedBox(height: 25 * scale),
+                            _buildInputField(
+                              scale: scale,
+                              hintText: "Email Address",
+                              iconAsset: 'assets/email.png',
+                              keyboardType: TextInputType.emailAddress,
+                              controller: _emailController,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter email address';
+                                }
+                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                  return 'Please enter a valid email';
+                                }
+                                return null;
+                              },
+                            ),
+                            SizedBox(height: 25 * scale),
+                            _buildPhoneInputField(
+                              scale: scale,
+                              hintText: "Contact Number",
+                              controller: _phoneController,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter contact number';
+                                }
+                                if (value.length < 10) {
+                                  return 'Please enter a valid phone number';
+                                }
+                                return null;
+                              },
+                            ),
+                            SizedBox(height: 25 * scale),
+                            _buildInputField(
+                              scale: scale,
+                              hintText: "Password",
+                              iconAsset: 'assets/password.png',
+                              obscureText: _obscurePassword,
+                              controller: _passwordController,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please enter password';
+                                }
+                                if (value.length < 6) {
+                                  return 'Password must be at least 6 characters';
+                                }
+                                return null;
+                              },
+                              onSuffixIconPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                            SizedBox(height: 25 * scale),
+                            _buildInputField(
+                              scale: scale,
+                              hintText: "Confirm Password",
+                              iconAsset: 'assets/password.png',
+                              obscureText: _obscureConfirmPassword,
+                              controller: _confirmPasswordController,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Please confirm password';
+                                }
+                                if (value != _passwordController.text) {
+                                  return 'Passwords do not match';
+                                }
+                                return null;
+                              },
+                              onSuffixIconPressed: () {
+                                setState(() {
+                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 20 * scale),
+                    Container(
+                      width: 294 * scale,
+                      height: 45 * scale,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildInputField(
-                            scale: scale,
-                            hintText: "Company name or Full name",
-                            iconAsset: 'assets/user.png',
-                          ),
-                          SizedBox(height: 25 * scale),
-                          _buildInputField(
-                            scale: scale,
-                            hintText: "Email Address",
-                            iconAsset: 'assets/email.png',
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                          SizedBox(height: 25 * scale),
-                          _buildPhoneInputField(
-                            scale: scale,
-                            hintText: "Contact Number",
-                          ),
-                          SizedBox(height: 25 * scale),
-                          _buildInputField(
-                            scale: scale,
-                            hintText: "Password",
-                            iconAsset: 'assets/password.png',
-                            obscureText: _obscurePassword,
-                            onSuffixIconPressed: () {
+                          GestureDetector(
+                            onTap: () {
                               setState(() {
-                                _obscurePassword = !_obscurePassword;
+                                _agreeToTerms = !_agreeToTerms;
                               });
                             },
-                          ),
-                          SizedBox(height: 25 * scale),
-                          _buildInputField(
-                            scale: scale,
-                            hintText: "Confirm Password",
-                            iconAsset: 'assets/password.png',
-                            obscureText: _obscureConfirmPassword,
-                            onSuffixIconPressed: () {
-                              setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
-                              });
-                            },
-                          ),
-                          SizedBox(height: 20 * scale),
-                          Container(
-                            width: 294 * scale,
-                            height: 45 * scale,
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                GestureDetector(
-                                  onTap: () {
-                                    setState(() {
-                                      _agreeToTerms = !_agreeToTerms;
-                                    });
-                                  },
-                                  child: Container(
-                                    width: 20 * scale,
-                                    height: 20 * scale,
-                                    margin: EdgeInsets.only(
-                                        right: 8 * scale, top: 2 * scale),
-                                    decoration: BoxDecoration(
-                                      color: _agreeToTerms
-                                          ? const Color(0xFF4B744F)
-                                          : Colors.white,
-                                      borderRadius:
-                                      BorderRadius.circular(4 * scale),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.25),
-                                          blurRadius: 4,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: _agreeToTerms
-                                        ? Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 14 * scale,
-                                    )
-                                        : null,
+                            child: Container(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              margin: EdgeInsets.only(
+                                  right: 8 * scale, top: 2 * scale),
+                              decoration: BoxDecoration(
+                                color: _agreeToTerms
+                                    ? const Color(0xFF4B744F)
+                                    : Colors.white,
+                                borderRadius:
+                                BorderRadius.circular(4 * scale),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.25),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 4),
                                   ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 12 * scale,
-                                      height: 14 / 12,
-                                      color: const Color(0xFF7D8AB0),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
+                              child: _agreeToTerms
+                                  ? Icon(
+                                Icons.check,
+                                color: Colors.white,
+                                size: 14 * scale,
+                              )
+                                  : null,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12 * scale,
+                                height: 14 / 12,
+                                color: const Color(0xFF7D8AB0),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const Spacer(),
                   ],
                 ),
               ),
@@ -566,56 +791,94 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                   },
                 ),
               ),
-              if (!kIsWeb)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Image.asset(
-                    'assets/leather_up.png',
-                    fit: BoxFit.cover,
-                  ),
-                ),
+              !kIsWeb
+                  ? Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      child: Image.asset(
+                        'assets/leather_up.png',
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
               Positioned(
                 bottom: 190 * scale,
                 right: 30 * scale,
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      _createFadePageRoute(const CarrierOnboarding1Screen()),
-                    );
-                  },
-                  child: Container(
-                    width: 110 * scale,
-                    height: 55 * scale,
-                    decoration: BoxDecoration(
-                      image: const DecorationImage(
-                        image: AssetImage('assets/signup_button.png'),
-                        fit: BoxFit.fill,
-                      ),
-                      borderRadius: BorderRadius.circular(24.5 * scale),
-                    ),
-                    child: const Align(
-                      alignment: Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black26,
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
-                            ),
-                          ],
+                child: Consumer2<AuthProvider, AppStateProvider>(
+                  builder: (context, authProvider, appStateProvider, child) {
+                    return GestureDetector(
+                      onTap: _handleSignup,
+                      child: Container(
+                        width: 110 * scale,
+                        height: 55 * scale,
+                        decoration: BoxDecoration(
+                          image: const DecorationImage(
+                            image: AssetImage('assets/signup_button.png'),
+                            fit: BoxFit.fill,
+                          ),
+                          borderRadius: BorderRadius.circular(24.5 * scale),
+                        ),
+                        child: Align(
+                          alignment: Alignment(0, -0.2),
+                          child: authProvider.isLoading
+                              ? SizedBox(
+                                  width: 20 * scale,
+                                  height: 20 * scale,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : Text(
+                                  "Next",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black26,
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
                 ),
+              ),
+              // Error message display
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  if (authProvider.errorMessage != null) {
+                    return Positioned(
+                      bottom: 250 * scale,
+                      left: 20 * scale,
+                      right: 20 * scale,
+                      child: Container(
+                        padding: EdgeInsets.all(12 * scale),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8 * scale),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Text(
+                          authProvider.errorMessage!,
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontSize: 14 * scale,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
               ),
             ],
           ),
@@ -631,6 +894,8 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     TextInputType keyboardType = TextInputType.text,
     VoidCallback? onSuffixIconPressed,
     List<TextInputFormatter>? inputFormatters,
+    TextEditingController? controller,
+    String? Function(String?)? validator,
   }) {
     return Container(
       height: 56,
@@ -658,10 +923,12 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: TextField(
+              child: TextFormField(
+                controller: controller,
                 obscureText: obscureText,
                 keyboardType: keyboardType,
                 inputFormatters: inputFormatters,
+                validator: validator,
                 decoration: InputDecoration(
                   hintText: hintText,
                   border: InputBorder.none,
@@ -691,7 +958,11 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     );
   }
 
-  Widget _buildWebPhoneInputField({required String hintText}) {
+  Widget _buildWebPhoneInputField({
+    required String hintText,
+    TextEditingController? controller,
+    String? Function(String?)? validator,
+  }) {
     return Container(
       height: 56,
       decoration: BoxDecoration(
@@ -710,25 +981,15 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Row(
           children: [
-            Image.asset(
-              'assets/canada_flag.png',
-              width: 24,
-              height: 16,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 8),
-            const Text(
-              '+1',
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF111827),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            // Country dropdown
+            _buildCountryDropdown(),
             const SizedBox(width: 12),
+            // Phone number input
             Expanded(
-              child: TextField(
+              child: TextFormField(
+                controller: controller,
                 keyboardType: TextInputType.phone,
+                validator: validator,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
                 ],
@@ -747,6 +1008,121 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCountryDropdown() {
+    return Container(
+      height: 40,
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedCountryKey,
+          isExpanded: false,
+          icon: const Icon(
+            Icons.keyboard_arrow_down,
+            color: Color(0xFF6B7280),
+            size: 20,
+          ),
+          style: const TextStyle(
+            fontSize: 16,
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w500,
+          ),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() {
+                _selectedCountryKey = newValue;
+                final selectedCountry = _countries.firstWhere(
+                  (country) => country['key'] == newValue,
+                );
+                _selectedCountryCode = selectedCountry['code']!;
+                _selectedCountryFlag = selectedCountry['flag']!;
+              });
+            }
+          },
+          items: _countries.map<DropdownMenuItem<String>>((Map<String, String> country) {
+            return DropdownMenuItem<String>(
+              value: country['key'],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    country['flag']!,
+                    width: 20,
+                    height: 14,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 20,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: const Icon(
+                          Icons.flag,
+                          size: 12,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    country['code']!,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          selectedItemBuilder: (BuildContext context) {
+            return _countries.map<Widget>((Map<String, String> country) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    _selectedCountryFlag,
+                    width: 20,
+                    height: 14,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 20,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: const Icon(
+                          Icons.flag,
+                          size: 12,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _selectedCountryCode,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            }).toList();
+          },
         ),
       ),
     );
@@ -798,32 +1174,40 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
   }
 
   Widget _buildWebSignUpButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: () {
-          Navigator.push(
-            context,
-            _createFadePageRoute(const CarrierOnboarding1Screen()),
-          );
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF4B744F),
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+    return Consumer2<AuthProvider, AppStateProvider>(
+      builder: (context, authProvider, appStateProvider, child) {
+        return SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: _handleSignup,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4B744F),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: authProvider.isLoading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Text(
+                    'Create Account',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
           ),
-        ),
-        child: const Text(
-          'Create Account',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -859,6 +1243,8 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     TextInputType keyboardType = TextInputType.text,
     VoidCallback? onSuffixIconPressed,
     List<TextInputFormatter>? inputFormatters,
+    TextEditingController? controller,
+    String? Function(String?)? validator,
   }) {
     return Container(
       width: 314 * scale,
@@ -886,10 +1272,12 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
             ),
             SizedBox(width: 10 * scale),
             Expanded(
-              child: TextField(
+              child: TextFormField(
+                controller: controller,
                 obscureText: obscureText,
                 keyboardType: keyboardType,
                 inputFormatters: inputFormatters,
+                validator: validator,
                 decoration: InputDecoration(
                   hintText: hintText,
                   border: InputBorder.none,
@@ -920,7 +1308,12 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
   }
 
   // Helper method for the phone number field with flag and country code
-  Widget _buildPhoneInputField({required double scale, required String hintText}) {
+  Widget _buildPhoneInputField({
+    required double scale, 
+    required String hintText,
+    TextEditingController? controller,
+    String? Function(String?)? validator,
+  }) {
     return Container(
       width: 314 * scale,
       height: 60 * scale,
@@ -939,24 +1332,14 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
         padding: EdgeInsets.symmetric(horizontal: 10 * scale),
         child: Row(
           children: [
-            Image.asset(
-              'assets/canada_flag.png',
-              width: 30 * scale,
-              height: 20 * scale,
-              fit: BoxFit.contain,
-            ),
-            SizedBox(width: 8 * scale),
-            Text(
-              '+1',
-              style: TextStyle(
-                fontSize: 16 * scale,
-                color: const Color(0xFF000000),
-              ),
-            ),
+            // Country dropdown for mobile
+            _buildMobileCountryDropdown(scale),
             SizedBox(width: 10 * scale),
             Expanded(
-              child: TextField(
+              child: TextFormField(
+                controller: controller,
                 keyboardType: TextInputType.phone,
+                validator: validator,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly
                 ],
@@ -975,6 +1358,122 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // Mobile country dropdown
+  Widget _buildMobileCountryDropdown(double scale) {
+    return Container(
+      height: 40 * scale,
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(8 * scale),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedCountryKey,
+          isExpanded: false,
+          icon: Icon(
+            Icons.keyboard_arrow_down,
+            color: const Color(0xFF6B7280),
+            size: 20 * scale,
+          ),
+          style: TextStyle(
+            fontSize: 14 * scale,
+            color: const Color(0xFF111827),
+            fontWeight: FontWeight.w500,
+          ),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() {
+                _selectedCountryKey = newValue;
+                final selectedCountry = _countries.firstWhere(
+                  (country) => country['key'] == newValue,
+                );
+                _selectedCountryCode = selectedCountry['code']!;
+                _selectedCountryFlag = selectedCountry['flag']!;
+              });
+            }
+          },
+          items: _countries.map<DropdownMenuItem<String>>((Map<String, String> country) {
+            return DropdownMenuItem<String>(
+              value: country['key'],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    country['flag']!,
+                    width: 20 * scale,
+                    height: 14 * scale,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 20 * scale,
+                        height: 14 * scale,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2 * scale),
+                        ),
+                        child: Icon(
+                          Icons.flag,
+                          size: 12 * scale,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 6 * scale),
+                  Text(
+                    country['code']!,
+                    style: TextStyle(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          selectedItemBuilder: (BuildContext context) {
+            return _countries.map<Widget>((Map<String, String> country) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    _selectedCountryFlag,
+                    width: 20 * scale,
+                    height: 14 * scale,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 20 * scale,
+                        height: 14 * scale,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2 * scale),
+                        ),
+                        child: Icon(
+                          Icons.flag,
+                          size: 12 * scale,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 6 * scale),
+                  Text(
+                    _selectedCountryCode,
+                    style: TextStyle(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            }).toList();
+          },
         ),
       ),
     );

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'joiningoption.dart'; // Import the JoiningOption screen
 
 class WelcomeScreen extends StatefulWidget {
   final Widget nextScreen;
@@ -38,12 +37,17 @@ class WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProviderS
     // Start the animation and make it repeat for a duration of 2 seconds
     _waveController.repeat(reverse: true);
     Timer(const Duration(milliseconds: 2000), () {
-      _waveController.stop();
+      if (mounted) {
+        _waveController.stop();
+      }
     });
   }
 
   @override
   void dispose() {
+    if (_waveController.isAnimating) {
+      _waveController.stop();
+    }
     _waveController.dispose();
     super.dispose();
   }
@@ -159,11 +163,19 @@ class WelcomeScreenState extends State<WelcomeScreen> with SingleTickerProviderS
                         });
                       },
                       onTap: () {
-                        // Navigate to the next screen with the custom slide transition.
-                        Navigator.push(
-                          context,
-                          _createSlidePageRoute(),
-                        );
+                        // Check if the widget is still mounted before navigating
+                        if (mounted) {
+                          // Add a small delay to ensure animations complete
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            if (mounted) {
+                              // Navigate to the next screen with the custom slide transition.
+                              Navigator.push(
+                                context,
+                                _createSlidePageRoute(),
+                              );
+                            }
+                          });
+                        }
                       },
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),

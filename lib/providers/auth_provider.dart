@@ -96,6 +96,10 @@ class AuthProvider with ChangeNotifier {
     try {
       final userData = await FirebaseService.getCurrentUserData();
       if (userData != null) {
+        print('AuthProvider: Loaded user data: ${userData.toString()}');
+        if (userData is ShipperModel) {
+          print('AuthProvider: Loaded shipper with isOnboardingComplete: ${userData.isOnboardingComplete}');
+        }
         _setUser(firebaseUser, userData);
         await _storeAuthData(userData);
       } else {
@@ -201,7 +205,10 @@ class AuthProvider with ChangeNotifier {
         createdAt: DateTime.now(),
         companyName: companyName,
         additionalData: additionalData,
+        isOnboardingComplete: false, // Explicitly set to false
       );
+      
+      print('AuthProvider: Creating shipper with isOnboardingComplete: ${shipperData.isOnboardingComplete}');
 
       final userCredential = await FirebaseService.signUpShipper(
         email: email,

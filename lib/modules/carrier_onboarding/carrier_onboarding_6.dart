@@ -106,12 +106,26 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
           carrier.uid,
           'onboarding_6_income',
           response,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
         );
         
         print('Onboarding 6 response saved: ${_incomeController.text.trim()}');
       }
     } catch (e) {
       print('Error saving onboarding 6 response: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isSaving = false;

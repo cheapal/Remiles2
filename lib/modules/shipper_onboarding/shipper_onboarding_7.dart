@@ -1,9 +1,19 @@
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_1.dart';
+import 'package:provider/provider.dart';
+import '../../core/firebase_service.dart';
+import '../../providers/auth_provider.dart';
+import '../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-class ShipperOnboarding7Screen extends StatelessWidget {
+class ShipperOnboarding7Screen extends StatefulWidget {
   const ShipperOnboarding7Screen({super.key});
+
+  @override
+  State<ShipperOnboarding7Screen> createState() => _ShipperOnboarding7ScreenState();
+}
+
+class _ShipperOnboarding7ScreenState extends State<ShipperOnboarding7Screen> {
+  bool _completing = false;
 
   // Custom page route for a smooth fade transition
   PageRouteBuilder _createFadeRoute(Widget nextScreen) {
@@ -129,9 +139,46 @@ class ShipperOnboarding7Screen extends StatelessWidget {
                 right: 0,
                 child: Center( // Centered horizontally
                   child: GestureDetector(
-                    onTap: () {
-                      // Navigate to the next onboarding screen with a fade transition
-                      Navigator.of(context).push(_createFadeRoute(const ShipperDashboard1()));
+                    onTap: () async {
+                      if (_completing) return;
+                      
+                      setState(() => _completing = true);
+                      try {
+                        final authProvider = context.read<AuthProvider>();
+                        final shipper = authProvider.shipperUser;
+                        if (shipper != null) {
+                          await FirebaseService.markShipperOnboardingComplete(shipper.uid).timeout(
+                            const Duration(seconds: 10),
+                            onTimeout: () {
+                              throw Exception('Network timeout. Please check your internet connection.');
+                            },
+                          );
+                          // Update local provider state
+                          authProvider.setUserData(
+                            authProvider.firebaseUser,
+                            shipper.copyWithShipper(
+                              isOnboardingComplete: true,
+                            ),
+                          );
+                        }
+                        if (!context.mounted) return;
+                        Navigator.of(context).pushAndRemoveUntil(
+                          _createFadeRoute(const ShipperDashboardMainPage()),
+                          (route) => false,
+                        );
+                      } catch (e) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to complete onboarding: ${e.toString()}'),
+                              backgroundColor: Colors.red,
+                              duration: const Duration(seconds: 3),
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (mounted) setState(() => _completing = false);
+                      }
                     },
                     child: Container(
                       width: 290 * scale, // Increased dimensions
@@ -145,21 +192,30 @@ class ShipperOnboarding7Screen extends StatelessWidget {
                       ),
                       child: Align(
                         alignment: const Alignment(0, -0.2),
-                        child: Text(
-                          "See How Re-Miles Helps You",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18 * scale,
-                            fontWeight: FontWeight.bold,
-                            shadows: const [
-                              Shadow(
-                                color: Color.fromRGBO(0, 0, 0, 0.3),
-                                offset: Offset(0, 2),
-                                blurRadius: 4,
+                        child: _completing
+                            ? SizedBox(
+                                width: 24 * scale,
+                                height: 24 * scale,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Text(
+                                "See How Re-Miles Helps You",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18 * scale,
+                                  fontWeight: FontWeight.bold,
+                                  shadows: const [
+                                    Shadow(
+                                      color: Color.fromRGBO(0, 0, 0, 0.3),
+                                      offset: Offset(0, 2),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ),

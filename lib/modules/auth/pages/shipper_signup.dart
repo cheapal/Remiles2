@@ -8,6 +8,7 @@ import '../../../core/auth_wrapper.dart';
 import '../../../models/user_model.dart';
 import '../../carrier_dashboard/views/dashboard/pages/main_page.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import '../../shipper_onboarding/shipper_onboarding_wrapper.dart';
 import 'choose_role.dart';
 
 class ShipperSignUpScreen extends StatefulWidget {
@@ -119,11 +120,20 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
     print('Shipper Signup: Navigating based on role: $userRole');
     
     if (userRole == UserRole.shipper) {
-      print('Shipper Signup: Navigating to Shipper Dashboard');
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
-        (route) => false,
-      );
+      final shipper = authProvider.shipperUser;
+      if (shipper != null && shipper.isOnboardingComplete == false) {
+        print('Shipper Signup: Navigating to Shipper Onboarding');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const ShipperOnboardingWrapper()),
+          (route) => false,
+        );
+      } else {
+        print('Shipper Signup: Navigating to Shipper Dashboard');
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+          (route) => false,
+        );
+      }
     } else if (userRole == UserRole.carrier) {
       print('Shipper Signup: Navigating to Carrier Dashboard');
       Navigator.of(context).pushAndRemoveUntil(

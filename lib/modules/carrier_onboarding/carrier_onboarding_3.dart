@@ -107,12 +107,26 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
           carrier.uid,
           'onboarding_3_service_areas',
           response,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
         );
         
         print('Onboarding 3 response saved: ${_selectedOptions.toList()}');
       }
     } catch (e) {
       print('Error saving onboarding 3 response: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isSaving = false;

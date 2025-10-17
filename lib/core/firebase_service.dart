@@ -6,6 +6,7 @@ import '../models/user_model.dart';
 import '../models/shipper_model.dart';
 import '../models/carrier_model.dart';
 import '../models/carrier_onboarding_data.dart';
+import '../models/shipper_onboarding_data.dart';
 
 /// Firebase service class to handle all Firebase operations
 class FirebaseService {
@@ -238,7 +239,9 @@ class FirebaseService {
       if (userCredential.user != null) {
         // Create shipper document in Firestore
         final shipper = shipperData.copyWithShipper(uid: userCredential.user!.uid);
+        print('FirebaseService: Creating shipper with isOnboardingComplete: ${shipper.isOnboardingComplete}');
         await createShipper(shipper);
+        print('FirebaseService: Shipper created successfully');
       }
 
       return userCredential;
@@ -385,6 +388,96 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Get completed onboarding screens failed');
       return [];
+    }
+  }
+
+  // Shipper Onboarding Data Methods
+  static Future<void> saveShipperOnboardingResponse(
+    String shipperId,
+    String screenName,
+    Map<String, dynamic> response,
+  ) async {
+    try {
+      final shipperRef = shippers.doc(shipperId);
+      final shipperDoc = await shipperRef.get();
+
+      if (!shipperDoc.exists) {
+        throw Exception('Shipper document not found');
+      }
+
+      final shipperData = shipperDoc.data() as Map<String, dynamic>;
+      final currentOnboardingData = shipperData['onboardingData'] != null
+          ? ShipperOnboardingData.fromFirestore(shipperData['onboardingData'])
+          : const ShipperOnboardingData();
+
+      final updatedOnboardingData = currentOnboardingData.addResponse(screenName, response);
+
+      await shipperRef.update({
+        'onboardingData': updatedOnboardingData.toFirestore(),
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      print('Shipper onboarding response saved for screen: $screenName');
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Save shipper onboarding response failed');
+      rethrow;
+    }
+  }
+
+  static Future<void> markShipperOnboardingComplete(String shipperId) async {
+    try {
+      final shipperRef = shippers.doc(shipperId);
+      final shipperDoc = await shipperRef.get();
+
+      if (!shipperDoc.exists) {
+        throw Exception('Shipper document not found');
+      }
+
+      final shipperData = shipperDoc.data() as Map<String, dynamic>;
+      final currentOnboardingData = shipperData['onboardingData'] != null
+          ? ShipperOnboardingData.fromFirestore(shipperData['onboardingData'])
+          : const ShipperOnboardingData();
+
+      final completedOnboardingData = currentOnboardingData.markComplete();
+
+      await shipperRef.update({
+        'onboardingData': completedOnboardingData.toFirestore(),
+        'isOnboardingComplete': true,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      print('Shipper onboarding marked as complete');
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Mark shipper onboarding complete failed');
+      rethrow;
+    }
+  }
+
+  static Future<ShipperOnboardingData?> getShipperOnboardingData(String shipperId) async {
+    try {
+      final shipperDoc = await shippers.doc(shipperId).get();
+
+      if (!shipperDoc.exists) {
+        return null;
+      }
+
+      final shipperData = shipperDoc.data() as Map<String, dynamic>;
+      return shipperData['onboardingData'] != null
+          ? ShipperOnboardingData.fromFirestore(shipperData['onboardingData'])
+          : null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Get shipper onboarding data failed');
+      rethrow;
+    }
+  }
+
+  static Future<bool> isShipperOnboardingComplete(String shipperId) async {
+    try {
+      final onboardingData = await getShipperOnboardingData(shipperId);
+      return onboardingData?.isCompleted ?? false;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Check shipper onboarding complete failed');
+      return false;
     }
   }
 }

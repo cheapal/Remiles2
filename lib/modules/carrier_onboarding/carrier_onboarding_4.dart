@@ -19,6 +19,7 @@ class _CarrierOnboarding4ScreenState extends State<CarrierOnboarding4Screen> {
   // State variable to hold the currently selected options
   Set<String> _selectedOptions = {};
   bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -102,12 +103,30 @@ class _CarrierOnboarding4ScreenState extends State<CarrierOnboarding4Screen> {
           carrier.uid,
           'onboarding_4_equipment',
           response,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
         );
         
         print('Onboarding 4 response saved: ${_selectedOptions.toList()}');
       }
     } catch (e) {
       print('Error saving onboarding 4 response: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
     }
   }
 
@@ -250,19 +269,28 @@ class _CarrierOnboarding4ScreenState extends State<CarrierOnboarding4Screen> {
                 top: 625 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () async {
-                    if (_selectedOptions.isNotEmpty) {
+                  onTap: _isSaving ? null : () async {
+                    if (_selectedOptions.isEmpty) {
+                      _showAlertDialog(context, 'Please select at least one option to proceed.');
+                      return;
+                    }
+                    
+                    setState(() => _isSaving = true);
+                    try {
                       // Save the response before proceeding
                       await _saveOnboardingResponse();
                       
+                      if (!mounted) return;
                       Navigator.push(
                         context,
                         _createFadePageRoute(CarrierOnboarding5Screen(
                           onOnboardingComplete: widget.onOnboardingComplete,
                         )),
                       );
-                    } else {
-                      _showAlertDialog(context, 'Please select at least one option to proceed.');
+                    } catch (e) {
+                      // Error handling is already in _saveOnboardingResponse
+                    } finally {
+                      if (mounted) setState(() => _isSaving = false);
                     }
                   },
                   child: Container(
@@ -277,21 +305,30 @@ class _CarrierOnboarding4ScreenState extends State<CarrierOnboarding4Screen> {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
+                      child: _isSaving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

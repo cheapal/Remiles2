@@ -20,6 +20,7 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
   // State variable to hold the currently selected vehicle types
   Set<String> _selectedVehicleTypes = {};
   bool _isLoading = true;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -103,12 +104,18 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
           carrier.uid,
           'onboarding_1_vehicle_types',
           response,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
         );
         
         print('Onboarding 1 response saved: ${_selectedVehicleTypes.toList()}');
       }
     } catch (e) {
       print('Error saving onboarding 1 response: $e');
+      rethrow; // Re-throw to handle in the calling method
     }
   }
 
@@ -254,18 +261,36 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
                 left: 287 * scale,
                 child: GestureDetector(
                   onTap: () async {
-                    if (_selectedVehicleTypes.isNotEmpty) {
+                    if (_selectedVehicleTypes.isEmpty) {
+                      _showAlertDialog(context, 'Please select at least one option to proceed.');
+                      return;
+                    }
+                    if (_saving) return;
+                    
+                    setState(() => _saving = true);
+                    try {
                       // Save the response before proceeding
                       await _saveOnboardingResponse();
                       
+                      if (!mounted) return;
                       Navigator.push(
                         context,
                         _createFadePageRoute(CarrierOnboarding2Screen(
                           onOnboardingComplete: widget.onOnboardingComplete,
                         )),
                       );
-                    } else {
-                      _showAlertDialog(context, 'Please select at least one option to proceed.');
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to save: ${e.toString()}'),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
                     }
                   },
                   child: Container(
@@ -280,21 +305,30 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
                     ),
                     child: Align(
                       alignment: Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.3),
-                              offset: const Offset(0, 2),
-                              blurRadius: 4,
+                      child: _saving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.3),
+                                    offset: const Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

@@ -5,9 +5,16 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/firebase_service.dart';
 
-class CarrierOnboarding7Screen extends StatelessWidget {
+class CarrierOnboarding7Screen extends StatefulWidget {
   final VoidCallback? onOnboardingComplete;
   const CarrierOnboarding7Screen({super.key, this.onOnboardingComplete});
+
+  @override
+  State<CarrierOnboarding7Screen> createState() => _CarrierOnboarding7ScreenState();
+}
+
+class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
+  bool _completing = false;
   PageRouteBuilder _createFadePageRoute(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
@@ -172,7 +179,7 @@ class CarrierOnboarding7Screen extends StatelessWidget {
                 top: 677 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () => _handleOnboardingComplete(context),
+                  onTap: _completing ? null : () => _handleOnboardingComplete(context),
                   child: Container(
                     width: 110 * scale,
                     height: 55 * scale,
@@ -185,21 +192,30 @@ class CarrierOnboarding7Screen extends StatelessWidget {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
+                      child: _completing
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),
@@ -223,6 +239,7 @@ class CarrierOnboarding7Screen extends StatelessWidget {
   }
 
   Future<void> _handleOnboardingComplete(BuildContext context) async {
+    setState(() => _completing = true);
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
@@ -238,6 +255,11 @@ class CarrierOnboarding7Screen extends StatelessWidget {
           carrier.uid,
           'onboarding_7_completion',
           response,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
         );
         
         // Mark onboarding as complete in Firebase
@@ -247,10 +269,10 @@ class CarrierOnboarding7Screen extends StatelessWidget {
       }
       
       // Call the completion callback if provided
-      onOnboardingComplete?.call();
+      widget.onOnboardingComplete?.call();
       
       // Navigate to the main dashboard and clear all previous screens
-      if (context.mounted) {
+      if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const MainPage()),
           (route) => false, // Remove all previous routes
@@ -258,13 +280,22 @@ class CarrierOnboarding7Screen extends StatelessWidget {
       }
     } catch (e) {
       print('Error completing onboarding: $e');
-      // Still navigate to dashboard even if there's an error
-      if (context.mounted) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to complete onboarding: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        // Still navigate to dashboard even if there's an error
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const MainPage()),
           (route) => false, // Remove all previous routes
         );
       }
+    } finally {
+      if (mounted) setState(() => _completing = false);
     }
   }
 

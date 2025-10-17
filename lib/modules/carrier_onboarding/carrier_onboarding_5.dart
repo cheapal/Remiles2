@@ -19,6 +19,7 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
   // State variable to hold the currently selected option
   String? _selectedOption;
   bool _isLoading = true;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -102,12 +103,30 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
           carrier.uid,
           'onboarding_5_experience',
           response,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
         );
         
         print('Onboarding 5 response saved: $_selectedOption');
       }
     } catch (e) {
       print('Error saving onboarding 5 response: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
     }
   }
 
@@ -247,29 +266,37 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
                 top: 625 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () async {
-                    if (_selectedOption == 'Never') {
-                      // Save the response before proceeding
-                      await _saveOnboardingResponse();
-                      
-                      Navigator.push(
-                        context,
-                        _createFadePageRoute(CarrierOnboarding7Screen(
-                          onOnboardingComplete: widget.onOnboardingComplete,
-                        )),
-                      );
-                    } else if (_selectedOption != null) {
-                      // Save the response before proceeding
-                      await _saveOnboardingResponse();
-                      
-                      Navigator.push(
-                        context,
-                        _createFadePageRoute(CarrierOnboarding6Screen(
-                          onOnboardingComplete: widget.onOnboardingComplete,
-                        )),
-                      );
-                    } else {
+                  onTap: _isSaving ? null : () async {
+                    if (_selectedOption == null) {
                       _showAlertDialog(context, 'Please select an option to proceed.');
+                      return;
+                    }
+                    
+                    setState(() => _isSaving = true);
+                    try {
+                      // Save the response before proceeding
+                      await _saveOnboardingResponse();
+                      
+                      if (!mounted) return;
+                      if (_selectedOption == 'Never') {
+                        Navigator.push(
+                          context,
+                          _createFadePageRoute(CarrierOnboarding7Screen(
+                            onOnboardingComplete: widget.onOnboardingComplete,
+                          )),
+                        );
+                      } else {
+                        Navigator.push(
+                          context,
+                          _createFadePageRoute(CarrierOnboarding6Screen(
+                            onOnboardingComplete: widget.onOnboardingComplete,
+                          )),
+                        );
+                      }
+                    } catch (e) {
+                      // Error handling is already in _saveOnboardingResponse
+                    } finally {
+                      if (mounted) setState(() => _isSaving = false);
                     }
                   },
                   child: Container(
@@ -284,21 +311,30 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
+                      child: _isSaving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

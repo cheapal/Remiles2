@@ -7,6 +7,7 @@ import '../modules/auth/pages/welcome.dart';
 import '../modules/auth/pages/joiningoption.dart';
 import '../modules/shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import '../modules/carrier_onboarding/carrier_onboarding_wrapper.dart';
+import '../modules/shipper_onboarding/shipper_onboarding_wrapper.dart';
 import '../models/user_model.dart';
 
 class AuthWrapper extends StatefulWidget {
@@ -72,12 +73,40 @@ class _AuthWrapperState extends State<AuthWrapper> {
       // Navigate based on role
       print('AuthWrapper: Navigating based on role: ${_authProvider.currentUser?.role}');
       if (_authProvider.currentUser?.role == UserRole.shipper) {
-        print('AuthWrapper: Navigating to Shipper Dashboard');
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
-            (route) => false,
-          );
+        // Check if shipper needs onboarding
+        final shipper = _authProvider.shipperUser;
+        print('AuthWrapper: Shipper data: ${shipper?.toString()}');
+        if (shipper != null) {
+          // Check both the flag and actual onboarding data
+          final isOnboardingComplete = shipper.isOnboardingComplete;
+          print('AuthWrapper: Shipper isOnboardingComplete flag: $isOnboardingComplete');
+          print('AuthWrapper: Shipper onboarding data: ${shipper.onboardingData?.toString()}');
+          
+          if (!isOnboardingComplete) {
+            print('AuthWrapper: Navigating to Shipper Onboarding Wrapper');
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const ShipperOnboardingWrapper()),
+                (route) => false,
+              );
+            }
+          } else {
+            print('AuthWrapper: Navigating to Shipper Dashboard');
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+                (route) => false,
+              );
+            }
+          }
+        } else {
+          print('AuthWrapper: No shipper data found, navigating to login');
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+            );
+          }
         }
       } else if (_authProvider.currentUser?.role == UserRole.carrier) {
         print('AuthWrapper: Navigating to Carrier Onboarding Wrapper');

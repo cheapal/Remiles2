@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'user_model.dart';
+import 'shipper_onboarding_data.dart';
 
 class ShipperModel extends UserModel {
   final String companyName;
@@ -17,6 +18,8 @@ class ShipperModel extends UserModel {
   final int totalShipments;
   final double? rating;
   final DateTime? verificationDate;
+  final bool isOnboardingComplete;
+  final ShipperOnboardingData? onboardingData;
 
   ShipperModel({
     required String uid,
@@ -42,6 +45,8 @@ class ShipperModel extends UserModel {
     this.totalShipments = 0,
     this.rating,
     this.verificationDate,
+    this.isOnboardingComplete = false,
+    this.onboardingData,
   }) : super(
           uid: uid,
           email: email,
@@ -87,6 +92,10 @@ class ShipperModel extends UserModel {
       rating: data['rating']?.toDouble(),
       verificationDate: data['verificationDate'] != null
           ? (data['verificationDate'] as Timestamp).toDate()
+          : null,
+      isOnboardingComplete: data['isOnboardingComplete'] ?? false,
+      onboardingData: data['onboardingData'] != null
+          ? ShipperOnboardingData.fromFirestore(data['onboardingData'])
           : null,
     );
   }
@@ -145,6 +154,8 @@ class ShipperModel extends UserModel {
       'totalShipments': totalShipments,
       'rating': rating,
       'verificationDate': verificationDate?.toIso8601String(),
+      'isOnboardingComplete': isOnboardingComplete,
+      'onboardingData': onboardingData?.toFirestore(),
     });
     return json;
   }
@@ -170,6 +181,8 @@ class ShipperModel extends UserModel {
       'verificationDate': verificationDate != null 
           ? Timestamp.fromDate(verificationDate!) 
           : null,
+      'isOnboardingComplete': isOnboardingComplete,
+      'onboardingData': onboardingData?.toFirestore(),
     });
     return firestore;
   }
@@ -199,6 +212,8 @@ class ShipperModel extends UserModel {
     int? totalShipments,
     double? rating,
     DateTime? verificationDate,
+    bool? isOnboardingComplete,
+    ShipperOnboardingData? onboardingData,
   }) {
     return ShipperModel(
       uid: uid ?? this.uid,
@@ -224,6 +239,8 @@ class ShipperModel extends UserModel {
       totalShipments: totalShipments ?? this.totalShipments,
       rating: rating ?? this.rating,
       verificationDate: verificationDate ?? this.verificationDate,
+      isOnboardingComplete: isOnboardingComplete ?? this.isOnboardingComplete,
+      onboardingData: onboardingData ?? this.onboardingData,
     );
   }
 

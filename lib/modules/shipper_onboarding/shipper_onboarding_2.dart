@@ -1,8 +1,14 @@
+import 'package:Remiles/modules/shipper_onboarding/shipper_onboarding_1.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
+
+import '../../core/firebase_service.dart';
+import '../../providers/auth_provider.dart';
 import 'shipper_onboarding_3.dart';
-import 'shipper_onboarding_1.dart'; // Import the previous screen for navigation
 import 'other_shipper_onboarding_2.dart';
+// duplicate import removed
+
 
 class ShipperOnboarding2Screen extends StatefulWidget {
   const ShipperOnboarding2Screen({super.key});
@@ -13,6 +19,28 @@ class ShipperOnboarding2Screen extends StatefulWidget {
 
 class _ShipperOnboarding2ScreenState extends State<ShipperOnboarding2Screen> {
   Set<String> _selectedChallenges = {};
+  bool _loadingPrefill = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillFromServer();
+  }
+
+  Future<void> _prefillFromServer() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+      if (shipper == null) return setState(() => _loadingPrefill = false);
+      final data = await FirebaseService.getShipperOnboardingData(shipper.uid);
+      final response = data?.getResponse('screen2_challenges');
+      if (response != null && response['selected'] is List) {
+        _selectedChallenges = Set<String>.from(List<String>.from(response['selected']));
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loadingPrefill = false);
+  }
 
   PageRouteBuilder _createFadeRoute(Widget nextScreen) {
     return PageRouteBuilder(
@@ -53,6 +81,8 @@ class _ShipperOnboarding2ScreenState extends State<ShipperOnboarding2Screen> {
                 height: double.infinity,
                 color: const Color(0xFFFEFEF6),
               ),
+              if (_loadingPrefill)
+                const Center(child: CircularProgressIndicator()),
               Positioned(
                 top: 50 * scale,
                 left: 10 * scale,
@@ -127,11 +157,45 @@ class _ShipperOnboarding2ScreenState extends State<ShipperOnboarding2Screen> {
                 top: 714 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
-                    if (_selectedChallenges.isNotEmpty) {
-                      Navigator.push(context, _createFadeRoute(const ShipperOnboarding3Screen()));
-                    } else {
+                  onTap: () async {
+                    if (_selectedChallenges.isEmpty) {
                       _showAlertDialog(context, 'Please select at least one option to proceed.');
+                      return;
+                    }
+                    if (_saving) return;
+                    
+                    setState(() => _saving = true);
+                    try {
+                      final authProvider = context.read<AuthProvider>();
+                      final shipper = authProvider.shipperUser;
+                      if (shipper != null) {
+                        await FirebaseService.saveShipperOnboardingResponse(
+                          shipper.uid,
+                          'screen2_challenges',
+                          {
+                            'selected': _selectedChallenges.toList(),
+                          },
+                        ).timeout(
+                          const Duration(seconds: 10),
+                          onTimeout: () {
+                            throw Exception('Network timeout. Please check your internet connection.');
+                          },
+                        );
+                      }
+                      if (!mounted) return;
+                      Navigator.push(context, _createFadeRoute(const ShipperOnboarding3Screen()));
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to save: ${e.toString()}'),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
                     }
                   },
                   child: Container(
@@ -146,21 +210,30 @@ class _ShipperOnboarding2ScreenState extends State<ShipperOnboarding2Screen> {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
+                      child: _saving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

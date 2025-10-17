@@ -106,12 +106,26 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
           carrier.uid,
           'onboarding_2_business_type',
           response,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
         );
         
         print('Onboarding 2 response saved: $_selectedOption');
       }
     } catch (e) {
       print('Error saving onboarding 2 response: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isSaving = false;

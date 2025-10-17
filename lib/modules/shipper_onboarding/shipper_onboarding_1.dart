@@ -1,8 +1,13 @@
-import 'package:Remiles/modules/auth/pages/shipper_signup.dart';
+// import removed duplicate
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
+
+import '../../core/firebase_service.dart';
+import '../../providers/auth_provider.dart';
 import 'shipper_onboarding_2.dart';
-import 'other_shipper_onboarding_1.dart'; // Import the new other screen
+import 'other_shipper_onboarding_1.dart';
+// use the absolute above import already present, remove duplicate relative
 
 class ShipperOnboarding1Screen extends StatefulWidget {
   const ShipperOnboarding1Screen({super.key});
@@ -14,6 +19,28 @@ class ShipperOnboarding1Screen extends StatefulWidget {
 class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
   // State variable to hold the currently selected vehicle types
   Set<String> _selectedFreightTypes = {};
+  bool _loadingPrefill = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillFromServer();
+  }
+
+  Future<void> _prefillFromServer() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+      if (shipper == null) return setState(() => _loadingPrefill = false);
+      final data = await FirebaseService.getShipperOnboardingData(shipper.uid);
+      final response = data?.getResponse('screen1_freight_types');
+      if (response != null && response['selected'] is List) {
+        _selectedFreightTypes = Set<String>.from(List<String>.from(response['selected']));
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loadingPrefill = false);
+  }
 
   // A custom page route to handle the fade transition
   PageRouteBuilder _createFadePageRoute(Widget page) {
@@ -28,22 +55,7 @@ class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
     );
   }
 
-  // A custom page route for smooth transitions
-  PageRouteBuilder _createRoute(Widget nextScreen) {
-    return PageRouteBuilder(
-      pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        const begin = Offset(1.0, 0.0);
-        const end = Offset.zero;
-        const curve = Curves.ease;
-        var tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-        return SlideTransition(
-          position: animation.drive(tween),
-          child: child,
-        );
-      },
-    );
-  }
+  // removed unused _createRoute
 
   // A helper function to show a simple AlertDialog
   void _showAlertDialog(BuildContext context, String message) {
@@ -85,6 +97,8 @@ class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
           bottom: false,
           child: Stack(
             children: [
+              if (_loadingPrefill)
+                const Center(child: CircularProgressIndicator()),
               // Main background and content
               Container(
                 width: double.infinity,
@@ -103,10 +117,7 @@ class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
                     size: 40 * scale,
                   ),
                   onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      _createFadePageRoute(const ShipperSignUpScreen()),
-                    );
+                    Navigator.of(context).maybePop();
                   },
                 ),
               ),
@@ -177,14 +188,48 @@ class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
                 top: 714 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
-                    if (_selectedFreightTypes.isNotEmpty) {
+                  onTap: () async {
+                    if (_selectedFreightTypes.isEmpty) {
+                      _showAlertDialog(context, 'Please select at least one option to proceed.');
+                      return;
+                    }
+                    if (_saving) return;
+                    
+                    setState(() => _saving = true);
+                    try {
+                      final authProvider = context.read<AuthProvider>();
+                      final shipper = authProvider.shipperUser;
+                      if (shipper != null) {
+                        await FirebaseService.saveShipperOnboardingResponse(
+                          shipper.uid,
+                          'screen1_freight_types',
+                          {
+                            'selected': _selectedFreightTypes.toList(),
+                          },
+                        ).timeout(
+                          const Duration(seconds: 10),
+                          onTimeout: () {
+                            throw Exception('Network timeout. Please check your internet connection.');
+                          },
+                        );
+                      }
+                      if (!mounted) return;
                       Navigator.push(
                         context,
                         _createFadePageRoute(const ShipperOnboarding2Screen()),
                       );
-                    } else {
-                      _showAlertDialog(context, 'Please select at least one option to proceed.');
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to save: ${e.toString()}'),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
                     }
                   },
                   child: Container(
@@ -199,21 +244,30 @@ class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(
-                              color: const Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: const Offset(0, 2),
-                              blurRadius: 4,
+                      child: _saving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: [
+                                  Shadow(
+                                    color: const Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: const Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

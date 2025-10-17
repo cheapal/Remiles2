@@ -1,6 +1,10 @@
+import 'package:Remiles/modules/shipper_onboarding/shipper_onboarding_4.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
-import 'shipper_onboarding_4.dart';
+
+import '../../core/firebase_service.dart';
+import '../../providers/auth_provider.dart';
 import 'shipper_onboarding_6.dart';
 
 class ShipperOnboarding5Screen extends StatefulWidget {
@@ -12,6 +16,28 @@ class ShipperOnboarding5Screen extends StatefulWidget {
 
 class _ShipperOnboarding5ScreenState extends State<ShipperOnboarding5Screen> {
   String? _selectedOption;
+  bool _loadingPrefill = true;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillFromServer();
+  }
+
+  Future<void> _prefillFromServer() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+      if (shipper == null) return setState(() => _loadingPrefill = false);
+      final data = await FirebaseService.getShipperOnboardingData(shipper.uid);
+      final response = data?.getResponse('screen5_losses');
+      if (response != null && response['selected'] is String) {
+        _selectedOption = response['selected'] as String;
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _loadingPrefill = false);
+  }
 
   PageRouteBuilder _createFadeRoute(Widget nextScreen) {
     return PageRouteBuilder(
@@ -52,6 +78,8 @@ class _ShipperOnboarding5ScreenState extends State<ShipperOnboarding5Screen> {
                 height: double.infinity,
                 color: const Color(0xFFFEFEF6),
               ),
+              if (_loadingPrefill)
+                const Center(child: CircularProgressIndicator()),
               Positioned(
                 top: 50 * scale,
                 left: 10 * scale,
@@ -121,11 +149,45 @@ class _ShipperOnboarding5ScreenState extends State<ShipperOnboarding5Screen> {
                 top: 625 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: () {
-                    if (_selectedOption != null) {
-                      Navigator.push(context, _createFadeRoute(const ShipperOnboarding6Screen()));
-                    } else {
+                  onTap: () async {
+                    if (_selectedOption == null) {
                       _showAlertDialog(context, 'Please select an option to proceed.');
+                      return;
+                    }
+                    if (_saving) return;
+                    
+                    setState(() => _saving = true);
+                    try {
+                      final authProvider = context.read<AuthProvider>();
+                      final shipper = authProvider.shipperUser;
+                      if (shipper != null) {
+                        await FirebaseService.saveShipperOnboardingResponse(
+                          shipper.uid,
+                          'screen5_losses',
+                          {
+                            'selected': _selectedOption,
+                          },
+                        ).timeout(
+                          const Duration(seconds: 10),
+                          onTimeout: () {
+                            throw Exception('Network timeout. Please check your internet connection.');
+                          },
+                        );
+                      }
+                      if (!mounted) return;
+                      Navigator.push(context, _createFadeRoute(const ShipperOnboarding6Screen()));
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Failed to save: ${e.toString()}'),
+                            backgroundColor: Colors.red,
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) setState(() => _saving = false);
                     }
                   },
                   child: Container(
@@ -140,21 +202,30 @@ class _ShipperOnboarding5ScreenState extends State<ShipperOnboarding5Screen> {
                     ),
                     child: Align(
                       alignment: const Alignment(0, -0.2),
-                      child: Text(
-                        "Next",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18 * scale,
-                          fontWeight: FontWeight.bold,
-                          shadows: const [
-                            Shadow(
-                              color: Color.fromRGBO(0, 0, 0, 0.3),
-                              offset: Offset(0, 2),
-                              blurRadius: 4,
+                      child: _saving
+                          ? SizedBox(
+                              width: 20 * scale,
+                              height: 20 * scale,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              "Next",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18 * scale,
+                                fontWeight: FontWeight.bold,
+                                shadows: const [
+                                  Shadow(
+                                    color: Color.fromRGBO(0, 0, 0, 0.3),
+                                    offset: Offset(0, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                              ),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
                 ),

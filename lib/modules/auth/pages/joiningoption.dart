@@ -139,7 +139,7 @@ class SignScreen extends StatelessWidget {
               Positioned(
                 left: 0,
                 right: 0,
-                top: 100, // Positioned at the top instead of bottom   bottom: 320,
+                top: 300, // Positioned at the top instead of bottom   bottom: 320,
                 child: Center(
                   child: SizedBox(
                     width: 200, // Smaller width

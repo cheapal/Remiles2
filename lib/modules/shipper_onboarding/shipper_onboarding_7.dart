@@ -1,7 +1,7 @@
 import 'package:provider/provider.dart';
 import '../../core/firebase_service.dart';
 import '../../providers/auth_provider.dart';
-import '../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import '../shipper_dashboard/pages/shipper_dashboard_1.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -163,7 +163,7 @@ class _ShipperOnboarding7ScreenState extends State<ShipperOnboarding7Screen> {
                         }
                         if (!context.mounted) return;
                         Navigator.of(context).pushAndRemoveUntil(
-                          _createFadeRoute(const ShipperDashboardMainPage()),
+                          _createFadeRoute(const ShipperDashboard1()),
                           (route) => false,
                         );
                       } catch (e) {

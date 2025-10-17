@@ -6,9 +6,11 @@ import '../modules/auth/pages/login_screen.dart';
 import '../modules/auth/pages/welcome.dart';
 import '../modules/auth/pages/joiningoption.dart';
 import '../modules/shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import '../modules/shipper_dashboard/pages/shipper_dashboard_1.dart';
 import '../modules/carrier_onboarding/carrier_onboarding_wrapper.dart';
 import '../modules/shipper_onboarding/shipper_onboarding_wrapper.dart';
 import '../models/user_model.dart';
+import 'firebase_service.dart';
 
 class AuthWrapper extends StatefulWidget {
   const AuthWrapper({Key? key}) : super(key: key);
@@ -91,12 +93,27 @@ class _AuthWrapperState extends State<AuthWrapper> {
               );
             }
           } else {
-            print('AuthWrapper: Navigating to Shipper Dashboard');
-            if (mounted) {
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
-                (route) => false,
-              );
+            // Check if dashboard steps are completed
+            print('AuthWrapper: Checking if dashboard steps are completed...');
+            final isDashboardComplete = await FirebaseService.isShipperDashboardComplete(shipper.uid);
+            print('AuthWrapper: Dashboard complete: $isDashboardComplete');
+            
+            if (!isDashboardComplete) {
+              print('AuthWrapper: Navigating to Shipper Dashboard 1');
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const ShipperDashboard1()),
+                  (route) => false,
+                );
+              }
+            } else {
+              print('AuthWrapper: Navigating to Shipper Dashboard Main Page');
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+                  (route) => false,
+                );
+              }
             }
           }
         } else {

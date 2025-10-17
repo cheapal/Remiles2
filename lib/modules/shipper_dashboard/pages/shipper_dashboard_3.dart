@@ -1,6 +1,9 @@
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../core/firebase_service.dart';
 
 class ShipperDashboard3 extends StatefulWidget {
   const ShipperDashboard3({super.key});
@@ -15,6 +18,10 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
   int _selectedTab = 0;
   bool _isGstRegistered = false;
   bool? _isCarbonFootprintInterested = null;
+  bool _saving = false;
+  
+  // Form controller
+  final TextEditingController _businessNumberController = TextEditingController();
 
   @override
   void initState() {
@@ -29,6 +36,7 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
   @override
   void dispose() {
     _progressController1.dispose();
+    _businessNumberController.dispose();
     super.dispose();
   }
 
@@ -161,6 +169,7 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
                         hintText: "What is your Business Number (BN)?",
                         subtext:
                         "9-digit CRA-assigned number used for tax purposes.",
+                        controller: _businessNumberController,
                       ),
                       const SizedBox(height: 25),
                       const Text(
@@ -201,15 +210,7 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
                       Align(
                         alignment: Alignment.center,
                         child: GestureDetector(
-                          onTap: () {
-                            /// open shipper dashboard main screen
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                const ShipperDashboardMainPage(),
-                              ),
-                            );
-                          },
+                          onTap: _saving ? null : () => _handleSubmit(),
                           child: Container(
                             width: 314,
                             height: 57,
@@ -225,15 +226,24 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
                               ],
                               borderRadius: BorderRadius.circular(26),
                             ),
-                            child: const Center(
-                              child: Text(
-                                "Submit",
-                                style: TextStyle(
-                                  color: Color(0xFFFFFFFF),
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                            child: Center(
+                              child: _saving
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Text(
+                                      "Submit",
+                                      style: TextStyle(
+                                        color: Color(0xFFFFFFFF),
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
                             ),
                           ),
                         ),
@@ -311,12 +321,95 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
     );
   }
 
+  // ===== Methods =====
+  
+  Future<void> _handleSubmit() async {
+    // Validate required fields
+    if (_businessNumberController.text.trim().isEmpty) {
+      _showAlertDialog(context, 'Please enter your Business Number (BN).');
+      return;
+    }
+    
+    if (_isCarbonFootprintInterested == null) {
+      _showAlertDialog(context, 'Please select your interest in carbon footprint tracking.');
+      return;
+    }
+    
+    setState(() => _saving = true);
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+      
+      if (shipper != null) {
+        final response = {
+          'businessNumber': _businessNumberController.text.trim(),
+          'isGstRegistered': _isGstRegistered,
+          'isCarbonFootprintInterested': _isCarbonFootprintInterested!,
+          'timestamp': DateTime.now().toIso8601String(),
+        };
+        
+        await FirebaseService.saveShipperDashboardResponse(
+          shipper.uid,
+          'dashboard_3_business_number',
+          response,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
+        );
+        
+        print('Dashboard 3 response saved successfully');
+      }
+      
+      if (!mounted) return;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const ShipperDashboardMainPage(),
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+  
+  void _showAlertDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Validation Error'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   // ===== Widgets =====
 
   Widget _buildTextInputField({
     required BuildContext context,
     required String hintText,
     String? subtext,
+    TextEditingController? controller,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -342,6 +435,7 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
               children: [
                 Expanded(
                   child: TextField(
+                    controller: controller,
                     decoration: InputDecoration(
                       hintText: hintText,
                       border: InputBorder.none,

@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'dart:io';
 import '../models/user_model.dart';
 import '../models/shipper_model.dart';
 import '../models/carrier_model.dart';
@@ -478,6 +479,77 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Check shipper onboarding complete failed');
       return false;
+    }
+  }
+
+  // Save shipper dashboard response
+  static Future<void> saveShipperDashboardResponse(
+    String shipperUid,
+    String screenKey,
+    Map<String, dynamic> response,
+  ) async {
+    try {
+      await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('dashboard_responses')
+          .doc(screenKey)
+          .set(response, SetOptions(merge: true));
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save shipper dashboard response');
+      rethrow;
+    }
+  }
+
+  // Get shipper dashboard response
+  static Future<Map<String, dynamic>?> getShipperDashboardResponse(
+    String shipperUid,
+    String screenKey,
+  ) async {
+    try {
+      final doc = await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('dashboard_responses')
+          .doc(screenKey)
+          .get();
+      
+      return doc.exists ? doc.data() : null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get shipper dashboard response');
+      return null;
+    }
+  }
+
+  // Check if shipper has completed all dashboard steps
+  static Future<bool> isShipperDashboardComplete(String shipperUid) async {
+    try {
+      // Check if all three dashboard steps are completed
+      final dashboard2 = await getShipperDashboardResponse(shipperUid, 'dashboard_2_business_info');
+      final dashboard3 = await getShipperDashboardResponse(shipperUid, 'dashboard_3_business_number');
+      
+      return dashboard2 != null && dashboard3 != null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Check shipper dashboard complete failed');
+      return false;
+    }
+  }
+
+  // Upload image to Firebase Storage
+  static Future<String?> uploadImage(
+    String shipperUid,
+    String imageType,
+    File imageFile,
+  ) async {
+    try {
+      final ref = _storage.ref().child('shippers/$shipperUid/documents/$imageType.jpg');
+      final uploadTask = ref.putFile(imageFile);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload image');
+      return null;
     }
   }
 }

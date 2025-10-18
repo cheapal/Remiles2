@@ -552,4 +552,23 @@ class FirebaseService {
       return null;
     }
   }
+
+  // Save shipper load data
+  static Future<void> saveShipperLoad(
+    String shipperUid,
+    Map<String, dynamic> loadData,
+  ) async {
+    try {
+      final loadId = DateTime.now().millisecondsSinceEpoch.toString();
+      await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads')
+          .doc(loadId)
+          .set(loadData);
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save shipper load');
+      rethrow;
+    }
+  }
 }

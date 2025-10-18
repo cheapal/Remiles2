@@ -1172,8 +1172,11 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                     children:  [
                       // Show eco SVG only if user is interested in carbon footprint tracking
                       if (_isCarbonFootprintInterested) ...[
-                        SvgPicture.asset('assets/eco.svg',
-                            width: 50, height: 50,),
+                        Padding(
+                          padding: const EdgeInsets.only(top:15),
+                          child: SvgPicture.asset('assets/eco.svg',
+                              width: 50, height: 50,),
+                        ),
                         SizedBox(width: 20),
                       ],
                       SvgPicture.asset('assets/person.svg',

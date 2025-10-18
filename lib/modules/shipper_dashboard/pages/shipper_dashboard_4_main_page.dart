@@ -8,8 +8,10 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.da
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../core/firebase_service.dart';
 
 import '../../carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 
@@ -1076,6 +1078,47 @@ class ShipperDashboardHomePage extends StatefulWidget {
 }
 
 class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
+  bool _isCarbonFootprintInterested = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCarbonFootprintInterest();
+  }
+
+  Future<void> _loadCarbonFootprintInterest() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+      
+      if (shipper != null) {
+        final dashboard3Data = await FirebaseService.getShipperDashboardResponse(
+          shipper.uid,
+          'dashboard_3_business_number',
+        );
+        
+        if (dashboard3Data != null) {
+          setState(() {
+            _isCarbonFootprintInterested = dashboard3Data['isCarbonFootprintInterested'] ?? false;
+          });
+        } else {
+          setState(() {
+            _isCarbonFootprintInterested = false;
+          });
+        }
+      } else {
+        setState(() {
+          _isCarbonFootprintInterested = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading carbon footprint interest: $e');
+      setState(() {
+        _isCarbonFootprintInterested = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
@@ -1124,22 +1167,20 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(
-                width: 71,
-                height: 71,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: darkGreen,
-                      width: 2),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Image.asset(
-                  'assets/profile_icon.png',
-                  fit: BoxFit.cover,
-                ),
-              ),
+              Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children:  [
+                      // Show eco SVG only if user is interested in carbon footprint tracking
+                      if (_isCarbonFootprintInterested) ...[
+                        SvgPicture.asset('assets/eco.svg',
+                            width: 50, height: 50,),
+                        SizedBox(width: 20),
+                      ],
+                      SvgPicture.asset('assets/person.svg',
+                          width: 75, height: 65,),
+                      SizedBox(width: 20),
+                    ],
+                  ),
             ],
           ),
           const SizedBox(height: 20),

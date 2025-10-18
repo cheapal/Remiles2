@@ -571,4 +571,94 @@ class FirebaseService {
       rethrow;
     }
   }
+
+  // Save support ticket
+  static Future<void> saveSupportTicket(
+    String userId,
+    Map<String, dynamic> supportData,
+  ) async {
+    try {
+      final ticketId = DateTime.now().millisecondsSinceEpoch.toString();
+      await _firestore
+          .collection('support_tickets')
+          .doc(ticketId)
+          .set(supportData);
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save support ticket');
+      rethrow;
+    }
+  }
+
+  // Save user preferences
+  static Future<void> saveUserPreferences(
+    String userId,
+    Map<String, dynamic> preferencesData,
+  ) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('preferences')
+          .doc('user_preferences')
+          .set(preferencesData, SetOptions(merge: true));
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save user preferences');
+      rethrow;
+    }
+  }
+
+  // Get user preferences
+  static Future<Map<String, dynamic>?> getUserPreferences(String userId) async {
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('preferences')
+          .doc('user_preferences')
+          .get();
+      
+      return doc.exists ? doc.data() : null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get user preferences');
+      return null;
+    }
+  }
+
+  // Save shipper preferences (stored in shipper document)
+  static Future<void> saveShipperPreferences(
+    String shipperUid,
+    Map<String, dynamic> preferencesData,
+  ) async {
+    try {
+      await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .update({
+        'preferences': preferencesData,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save shipper preferences');
+      rethrow;
+    }
+  }
+
+  // Get shipper preferences (from shipper document)
+  static Future<Map<String, dynamic>?> getShipperPreferences(String shipperUid) async {
+    try {
+      final doc = await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .get();
+      
+      if (doc.exists) {
+        final data = doc.data();
+        return data?['preferences'] as Map<String, dynamic>?;
+      }
+      return null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get shipper preferences');
+      return null;
+    }
+  }
 }

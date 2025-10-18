@@ -1,8 +1,27 @@
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../../../providers/auth_provider.dart';
+import '../../../../../core/firebase_service.dart';
 
-class SupportScreen extends StatelessWidget {
+class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
+
+  @override
+  State<SupportScreen> createState() => _SupportScreenState();
+}
+
+class _SupportScreenState extends State<SupportScreen> {
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +90,7 @@ class SupportScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           TextFormField(
+                            controller: _titleController,
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.white,
@@ -83,6 +103,7 @@ class SupportScreen extends StatelessWidget {
                                 vertical: 15.0,
                                 horizontal: 15.0,
                               ),
+                              hintText: 'Enter a brief title for your issue',
                             ),
                             maxLines: 1,
                           ),
@@ -100,6 +121,7 @@ class SupportScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                           TextFormField(
+                            controller: _descriptionController,
                             decoration: InputDecoration(
                               filled: true,
                               fillColor: Colors.white,
@@ -112,6 +134,7 @@ class SupportScreen extends StatelessWidget {
                                 vertical: 15.0,
                                 horizontal: 15.0,
                               ),
+                              hintText: 'Please describe your issue in detail...',
                             ),
                             maxLines: 7, // Multi-line input for description
                             minLines: 5,
@@ -121,14 +144,11 @@ class SupportScreen extends StatelessWidget {
                           // Submit Button
                           Center(
                             child: ElevatedButton(
-                              onPressed: () {
-                                // Handle submit action
-                                print('Submit button pressed!');
-                              },
+                              onPressed: _isSubmitting ? null : _submitSupportTicket,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(
-                                  0xFF2C5E4A,
-                                ), // Dark green color
+                                backgroundColor: _isSubmitting 
+                                    ? const Color(0xFF2C5E4A).withOpacity(0.7)
+                                    : const Color(0xFF2C5E4A), // Dark green color
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 60,
                                   vertical: 15,
@@ -138,13 +158,22 @@ class SupportScreen extends StatelessWidget {
                                 ),
                                 elevation: 5, // Shadow effect
                               ),
-                              child: const Text(
-                                'Submit',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.white,
-                                ),
-                              ),
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Submit',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                             ),
                           ),
                         ],
@@ -157,6 +186,117 @@ class SupportScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  // ======== Methods ========
+  
+  Future<void> _submitSupportTicket() async {
+    if (_isSubmitting) return;
+    
+    // Validate form
+    if (!_validateForm()) return;
+    
+    setState(() => _isSubmitting = true);
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final user = authProvider.currentUser;
+      
+      if (user != null) {
+        final supportData = {
+          'title': _titleController.text.trim(),
+          'description': _descriptionController.text.trim(),
+          'userId': user.uid,
+          'userEmail': user.email,
+          'userRole': user.role.toString(),
+          'status': 'open',
+          'priority': 'medium',
+          'createdAt': DateTime.now().toIso8601String(),
+          'updatedAt': DateTime.now().toIso8601String(),
+        };
+        
+        await FirebaseService.saveSupportTicket(
+          user.uid,
+          supportData,
+        ).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            throw Exception('Network timeout. Please check your internet connection.');
+          },
+        );
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Support ticket submitted successfully! We\'ll get back to you soon.'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
+            ),
+          );
+          
+          // Clear form
+          _clearForm();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit support ticket: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  bool _validateForm() {
+    if (_titleController.text.trim().isEmpty) {
+      _showAlertDialog(context, 'Please enter a title for your support request.');
+      return false;
+    }
+    
+    if (_descriptionController.text.trim().isEmpty) {
+      _showAlertDialog(context, 'Please describe your problem in detail.');
+      return false;
+    }
+    
+    if (_titleController.text.trim().length < 5) {
+      _showAlertDialog(context, 'Please enter a more descriptive title (at least 5 characters).');
+      return false;
+    }
+    
+    if (_descriptionController.text.trim().length < 20) {
+      _showAlertDialog(context, 'Please provide a more detailed description (at least 20 characters).');
+      return false;
+    }
+    
+    return true;
+  }
+
+  void _clearForm() {
+    _titleController.clear();
+    _descriptionController.clear();
+  }
+
+  void _showAlertDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Validation Error'),
+          content: Text(message),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -553,6 +553,27 @@ class FirebaseService {
     }
   }
 
+  // Upload load document to separate folder
+  static Future<String?> uploadLoadDocument(
+    String shipperUid,
+    String loadId,
+    File documentFile,
+  ) async {
+    try {
+      // Get file name
+      final fileName = documentFile.path.split('/').last;
+      
+      final ref = _storage.ref().child('shippers/$shipperUid/loads/$loadId/documents/$fileName');
+      final uploadTask = ref.putFile(documentFile);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload load document');
+      return null;
+    }
+  }
+
   // Save shipper load data
   static Future<void> saveShipperLoad(
     String shipperUid,
@@ -560,6 +581,7 @@ class FirebaseService {
   ) async {
     try {
       final loadId = DateTime.now().millisecondsSinceEpoch.toString();
+      loadData['id'] = loadId;
       await _firestore
           .collection('shippers')
           .doc(shipperUid)
@@ -568,6 +590,27 @@ class FirebaseService {
           .set(loadData);
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to save shipper load');
+      rethrow;
+    }
+  }
+
+  // Update existing shipper load data
+  static Future<void> updateShipperLoad(
+    String shipperUid,
+    String loadId,
+    Map<String, dynamic> loadData,
+  ) async {
+    try {
+      loadData['id'] = loadId;
+      loadData['updatedAt'] = DateTime.now().toIso8601String();
+      await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads')
+          .doc(loadId)
+          .update(loadData);
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to update shipper load');
       rethrow;
     }
   }
@@ -659,6 +702,284 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to get shipper preferences');
       return null;
+    }
+  }
+
+  // Get shipper loads with search, filter, and pagination
+  static Future<Map<String, dynamic>> getShipperLoads({
+    required String shipperUid,
+    String searchQuery = '',
+    String status = 'all',
+    String loadType = 'all',
+    String equipmentType = 'all',
+    String originCity = 'all',
+    String destinationCity = 'all',
+    String sortBy = 'createdAt',
+    String sortOrder = 'desc',
+    int limit = 10,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    try {
+      Query query = _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads');
+
+      // Apply status filter
+      if (status != 'all') {
+        query = query.where('status', isEqualTo: status);
+      }
+
+      // Apply load type filter
+      if (loadType != 'all') {
+        query = query.where('loadType', isEqualTo: loadType);
+      }
+
+      // Apply equipment type filter
+      if (equipmentType != 'all') {
+        query = query.where('equipmentNeeded', isEqualTo: equipmentType);
+      }
+
+
+      // Note: City filtering will be done client-side due to Firestore limitations
+      // with compound queries and text search
+
+      // Apply sorting
+      query = query.orderBy(sortBy, descending: sortOrder == 'desc');
+
+      // Apply pagination
+      if (lastDocument != null) {
+        query = query.startAfterDocument(lastDocument);
+      }
+
+      // Apply limit
+      query = query.limit(limit);
+
+      final snapshot = await query.get();
+      final loads = snapshot.docs.map((doc) {
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return data;
+      }).toList();
+
+      // Apply search and city filters client-side
+      final filteredLoads = loads.where((load) {
+        // Apply search filter
+        bool matchesSearch = true;
+        if (searchQuery.isNotEmpty) {
+          final searchLower = searchQuery.toLowerCase();
+          matchesSearch = (load['originAddress']?.toString().toLowerCase().contains(searchLower) ?? false) ||
+                         (load['destinationAddress']?.toString().toLowerCase().contains(searchLower) ?? false) ||
+                         (load['loadType']?.toString().toLowerCase().contains(searchLower) ?? false) ||
+                         (load['loadDescription']?.toString().toLowerCase().contains(searchLower) ?? false) ||
+                         (load['equipmentNeeded']?.toString().toLowerCase().contains(searchLower) ?? false);
+        }
+
+        // Apply origin city filter
+        bool matchesOriginCity = true;
+        if (originCity != 'all') {
+          matchesOriginCity = load['originAddress']?.toString().contains(originCity) ?? false;
+        }
+
+        // Apply destination city filter
+        bool matchesDestinationCity = true;
+        if (destinationCity != 'all') {
+          matchesDestinationCity = load['destinationAddress']?.toString().contains(destinationCity) ?? false;
+        }
+
+        return matchesSearch && matchesOriginCity && matchesDestinationCity;
+      }).toList();
+
+      return {
+        'loads': filteredLoads,
+        'lastDocument': snapshot.docs.isNotEmpty ? snapshot.docs.last : null,
+        'hasMore': snapshot.docs.length == limit,
+        'totalCount': filteredLoads.length,
+      };
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get shipper loads');
+      return {
+        'loads': <Map<String, dynamic>>[],
+        'lastDocument': null,
+        'hasMore': false,
+        'totalCount': 0,
+      };
+    }
+  }
+
+  // Get load statistics for shipper
+  static Future<Map<String, int>> getShipperLoadStats(String shipperUid) async {
+    try {
+      final snapshot = await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads')
+          .get();
+
+      final stats = <String, int>{
+        'active': 0,
+        'inTransit': 0,
+        'booked': 0,
+        'cancelled': 0,
+        'completed': 0,
+        'total': 0,
+      };
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final status = data['status']?.toString() ?? 'active';
+        
+        stats['total'] = (stats['total'] ?? 0) + 1;
+        
+        if (stats.containsKey(status)) {
+          stats[status] = (stats[status] ?? 0) + 1;
+        }
+      }
+
+      return stats;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get shipper load stats');
+      return {
+        'active': 0,
+        'inTransit': 0,
+        'booked': 0,
+        'cancelled': 0,
+        'completed': 0,
+        'total': 0,
+      };
+    }
+  }
+
+  // Update load status
+  static Future<void> updateLoadStatus(
+    String shipperUid,
+    String loadId,
+    String newStatus,
+  ) async {
+    try {
+      await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads')
+          .doc(loadId)
+          .update({
+        'status': newStatus,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to update load status');
+      rethrow;
+    }
+  }
+
+  // Delete load and all associated documents
+  static Future<void> deleteLoad(
+    String shipperUid,
+    String loadId,
+  ) async {
+    try {
+      // First, get the load data to find document URLs
+      final loadDoc = await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads')
+          .doc(loadId)
+          .get();
+      
+      if (loadDoc.exists) {
+        final loadData = loadDoc.data();
+        
+        // Delete associated documents from Storage
+        if (loadData != null) {
+          // Delete additional document if it exists
+          if (loadData['additionalDocument'] != null) {
+            try {
+              final documentUrl = loadData['additionalDocument'].toString();
+              final ref = _storage.refFromURL(documentUrl);
+              await ref.delete();
+            } catch (e) {
+              // Log error but don't fail the entire operation
+              await recordError(e, StackTrace.current, reason: 'Failed to delete load document from storage');
+            }
+          }
+        }
+        
+        // Also try to delete the entire load documents folder
+        try {
+          final loadDocumentsRef = _storage.ref().child('shippers/$shipperUid/loads/$loadId');
+          final listResult = await loadDocumentsRef.listAll();
+          
+          // Delete all files in the load documents folder
+          for (final item in listResult.items) {
+            try {
+              await item.delete();
+            } catch (e) {
+              // Log individual file deletion errors but continue
+              await recordError(e, StackTrace.current, reason: 'Failed to delete individual load document file');
+            }
+          }
+        } catch (e) {
+          // Log folder deletion error but don't fail the entire operation
+          await recordError(e, StackTrace.current, reason: 'Failed to delete load documents folder');
+        }
+      }
+      
+      // Delete the Firestore document
+      await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads')
+          .doc(loadId)
+          .delete();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to delete load');
+      rethrow;
+    }
+  }
+
+  // Mark load as booked
+  static Future<void> markLoadAsBooked(
+    String shipperUid,
+    String loadId,
+  ) async {
+    try {
+      await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads')
+          .doc(loadId)
+          .update({
+        'isBooked': true,
+        'status': 'booked', // Update status to booked
+        'bookedAt': DateTime.now().toIso8601String(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to mark load as booked');
+      rethrow;
+    }
+  }
+
+  // Unmark load as booked
+  static Future<void> unmarkLoadAsBooked(
+    String shipperUid,
+    String loadId,
+  ) async {
+    try {
+      await _firestore
+          .collection('shippers')
+          .doc(shipperUid)
+          .collection('loads')
+          .doc(loadId)
+          .update({
+        'isBooked': false,
+        'status': 'active', // Restore status to active
+        'bookedAt': null,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to unmark load as booked');
+      rethrow;
     }
   }
 }

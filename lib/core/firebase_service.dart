@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'app_config.dart';
 import 'dart:io';
 import '../models/user_model.dart';
 import '../models/shipper_model.dart';
@@ -14,7 +16,7 @@ class FirebaseService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseStorage _storage = FirebaseStorage.instance;
-  // static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
+  static final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
   static final FirebaseCrashlytics _crashlytics = FirebaseCrashlytics.instance;
 
   // Authentication methods
@@ -34,10 +36,57 @@ class FirebaseService {
   static Reference get storageRef => _storage.ref();
 
   // Analytics methods
-  // static FirebaseAnalytics get analytics => _analytics;
-  // static Future<void> logEvent(String name, {Map<String, dynamic>? parameters}) async {
-  //   await _analytics.logEvent(name: name, parameters: parameters);
-  // }
+  static FirebaseAnalytics get analytics => _analytics;
+  static Future<void> logEvent(String name, {Map<String, Object>? parameters}) async {
+    await _analytics.logEvent(name: name, parameters: parameters);
+  }
+  
+  // Helper method to convert dynamic parameters to Object parameters
+  static Map<String, Object> _convertParameters(Map<String, dynamic>? params) {
+    if (params == null) return {};
+    return params.map((key, value) => MapEntry(key, value as Object));
+  }
+  
+  // Public version for external use
+  static Map<String, Object> convertParameters(Map<String, dynamic>? params) {
+    if (params == null) return {};
+    return params.map((key, value) => MapEntry(key, value as Object));
+  }
+  
+  // User properties for analytics
+  static Future<void> setUserProperty(String name, String? value) async {
+    await _analytics.setUserProperty(name: name, value: value);
+  }
+  
+  static Future<void> setUserId(String? userId) async {
+    await _analytics.setUserId(id: userId);
+  }
+  
+  // Test method to verify analytics is working (debug only)
+  static Future<void> testAnalytics() async {
+    if (!AppConfig.enableTestEvents) {
+      if (AppConfig.enableDebugLogging) {
+        print('Analytics test skipped in ${AppConfig.buildMode} mode');
+      }
+      return;
+    }
+    
+    try {
+      await logEvent('analytics_test', parameters: _convertParameters({
+        'test_timestamp': DateTime.now().millisecondsSinceEpoch,
+        'test_success': true,
+        'build_mode': AppConfig.buildMode,
+        'app_version': AppConfig.versionInfo,
+      }));
+      if (AppConfig.enableDebugLogging) {
+        print('Analytics test event logged successfully');
+      }
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Analytics test failed: $e');
+      }
+    }
+  }
 
   // Crashlytics methods
   static FirebaseCrashlytics get crashlytics => _crashlytics;
@@ -48,8 +97,20 @@ class FirebaseService {
   // User management methods
   static Future<UserCredential?> signInWithEmailAndPassword(String email, String password) async {
     try {
-      return await _auth.signInWithEmailAndPassword(email: email, password: password);
+      final result = await _auth.signInWithEmailAndPassword(email: email, password: password);
+      // Log successful sign in
+      await logEvent('login', parameters: _convertParameters({
+        'method': 'email_password',
+        'success': true,
+      }));
+      return result;
     } catch (e) {
+      // Log failed sign in
+      await logEvent('login', parameters: _convertParameters({
+        'method': 'email_password',
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'Sign in failed');
       rethrow;
     }
@@ -57,8 +118,20 @@ class FirebaseService {
 
   static Future<UserCredential?> createUserWithEmailAndPassword(String email, String password) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      final result = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      // Log successful user creation
+      await logEvent('sign_up', parameters: _convertParameters({
+        'method': 'email_password',
+        'success': true,
+      }));
+      return result;
     } catch (e) {
+      // Log failed user creation
+      await logEvent('sign_up', parameters: _convertParameters({
+        'method': 'email_password',
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'User creation failed');
       rethrow;
     }
@@ -67,7 +140,16 @@ class FirebaseService {
   static Future<void> signOut() async {
     try {
       await _auth.signOut();
+      // Log successful sign out
+      await logEvent('logout', parameters: _convertParameters({
+        'success': true,
+      }));
     } catch (e) {
+      // Log failed sign out
+      await logEvent('logout', parameters: _convertParameters({
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'Sign out failed');
       rethrow;
     }
@@ -243,10 +325,26 @@ class FirebaseService {
         print('FirebaseService: Creating shipper with isOnboardingComplete: ${shipper.isOnboardingComplete}');
         await createShipper(shipper);
         print('FirebaseService: Shipper created successfully');
+        
+        // Set user properties for analytics
+        await setUserId(userCredential.user!.uid);
+        await setUserProperty('user_type', 'shipper');
+        await setUserProperty('onboarding_complete', shipper.isOnboardingComplete.toString());
+        
+        // Log shipper signup event
+        await logEvent('shipper_signup', parameters: _convertParameters({
+          'success': true,
+          'onboarding_complete': shipper.isOnboardingComplete,
+        }));
       }
 
       return userCredential;
     } catch (e) {
+      // Log failed shipper signup
+      await logEvent('shipper_signup', parameters: _convertParameters({
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'Shipper signup failed');
       rethrow;
     }
@@ -268,10 +366,26 @@ class FirebaseService {
         // Create carrier document in Firestore
         final carrier = carrierData.copyWithCarrier(uid: userCredential.user!.uid);
         await createCarrier(carrier);
+        
+        // Set user properties for analytics
+        await setUserId(userCredential.user!.uid);
+        await setUserProperty('user_type', 'carrier');
+        await setUserProperty('onboarding_complete', carrier.isOnboardingComplete.toString());
+        
+        // Log carrier signup event
+        await logEvent('carrier_signup', parameters: _convertParameters({
+          'success': true,
+          'onboarding_complete': carrier.isOnboardingComplete,
+        }));
       }
 
       return userCredential;
     } catch (e) {
+      // Log failed carrier signup
+      await logEvent('carrier_signup', parameters: _convertParameters({
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'Carrier signup failed');
       rethrow;
     }
@@ -285,7 +399,24 @@ class FirebaseService {
       final role = await getUserRole(user.uid);
       if (role == null) return null;
 
-      return await getUserByRole(user.uid, role);
+      // Set user properties for analytics when getting current user data
+      await setUserId(user.uid);
+      await setUserProperty('user_type', role.name);
+      
+      final userData = await getUserByRole(user.uid, role);
+      
+      // Set additional user properties based on user type
+      if (userData != null) {
+        if (role == UserRole.shipper) {
+          final shipper = userData as ShipperModel;
+          await setUserProperty('onboarding_complete', shipper.isOnboardingComplete.toString());
+        } else if (role == UserRole.carrier) {
+          final carrier = userData as CarrierModel;
+          await setUserProperty('onboarding_complete', carrier.isOnboardingComplete.toString());
+        }
+      }
+
+      return userData;
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Get current user data failed');
       rethrow;
@@ -347,8 +478,23 @@ class FirebaseService {
         'lastUpdated': FieldValue.serverTimestamp(),
       });
       
+      // Update user property for analytics
+      await setUserProperty('onboarding_complete', 'true');
+      
+      // Log onboarding completion event
+      await logEvent('onboarding_complete', parameters: _convertParameters({
+        'user_type': 'carrier',
+        'success': true,
+      }));
+      
       print('Carrier onboarding marked as complete');
     } catch (e) {
+      // Log failed onboarding completion
+      await logEvent('onboarding_complete', parameters: _convertParameters({
+        'user_type': 'carrier',
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'Mark carrier onboarding complete failed');
       rethrow;
     }
@@ -447,8 +593,23 @@ class FirebaseService {
         'lastUpdated': FieldValue.serverTimestamp(),
       });
 
+      // Update user property for analytics
+      await setUserProperty('onboarding_complete', 'true');
+      
+      // Log onboarding completion event
+      await logEvent('onboarding_complete', parameters: _convertParameters({
+        'user_type': 'shipper',
+        'success': true,
+      }));
+
       print('Shipper onboarding marked as complete');
     } catch (e) {
+      // Log failed onboarding completion
+      await logEvent('onboarding_complete', parameters: _convertParameters({
+        'user_type': 'shipper',
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'Mark shipper onboarding complete failed');
       rethrow;
     }
@@ -588,7 +749,20 @@ class FirebaseService {
           .collection('loads')
           .doc(loadId)
           .set(loadData);
+      
+      // Log load creation event
+      await logEvent('load_created', parameters: _convertParameters({
+        'load_id': loadId,
+        'load_type': loadData['loadType'] ?? 'unknown',
+        'equipment_needed': loadData['equipmentNeeded'] ?? 'unknown',
+        'success': true,
+      }));
     } catch (e) {
+      // Log failed load creation
+      await logEvent('load_created', parameters: _convertParameters({
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'Failed to save shipper load');
       rethrow;
     }
@@ -954,7 +1128,19 @@ class FirebaseService {
         'bookedAt': DateTime.now().toIso8601String(),
         'updatedAt': DateTime.now().toIso8601String(),
       });
+      
+      // Log load booking event
+      await logEvent('load_booked', parameters: _convertParameters({
+        'load_id': loadId,
+        'success': true,
+      }));
     } catch (e) {
+      // Log failed load booking
+      await logEvent('load_booked', parameters: _convertParameters({
+        'load_id': loadId,
+        'success': false,
+        'error': e.toString(),
+      }));
       await recordError(e, StackTrace.current, reason: 'Failed to mark load as booked');
       rethrow;
     }

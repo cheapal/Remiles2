@@ -4,6 +4,10 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter/foundation.dart';
+import 'core/firebase_service.dart';
+import 'core/app_config.dart';
 import 'package:provider/provider.dart';
 import 'modules/auth/pages/choose_role.dart';
 import 'firebase_options.dart';
@@ -20,6 +24,15 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // Initialize Firebase Analytics
+  await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(AppConfig.enableAnalytics);
+  
+  // Test analytics only in debug mode
+  if (AppConfig.enableTestEvents) {
+    print('${AppConfig.versionInfo} - Running analytics test...');
+    await FirebaseService.testAnalytics();
+  }
   
   // Initialize Firebase Crashlytics
   FlutterError.onError = (errorDetails) {

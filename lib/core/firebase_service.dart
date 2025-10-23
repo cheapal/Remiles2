@@ -10,6 +10,7 @@ import '../models/shipper_model.dart';
 import '../models/carrier_model.dart';
 import '../models/carrier_onboarding_data.dart';
 import '../models/shipper_onboarding_data.dart';
+import '../models/product_listing.dart';
 
 /// Firebase service class to handle all Firebase operations
 class FirebaseService {
@@ -30,6 +31,7 @@ class FirebaseService {
   static CollectionReference get shippers => _firestore.collection('shippers');
   static CollectionReference get carriers => _firestore.collection('carriers');
   static CollectionReference get loads => _firestore.collection('loads');
+  static CollectionReference get listings => _firestore.collection('listings');
 
   // Storage methods
   static FirebaseStorage get storage => _storage;
@@ -74,7 +76,7 @@ class FirebaseService {
     try {
       await logEvent('analytics_test', parameters: _convertParameters({
         'test_timestamp': DateTime.now().millisecondsSinceEpoch,
-        'test_success': true,
+        'test_success': 'true',
         'build_mode': AppConfig.buildMode,
         'app_version': AppConfig.versionInfo,
       }));
@@ -101,14 +103,14 @@ class FirebaseService {
       // Log successful sign in
       await logEvent('login', parameters: _convertParameters({
         'method': 'email_password',
-        'success': true,
+        'success': 'true',
       }));
       return result;
     } catch (e) {
       // Log failed sign in
       await logEvent('login', parameters: _convertParameters({
         'method': 'email_password',
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Sign in failed');
@@ -122,14 +124,14 @@ class FirebaseService {
       // Log successful user creation
       await logEvent('sign_up', parameters: _convertParameters({
         'method': 'email_password',
-        'success': true,
+        'success': 'true',
       }));
       return result;
     } catch (e) {
       // Log failed user creation
       await logEvent('sign_up', parameters: _convertParameters({
         'method': 'email_password',
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'User creation failed');
@@ -142,12 +144,12 @@ class FirebaseService {
       await _auth.signOut();
       // Log successful sign out
       await logEvent('logout', parameters: _convertParameters({
-        'success': true,
+        'success': 'true',
       }));
     } catch (e) {
       // Log failed sign out
       await logEvent('logout', parameters: _convertParameters({
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Sign out failed');
@@ -333,7 +335,7 @@ class FirebaseService {
         
         // Log shipper signup event
         await logEvent('shipper_signup', parameters: _convertParameters({
-          'success': true,
+          'success': 'true',
           'onboarding_complete': shipper.isOnboardingComplete,
         }));
       }
@@ -342,7 +344,7 @@ class FirebaseService {
     } catch (e) {
       // Log failed shipper signup
       await logEvent('shipper_signup', parameters: _convertParameters({
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Shipper signup failed');
@@ -374,7 +376,7 @@ class FirebaseService {
         
         // Log carrier signup event
         await logEvent('carrier_signup', parameters: _convertParameters({
-          'success': true,
+          'success': 'true',
           'onboarding_complete': carrier.isOnboardingComplete,
         }));
       }
@@ -383,7 +385,7 @@ class FirebaseService {
     } catch (e) {
       // Log failed carrier signup
       await logEvent('carrier_signup', parameters: _convertParameters({
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Carrier signup failed');
@@ -484,7 +486,7 @@ class FirebaseService {
       // Log onboarding completion event
       await logEvent('onboarding_complete', parameters: _convertParameters({
         'user_type': 'carrier',
-        'success': true,
+        'success': 'true',
       }));
       
       print('Carrier onboarding marked as complete');
@@ -492,7 +494,7 @@ class FirebaseService {
       // Log failed onboarding completion
       await logEvent('onboarding_complete', parameters: _convertParameters({
         'user_type': 'carrier',
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Mark carrier onboarding complete failed');
@@ -599,7 +601,7 @@ class FirebaseService {
       // Log onboarding completion event
       await logEvent('onboarding_complete', parameters: _convertParameters({
         'user_type': 'shipper',
-        'success': true,
+        'success': 'true',
       }));
 
       print('Shipper onboarding marked as complete');
@@ -607,7 +609,7 @@ class FirebaseService {
       // Log failed onboarding completion
       await logEvent('onboarding_complete', parameters: _convertParameters({
         'user_type': 'shipper',
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Mark shipper onboarding complete failed');
@@ -755,12 +757,12 @@ class FirebaseService {
         'load_id': loadId,
         'load_type': loadData['loadType'] ?? 'unknown',
         'equipment_needed': loadData['equipmentNeeded'] ?? 'unknown',
-        'success': true,
+        'success': 'true',
       }));
     } catch (e) {
       // Log failed load creation
       await logEvent('load_created', parameters: _convertParameters({
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Failed to save shipper load');
@@ -1132,13 +1134,13 @@ class FirebaseService {
       // Log load booking event
       await logEvent('load_booked', parameters: _convertParameters({
         'load_id': loadId,
-        'success': true,
+        'success': 'true',
       }));
     } catch (e) {
       // Log failed load booking
       await logEvent('load_booked', parameters: _convertParameters({
         'load_id': loadId,
-        'success': false,
+        'success': 'false',
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Failed to mark load as booked');
@@ -1166,6 +1168,151 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to unmark load as booked');
       rethrow;
+    }
+  }
+
+  // Product listing methods
+  static Future<String> createProductListing(ProductListing listing) async {
+    try {
+      final docRef = await listings.add(listing.toFirestore());
+      
+      // Log listing creation event
+      await logEvent('listing_created', parameters: _convertParameters({
+        'listing_id': docRef.id,
+        'shipper_uid': listing.shipperUid,
+        'condition': listing.condition,
+        'price': listing.price,
+        'success': 'true',
+      }));
+      
+      return docRef.id;
+    } catch (e) {
+      // Log failed listing creation
+      await logEvent('listing_created', parameters: _convertParameters({
+        'success': 'false',
+        'error': e.toString(),
+      }));
+      await recordError(e, StackTrace.current, reason: 'Failed to create product listing');
+      rethrow;
+    }
+  }
+
+  static Future<void> updateProductListing(String listingId, ProductListing listing) async {
+    try {
+      await listings.doc(listingId).update(listing.toFirestore());
+      
+      // Log listing update event
+      await logEvent('listing_updated', parameters: _convertParameters({
+        'listing_id': listingId,
+        'shipper_uid': listing.shipperUid,
+        'success': 'true',
+      }));
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to update product listing');
+      rethrow;
+    }
+  }
+
+  static Future<void> deleteProductListing(String listingId) async {
+    try {
+      await listings.doc(listingId).delete();
+      
+      // Log listing deletion event
+      await logEvent('listing_deleted', parameters: _convertParameters({
+        'listing_id': listingId,
+        'success': 'true',
+      }));
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to delete product listing');
+      rethrow;
+    }
+  }
+
+  static Future<ProductListing?> getProductListing(String listingId) async {
+    try {
+      final doc = await listings.doc(listingId).get();
+      if (doc.exists) {
+        return ProductListing.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get product listing');
+      rethrow;
+    }
+  }
+
+  static Future<List<ProductListing>> getProductListings({
+    String? shipperUid,
+    String? condition,
+    String? location,
+    int limit = 20,
+  }) async {
+    try {
+      Query query = listings.where('isActive', isEqualTo: true);
+      
+      if (shipperUid != null) {
+        query = query.where('shipperUid', isEqualTo: shipperUid);
+      }
+      
+      if (condition != null) {
+        query = query.where('condition', isEqualTo: condition);
+      }
+      
+      if (location != null) {
+        query = query.where('location', isEqualTo: location);
+      }
+      
+      query = query.orderBy('createdAt', descending: true).limit(limit);
+      
+      final snapshot = await query.get();
+      return snapshot.docs.map((doc) => ProductListing.fromFirestore(doc)).toList();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get product listings');
+      rethrow;
+    }
+  }
+
+  // Upload product images
+  static Future<List<String>> uploadProductImages(
+    String shipperUid,
+    String listingId,
+    List<File> imageFiles,
+  ) async {
+    try {
+      final List<String> imageUrls = [];
+      
+      for (int i = 0; i < imageFiles.length; i++) {
+        final fileName = 'image_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final ref = _storage.ref().child('shippers/$shipperUid/listings/$listingId/images/$fileName');
+        final uploadTask = ref.putFile(imageFiles[i]);
+        final snapshot = await uploadTask;
+        final downloadUrl = await snapshot.ref.getDownloadURL();
+        imageUrls.add(downloadUrl);
+      }
+      
+      return imageUrls;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload product images');
+      rethrow;
+    }
+  }
+
+  // Upload product video
+  static Future<String?> uploadProductVideo(
+    String shipperUid,
+    String listingId,
+    File videoFile,
+  ) async {
+    try {
+      final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final ref = _storage.ref().child('shippers/$shipperUid/listings/$listingId/video/$fileName');
+      final uploadTask = ref.putFile(videoFile);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload product video');
+      return null;
     }
   }
 }

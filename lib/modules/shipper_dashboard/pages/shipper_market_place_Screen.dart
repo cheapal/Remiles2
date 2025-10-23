@@ -3,6 +3,8 @@ import 'package:Remiles/core/theme/colors.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_create_listing.dart';
+import 'package:Remiles/core/firebase_service.dart';
+import 'package:Remiles/models/product_listing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -21,11 +23,33 @@ class ShipperMarketplaceScreen extends StatefulWidget {
 
 class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
     with TickerProviderStateMixin {
-  int _selectedTab = 2; // "Marketplace"
   int _selectedFilter = 0; // 0: All, 1: New, 2: Used, 3: Refurbished
   bool _isLoading = true;
+  String _searchQuery = '';
+  String _selectedLocation = 'All Locations';
+
+  // Data management
+  List<ProductListing> _listings = [];
+  List<ProductListing> _filteredListings = [];
+  String? _errorMessage;
+
+  // Available locations
+  final List<String> _availableLocations = [
+    'All Locations',
+    'Vancouver, BC',
+    'Toronto, ON',
+    'Montreal, QC',
+    'Calgary, AB',
+    'Edmonton, AB',
+    'Ottawa, ON',
+    'Winnipeg, MB',
+    'Quebec City, QC',
+    'Hamilton, ON',
+    'Kitchener, ON',
+  ];
 
   late final AnimationController _shimmerCtrl;
+  late final TextEditingController _searchController;
 
   @override
   void initState() {
@@ -33,15 +57,14 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
     _shimmerCtrl =
     AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
       ..repeat();
-    // Simulate loading state (replace with your real data fetch)
-    Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _isLoading = false);
-    });
+    _searchController = TextEditingController();
+    _loadListings();
   }
 
   @override
   void dispose() {
     _shimmerCtrl.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -50,57 +73,58 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
     final media = MediaQuery.of(context);
     final screenW = media.size.width;
     final bool isWide = screenW >= 900;
-    final double horizontalPadding =
-    screenW > kMaxContentWidth ? (screenW - kMaxContentWidth) / 2 : 16.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFEF6),
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // ===== Top bar (brand color, leather only on narrow) =====
-              TopNavigationBar(context),
+        child: RefreshIndicator(
+          onRefresh: _refreshListings,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              children: [
+                // ===== Top bar (brand color, leather only on narrow) =====
+                TopNavigationBar(context),
 
-              // Container(
-              //   width: double.infinity,
-              //   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              //   decoration: BoxDecoration(
-              //     color: brandColor,
-              //     image: isWide
-              //         ? null
-              //         : const DecorationImage(
-              //       image: AssetImage('assets/top_leather.png'),
-              //       fit: BoxFit.cover,
-              //     ),
-              //     boxShadow: [
-              //       BoxShadow(
-              //         color: Colors.black.withOpacity(0.20),
-              //         blurRadius: 5,
-              //         spreadRadius: 2,
-              //         offset: const Offset(0, 3),
-              //       ),
-              //     ],
-              //     borderRadius: const BorderRadius.only(
-              //       bottomLeft: Radius.circular(20),
-              //       bottomRight: Radius.circular(20),
-              //     ),
-              //   ),
-              //   child: SafeArea(
-              //     bottom: false,
-              //     child: _buildTopBar(isWide),
-              //   ),
-              // ),
+                // Container(
+                //   width: double.infinity,
+                //   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                //   decoration: BoxDecoration(
+                //     color: brandColor,
+                //     image: isWide
+                //         ? null
+                //         : const DecorationImage(
+                //       image: AssetImage('assets/top_leather.png'),
+                //       fit: BoxFit.cover,
+                //     ),
+                //     boxShadow: [
+                //       BoxShadow(
+                //         color: Colors.black.withOpacity(0.20),
+                //         blurRadius: 5,
+                //         spreadRadius: 2,
+                //         offset: const Offset(0, 3),
+                //       ),
+                //     ],
+                //     borderRadius: const BorderRadius.only(
+                //       bottomLeft: Radius.circular(20),
+                //       bottomRight: Radius.circular(20),
+                //     ),
+                //   ),
+                //   child: SafeArea(
+                //     bottom: false,
+                //     child: _buildTopBar(isWide),
+                //   ),
+                // ),
 
-              // ===== Content =====
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: isWide ? 100 : 20),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 760),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                // ===== Content =====
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: isWide ? 100 : 20),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       const SizedBox(height: 18),
 
                       // Title row with inline "+ Create listing" on the right
@@ -150,28 +174,41 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
 
                       const SizedBox(height: 16),
 
-                      // Filters row (All/New/Used/Refurbished)
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _filterChip('All', 0,
-                                activeBg: brandGreen, activeFg: Colors.white),
-                            const SizedBox(width: 10),
-                            _filterChip('New', 1),
-                            const SizedBox(width: 10),
-                            _filterChip('Used', 2),
-                            const SizedBox(width: 10),
-                            _filterChip('Refurbished', 3, width: 120),
-                          ],
+                      // Filters row (All/New/Used - Like New/Used - Good/Used - Fair/Refurbished)
+                      Padding(
+                        padding: EdgeInsetsGeometry.all(1),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Row(
+                            children: [
+                              _filterChip('All', 0,
+                                  activeBg: brandGreen, activeFg: Colors.white),
+                              const SizedBox(width: 10),
+                              _filterChip('New', 1,
+                                  activeBg: brandGreen, activeFg: Colors.white),
+                              const SizedBox(width: 10),
+                              _filterChip('Used - Like New', 2, width: 120,
+                                  activeBg: brandGreen, activeFg: Colors.white),
+                              const SizedBox(width: 10),
+                              _filterChip('Used - Good', 3, width: 100,
+                                  activeBg: brandGreen, activeFg: Colors.white),
+                              const SizedBox(width: 10),
+                              _filterChip('Used - Fair', 4, width: 100,
+                                  activeBg: brandGreen, activeFg: Colors.white),
+                              const SizedBox(width: 10),
+                              _filterChip('Refurbished', 5, width: 120,
+                                  activeBg: brandGreen, activeFg: Colors.white),
+                            ],
+                          ),
                         ),
                       ),
                       const SizedBox(height: 18),
 
-                      // Location + Today’s Picks
+                      // Location + Today's Picks
                       Row(
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             "Today's Picks",
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
@@ -179,15 +216,24 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
                               color: Colors.black,
                             ),
                           ),
-                          Spacer(),
-                          Icon(Icons.place, size: 20, color: brandColor),
-                          SizedBox(width: 6),
-                          Text(
-                            'Vancouver',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 17,
-                              color: brandGreen,
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: _showLocationPicker,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.place, size: 20, color: brandColor),
+                                const SizedBox(width: 6),
+                                Text(
+                                  _selectedLocation,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 17,
+                                    color: brandGreen,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.arrow_drop_down, size: 20, color: brandGreen),
+                              ],
                             ),
                           ),
                         ],
@@ -205,8 +251,7 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
           ),
         ),
       ),
-
-    );
+    ));
   }
 
 
@@ -233,17 +278,25 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
           const SizedBox(width: 12),
           Icon(Icons.search, size: 18, color: Colors.black.withOpacity(0.6)),
           const SizedBox(width: 10),
-          const Expanded(
+          Expanded(
             child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
               decoration: InputDecoration(
                 hintText: 'Search trucks, trailers, parts ....',
-                hintStyle: TextStyle(
+                hintStyle: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: Color(0xFF959595),
                 ),
                 isDense: true,
                 border: InputBorder.none,
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: _clearSearch,
+                      )
+                    : null,
               ),
             ),
           ),
@@ -305,7 +358,10 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
       }) {
     final bool isActive = _selectedFilter == index;
     return GestureDetector(
-      onTap: () => setState(() => _selectedFilter = index),
+      onTap: () {
+        setState(() => _selectedFilter = index);
+        _applyFilters();
+      },
       child: Container(
         width: width,
         height: 31,
@@ -348,31 +404,277 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
         ? 3
         : 2;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 8,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 16,
-        childAspectRatio: 184 / 169, // match design rectangles
-      ),
-      itemBuilder: (context, i) {
-        if (_isLoading) {
+    if (_isLoading) {
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: 8,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 16,
+          childAspectRatio: 184 / 169,
+        ),
+        itemBuilder: (context, i) {
           return Shimmer(
             controller: _shimmerCtrl,
             baseColor: const Color(0xFFE8E8E8),
             highlightColor: const Color(0xFFF5F5F5),
             child: _SkeletonAdCard(),
           );
-        }
-        // Demo listing card (replace with your real data card)
-        return const _AdCard(
-          title: 'Steel Ramps',
-          price: '\$ 1,250',
-          city: 'Burnaby, BC',
-          tag: 'New',
+        },
+      );
+    }
+
+    if (_errorMessage != null) {
+      return _buildErrorState();
+    }
+
+    if (_filteredListings.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _filteredListings.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 16,
+        childAspectRatio: 184 / 169,
+      ),
+      itemBuilder: (context, i) {
+        final listing = _filteredListings[i];
+        return _AdCard(
+          listing: listing,
+        );
+      },
+    );
+  }
+
+  // Data loading methods
+  Future<void> _loadListings() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+
+      final listings = await FirebaseService.getProductListings();
+      
+      if (mounted) {
+        setState(() {
+          _listings = listings;
+          _filteredListings = listings;
+          _isLoading = false;
+        });
+        _applyFilters();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load listings: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshListings() async {
+    await _loadListings();
+  }
+
+  // Search functionality
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
+    _applyFilters();
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchQuery = '';
+    });
+    _applyFilters();
+  }
+
+  // Filter functionality
+  void _applyFilters() {
+    List<ProductListing> filtered = List.from(_listings);
+
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((listing) {
+        return listing.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               listing.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+               listing.location.toLowerCase().contains(_searchQuery.toLowerCase());
+      }).toList();
+    }
+
+    // Apply condition filter
+    if (_selectedFilter > 0) {
+      final conditionMap = {
+        1: 'New',
+        2: 'Used - Like New',
+        3: 'Used - Good',
+        4: 'Used - Fair',
+        5: 'Refurbished',
+      };
+      final selectedCondition = conditionMap[_selectedFilter];
+      if (selectedCondition != null) {
+        filtered = filtered.where((listing) {
+          return listing.condition == selectedCondition;
+        }).toList();
+      }
+    }
+
+    // Apply location filter
+    if (_selectedLocation != 'All Locations') {
+      filtered = filtered.where((listing) {
+        return listing.location.toLowerCase().contains(_selectedLocation.toLowerCase());
+      }).toList();
+    }
+
+    setState(() {
+      _filteredListings = filtered;
+    });
+  }
+
+  // Error state widget
+  Widget _buildErrorState() {
+    return Container(
+      height: 200,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 48,
+              color: Colors.red.shade300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _errorMessage ?? 'Something went wrong',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.red,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadListings,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: brandColor,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Empty state widget
+  Widget _buildEmptyState() {
+    return Container(
+      height: 200,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 48,
+              color: Colors.grey.shade400,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _searchQuery.isNotEmpty 
+                  ? 'No listings found for "$_searchQuery"'
+                  : 'No listings available',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            if (_searchQuery.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: _clearSearch,
+                child: const Text('Clear search'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Location picker
+  void _showLocationPicker() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Select Location',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _availableLocations.length,
+                  itemBuilder: (context, index) {
+                    final location = _availableLocations[index];
+                    final isSelected = location == _selectedLocation;
+                    final isAllLocations = location == 'All Locations';
+                    return ListTile(
+                      leading: Icon(
+                        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                        color: isSelected ? brandGreen : Colors.grey,
+                      ),
+                      title: Text(
+                        location,
+                        style: TextStyle(
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          color: isSelected ? brandGreen : Colors.black,
+                        ),
+                      ),
+                      trailing: isAllLocations ? const Icon(Icons.public, color: brandGreen) : null,
+                      onTap: () {
+                        setState(() {
+                          _selectedLocation = location;
+                        });
+                        _applyFilters();
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -382,16 +684,10 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
 /// A beautiful ad card following the market design sizing & shadows
 class _AdCard extends StatelessWidget {
   const _AdCard({
-    required this.title,
-    required this.price,
-    required this.city,
-    required this.tag,
+    required this.listing,
   });
 
-  final String title;
-  final String price;
-  final String city;
-  final String tag;
+  final ProductListing listing;
 
   @override
   Widget build(BuildContext context) {
@@ -424,12 +720,20 @@ class _AdCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // image placeholder
+              // Product image
               Expanded(
                 child: Container(
                   width: double.infinity,
                   color: const Color(0xFFD9D9D9),
-                  child: const Icon(Icons.image, size: 34, color: Colors.white),
+                  child: listing.imageUrls.isNotEmpty
+                      ? Image.network(
+                          listing.imageUrls.first,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Icon(Icons.image, size: 34, color: Colors.white);
+                          },
+                        )
+                      : const Icon(Icons.image, size: 34, color: Colors.white),
                 ),
               ),
               Padding(
@@ -444,13 +748,13 @@ class _AdCard extends StatelessWidget {
                           padding:
                           const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: tag == 'New'
+                            color: listing.condition == 'New'
                                 ? brandGreen
                                 : const Color(0xFF386544),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            tag,
+                            listing.condition,
                             style: const TextStyle(
                               fontSize: 10.5,
                               color: Colors.white,
@@ -460,7 +764,7 @@ class _AdCard extends StatelessWidget {
                         ),
                         const Spacer(),
                         Text(
-                          price,
+                          '\$${listing.price.toStringAsFixed(0)}',
                           style: const TextStyle(
                             color: Color(0xFFCEB838),
                             fontWeight: FontWeight.w700,
@@ -470,7 +774,7 @@ class _AdCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      title,
+                      listing.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -480,15 +784,15 @@ class _AdCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Row(
-                      children: const [
-                        Icon(Icons.place, size: 14, color: Color(0xFF386544)),
-                        SizedBox(width: 3),
+                      children: [
+                        const Icon(Icons.place, size: 14, color: Color(0xFF386544)),
+                        const SizedBox(width: 3),
                         Expanded(
                           child: Text(
-                            'Burnaby, BC',
+                            listing.location,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 12,
                               color: brandGreen,
                               fontWeight: FontWeight.w600,

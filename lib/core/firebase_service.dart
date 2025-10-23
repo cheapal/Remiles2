@@ -1246,6 +1246,7 @@ class FirebaseService {
     String? condition,
     String? location,
     int limit = 20,
+    int offset = 0,
   }) async {
     try {
       Query query = listings.where('isActive', isEqualTo: true);
@@ -1262,7 +1263,21 @@ class FirebaseService {
         query = query.where('location', isEqualTo: location);
       }
       
-      query = query.orderBy('createdAt', descending: true).limit(limit);
+      query = query.orderBy('createdAt', descending: true);
+      
+      // For pagination, we need to use startAfter with the last document
+      // For now, we'll use a simple approach with limit and offset
+      if (offset > 0) {
+        // Get documents to skip
+        final skipQuery = query.limit(offset);
+        final skipSnapshot = await skipQuery.get();
+        
+        if (skipSnapshot.docs.isNotEmpty) {
+          query = query.startAfterDocument(skipSnapshot.docs.last);
+        }
+      }
+      
+      query = query.limit(limit);
       
       final snapshot = await query.get();
       return snapshot.docs.map((doc) => ProductListing.fromFirestore(doc)).toList();
@@ -1313,6 +1328,67 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to upload product video');
       return null;
+    }
+  }
+
+  // Save a listing for a user
+  static Future<void> saveListing(String userId, ProductListing listing) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('savedListings')
+          .doc(listing.id)
+          .set(listing.toFirestore());
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save listing');
+      rethrow;
+    }
+  }
+
+  // Remove a saved listing for a user
+  static Future<void> removeSavedListing(String userId, String listingId) async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('savedListings')
+          .doc(listingId)
+          .delete();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to remove saved listing');
+      rethrow;
+    }
+  }
+
+  // Check if a listing is saved by a user
+  static Future<bool> isListingSaved(String userId, String listingId) async {
+    try {
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('savedListings')
+          .doc(listingId)
+          .get();
+      return doc.exists;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to check saved status');
+      rethrow;
+    }
+  }
+
+  // Get all saved listings for a user
+  static Future<List<ProductListing>> getSavedListings(String userId) async {
+    try {
+      final QuerySnapshot snapshot = await _firestore
+          .collection('users')
+          .doc(userId)
+          .collection('savedListings')
+          .get();
+      return snapshot.docs.map((doc) => ProductListing.fromFirestore(doc)).toList();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get saved listings');
+      rethrow;
     }
   }
 }

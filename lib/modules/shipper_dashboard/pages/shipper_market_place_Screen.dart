@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:Remiles/core/theme/colors.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_create_listing.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_screen.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/product_listing.dart';
 import 'package:flutter/material.dart';
@@ -32,6 +32,12 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
   List<ProductListing> _listings = [];
   List<ProductListing> _filteredListings = [];
   String? _errorMessage;
+  
+  // Pagination
+  bool _isLoadingMore = false;
+  bool _hasMoreData = true;
+  int _currentPage = 0;
+  final int _pageSize = 10;
 
   // Available locations
   final List<String> _availableLocations = [
@@ -50,6 +56,7 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
 
   late final AnimationController _shimmerCtrl;
   late final TextEditingController _searchController;
+  late final ScrollController _scrollController;
 
   @override
   void initState() {
@@ -58,6 +65,8 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
     AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
       ..repeat();
     _searchController = TextEditingController();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
     _loadListings();
   }
 
@@ -65,6 +74,7 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
   void dispose() {
     _shimmerCtrl.dispose();
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -80,51 +90,52 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
         value: SystemUiOverlayStyle.light,
         child: RefreshIndicator(
           onRefresh: _refreshListings,
-          child: SingleChildScrollView(
+        child: SingleChildScrollView(
+            controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              children: [
-                // ===== Top bar (brand color, leather only on narrow) =====
-                TopNavigationBar(context),
+          child: Column(
+            children: [
+              // ===== Top bar (brand color, leather only on narrow) =====
+              TopNavigationBar(context),
 
-                // Container(
-                //   width: double.infinity,
-                //   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-                //   decoration: BoxDecoration(
-                //     color: brandColor,
-                //     image: isWide
-                //         ? null
-                //         : const DecorationImage(
-                //       image: AssetImage('assets/top_leather.png'),
-                //       fit: BoxFit.cover,
-                //     ),
-                //     boxShadow: [
-                //       BoxShadow(
-                //         color: Colors.black.withOpacity(0.20),
-                //         blurRadius: 5,
-                //         spreadRadius: 2,
-                //         offset: const Offset(0, 3),
-                //       ),
-                //     ],
-                //     borderRadius: const BorderRadius.only(
-                //       bottomLeft: Radius.circular(20),
-                //       bottomRight: Radius.circular(20),
-                //     ),
-                //   ),
-                //   child: SafeArea(
-                //     bottom: false,
-                //     child: _buildTopBar(isWide),
-                //   ),
-                // ),
+              // Container(
+              //   width: double.infinity,
+              //   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+              //   decoration: BoxDecoration(
+              //     color: brandColor,
+              //     image: isWide
+              //         ? null
+              //         : const DecorationImage(
+              //       image: AssetImage('assets/top_leather.png'),
+              //       fit: BoxFit.cover,
+              //     ),
+              //     boxShadow: [
+              //       BoxShadow(
+              //         color: Colors.black.withOpacity(0.20),
+              //         blurRadius: 5,
+              //         spreadRadius: 2,
+              //         offset: const Offset(0, 3),
+              //       ),
+              //     ],
+              //     borderRadius: const BorderRadius.only(
+              //       bottomLeft: Radius.circular(20),
+              //       bottomRight: Radius.circular(20),
+              //     ),
+              //   ),
+              //   child: SafeArea(
+              //     bottom: false,
+              //     child: _buildTopBar(isWide),
+              //   ),
+              // ),
 
-                // ===== Content =====
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: isWide ? 100 : 20),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 760),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+              // ===== Content =====
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: isWide ? 100 : 20),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       const SizedBox(height: 18),
 
                       // Title row with inline "+ Create listing" on the right
@@ -163,7 +174,36 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
 
                           const SizedBox(width: 12),
 
-                          Icon(Icons.person, size: 40, color: primaryColor),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ShipperProfileScreen(),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: brandColor,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Color.fromRGBO(25, 85, 41, 0.36),
+                                    blurRadius: 2.8,
+                                    spreadRadius: 0,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.person,
+                                size: 24,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
 
@@ -178,13 +218,13 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
                       Padding(
                         padding: EdgeInsetsGeometry.all(1),
                         child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
+                        scrollDirection: Axis.horizontal,
                           padding: const EdgeInsets.symmetric(vertical: 20),
-                          child: Row(
-                            children: [
-                              _filterChip('All', 0,
-                                  activeBg: brandGreen, activeFg: Colors.white),
-                              const SizedBox(width: 10),
+                        child: Row(
+                          children: [
+                            _filterChip('All', 0,
+                                activeBg: brandGreen, activeFg: Colors.white),
+                            const SizedBox(width: 10),
                               _filterChip('New', 1,
                                   activeBg: brandGreen, activeFg: Colors.white),
                               const SizedBox(width: 10),
@@ -193,13 +233,13 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
                               const SizedBox(width: 10),
                               _filterChip('Used - Good', 3, width: 100,
                                   activeBg: brandGreen, activeFg: Colors.white),
-                              const SizedBox(width: 10),
+                            const SizedBox(width: 10),
                               _filterChip('Used - Fair', 4, width: 100,
                                   activeBg: brandGreen, activeFg: Colors.white),
-                              const SizedBox(width: 10),
+                            const SizedBox(width: 10),
                               _filterChip('Refurbished', 5, width: 120,
                                   activeBg: brandGreen, activeFg: Colors.white),
-                            ],
+                          ],
                           ),
                         ),
                       ),
@@ -223,12 +263,12 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
                               children: [
                                 const Icon(Icons.place, size: 20, color: brandColor),
                                 const SizedBox(width: 6),
-                                Text(
+                          Text(
                                   _selectedLocation,
                                   style: const TextStyle(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 17,
-                                    color: brandGreen,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 17,
+                              color: brandGreen,
                                   ),
                                 ),
                                 const SizedBox(width: 4),
@@ -359,8 +399,14 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
     final bool isActive = _selectedFilter == index;
     return GestureDetector(
       onTap: () {
-        setState(() => _selectedFilter = index);
-        _applyFilters();
+        setState(() {
+          _selectedFilter = index;
+          _currentPage = 0;
+          _hasMoreData = true;
+          _listings.clear();
+          _filteredListings.clear();
+        });
+        _loadListings();
       },
       child: Container(
         width: width,
@@ -405,17 +451,17 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
         : 2;
 
     if (_isLoading) {
-      return GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 8,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 16,
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: 8,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 16,
           childAspectRatio: 184 / 169,
-        ),
-        itemBuilder: (context, i) {
+      ),
+      itemBuilder: (context, i) {
           return Shimmer(
             controller: _shimmerCtrl,
             baseColor: const Color(0xFFE8E8E8),
@@ -434,40 +480,108 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
       return _buildEmptyState();
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _filteredListings.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: crossAxisCount,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 16,
-        childAspectRatio: 184 / 169,
-      ),
-      itemBuilder: (context, i) {
-        final listing = _filteredListings[i];
-        return _AdCard(
-          listing: listing,
-        );
-      },
+    return Column(
+      children: [
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _filteredListings.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 16,
+            childAspectRatio: 184 / 169,
+          ),
+          itemBuilder: (context, i) {
+            final listing = _filteredListings[i];
+            return _AdCard(
+              listing: listing,
+            );
+          },
+        ),
+        if (_isLoadingMore)
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(brandGreen),
+              ),
+            ),
+          ),
+        if (!_hasMoreData && _filteredListings.isNotEmpty)
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: const Center(
+              child: Text(
+                'No more listings to load',
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
   // Data loading methods
-  Future<void> _loadListings() async {
+  Future<void> _loadListings({bool isRefresh = false}) async {
     try {
-      setState(() {
-        _isLoading = true;
-        _errorMessage = null;
-      });
+      if (isRefresh) {
+        setState(() {
+          _isLoading = true;
+          _errorMessage = null;
+          _currentPage = 0;
+          _hasMoreData = true;
+          _listings.clear();
+          _filteredListings.clear();
+        });
+      } else {
+        setState(() {
+          _isLoading = true;
+          _errorMessage = null;
+        });
+      }
 
-      final listings = await FirebaseService.getProductListings();
+      // Get condition filter
+      String? condition;
+      if (_selectedFilter > 0) {
+        final conditionMap = {
+          1: 'New',
+          2: 'Used - Like New',
+          3: 'Used - Good',
+          4: 'Used - Fair',
+          5: 'Refurbished',
+        };
+        condition = conditionMap[_selectedFilter];
+      }
+
+      // Get location filter
+      String? location;
+      if (_selectedLocation != 'All Locations') {
+        location = _selectedLocation;
+      }
+
+      final listings = await FirebaseService.getProductListings(
+        condition: condition,
+        location: location,
+        limit: _pageSize,
+        offset: _currentPage * _pageSize,
+      );
       
       if (mounted) {
         setState(() {
-          _listings = listings;
-          _filteredListings = listings;
+          if (isRefresh) {
+            _listings = listings;
+            _filteredListings = listings;
+          } else {
+            _listings.addAll(listings);
+            _filteredListings.addAll(listings);
+          }
           _isLoading = false;
+          _hasMoreData = listings.length == _pageSize;
+          _currentPage++;
         });
         _applyFilters();
       }
@@ -482,26 +596,102 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
   }
 
   Future<void> _refreshListings() async {
-    await _loadListings();
+    await _loadListings(isRefresh: true);
+  }
+
+  // Scroll listener for pagination
+  void _onScroll() {
+    if (_scrollController.position.pixels >= 
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreListings();
+    }
+  }
+
+  // Load more listings for pagination
+  Future<void> _loadMoreListings() async {
+    if (_isLoadingMore || !_hasMoreData || _isLoading) return;
+
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      // Get condition filter
+      String? condition;
+      if (_selectedFilter > 0) {
+        final conditionMap = {
+          1: 'New',
+          2: 'Used - Like New',
+          3: 'Used - Good',
+          4: 'Used - Fair',
+          5: 'Refurbished',
+        };
+        condition = conditionMap[_selectedFilter];
+      }
+
+      // Get location filter
+      String? location;
+      if (_selectedLocation != 'All Locations') {
+        location = _selectedLocation;
+      }
+
+      final listings = await FirebaseService.getProductListings(
+        condition: condition,
+        location: location,
+        limit: _pageSize,
+        offset: _currentPage * _pageSize,
+      );
+
+      if (mounted) {
+        setState(() {
+          _listings.addAll(listings);
+          _filteredListings.addAll(listings);
+          _isLoadingMore = false;
+          _hasMoreData = listings.length == _pageSize;
+          _currentPage++;
+        });
+        _applyFilters();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load more listings: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   // Search functionality
   void _onSearchChanged(String query) {
     setState(() {
       _searchQuery = query;
+      _currentPage = 0;
+      _hasMoreData = true;
+      _listings.clear();
+      _filteredListings.clear();
     });
-    _applyFilters();
+    _loadListings();
   }
 
   void _clearSearch() {
     _searchController.clear();
     setState(() {
       _searchQuery = '';
+      _currentPage = 0;
+      _hasMoreData = true;
+      _listings.clear();
+      _filteredListings.clear();
     });
-    _applyFilters();
+    _loadListings();
   }
 
-  // Filter functionality
+  // Apply filters to loaded data (for client-side filtering of already loaded items)
   void _applyFilters() {
     List<ProductListing> filtered = List.from(_listings);
 
@@ -511,30 +701,6 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
         return listing.title.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                listing.description.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                listing.location.toLowerCase().contains(_searchQuery.toLowerCase());
-      }).toList();
-    }
-
-    // Apply condition filter
-    if (_selectedFilter > 0) {
-      final conditionMap = {
-        1: 'New',
-        2: 'Used - Like New',
-        3: 'Used - Good',
-        4: 'Used - Fair',
-        5: 'Refurbished',
-      };
-      final selectedCondition = conditionMap[_selectedFilter];
-      if (selectedCondition != null) {
-        filtered = filtered.where((listing) {
-          return listing.condition == selectedCondition;
-        }).toList();
-      }
-    }
-
-    // Apply location filter
-    if (_selectedLocation != 'All Locations') {
-      filtered = filtered.where((listing) {
-        return listing.location.toLowerCase().contains(_selectedLocation.toLowerCase());
       }).toList();
     }
 
@@ -665,8 +831,12 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
                       onTap: () {
                         setState(() {
                           _selectedLocation = location;
+                          _currentPage = 0;
+                          _hasMoreData = true;
+                          _listings.clear();
+                          _filteredListings.clear();
                         });
-                        _applyFilters();
+                        _loadListings();
                         Navigator.pop(context);
                       },
                     );
@@ -697,7 +867,7 @@ class _AdCard extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ProductPagePrecise()
+            builder: (context) => ProductPagePrecise(listing: listing)
           ),
         );
       },

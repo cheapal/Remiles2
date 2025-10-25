@@ -3,14 +3,74 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import '../../../../../providers/auth_provider.dart';
-import '../../common/widgets/recommended_load.dart';
 import '../../common/widgets/top_navigation_bar.dart';
+import '../../common/widgets/recommended_load.dart';
+import 'manage_load.dart';
+import 'package:Remiles/core/firebase_service.dart';
+import 'package:Remiles/models/load_model.dart';
+import 'dart:io';
 
+class CarrierDashboardScreen extends StatefulWidget {
+  const CarrierDashboardScreen({super.key});
 
-class CarrierDashboardScreen extends StatelessWidget {
-   CarrierDashboardScreen({super.key});
+  @override
+  State<CarrierDashboardScreen> createState() => _CarrierDashboardScreenState();
+}
 
+class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
   final primaryColor = Color(0xFF1C6B4A);
+  
+  // State management for recommended loads
+  List<LoadModel> _recommendedLoads = [];
+  bool _isLoading = false;
+  String? _error;
+  
+  @override
+  void initState() {
+    super.initState();
+    _loadRecommendedLoads();
+  }
+  
+  Future<void> _loadRecommendedLoads() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    
+    try {
+      final user = FirebaseService.currentUser;
+      if (user == null) {
+        setState(() {
+          _error = 'User not authenticated';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      final result = await FirebaseService.getAvailableLoadsForCarrier(
+        carrierUid: user.uid,
+        searchQuery: '',
+        limit: 3, // Show top 3 recommended loads
+      );
+      
+      setState(() {
+        _recommendedLoads = List<LoadModel>.from(result['loads']);
+        _isLoading = false;
+      });
+    } catch (e) {
+      String errorMessage;
+      if (e is SocketException || e.toString().contains('network') || e.toString().contains('connection')) {
+        errorMessage = 'Network error. Please check your connection.';
+      } else {
+        errorMessage = 'Failed to load recommended loads.';
+      }
+      
+      setState(() {
+        _error = errorMessage;
+        _isLoading = false;
+      });
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -92,7 +152,14 @@ class CarrierDashboardScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(24),
                       ),
                     ),
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ManageLoadScreen(),
+                        ),
+                      );
+                    },
                     child: const Text(
                       "Find Loads",
                       style: TextStyle(color: Colors.black, fontSize: 16),
@@ -133,171 +200,26 @@ class CarrierDashboardScreen extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SvgPicture.asset('assets/filter.svg',
-                      width: 20, height: 20, color: Colors.black54),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ManageLoadScreen(),
+                        ),
+                      );
+                    },
+                    child: SvgPicture.asset('assets/filter.svg',
+                        width: 20, height: 20, color: Colors.black54),
+                  ),
                 ],
               ),
             ),
 
             const SizedBox(height: 24),
 
-            /// Recommended Load Caimport 'package:flutter/material.dart';
-            // import 'package:flutter_svg/flutter_svg.dart';
-            //
-            // class LoadCard extends StatelessWidget {
-            //   const LoadCard({super.key});
-            //
-            //   @override
-            //   Widget build(BuildContext context) {
-            //     return Card(
-            //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            //       elevation: 3,
-            //       margin: const EdgeInsets.all(12),
-            //       child: Container(
-            //         padding: const EdgeInsets.all(16),
-            //         decoration: BoxDecoration(
-            //           borderRadius: BorderRadius.circular(16),
-            //           border: Border.all(color: Colors.green.shade200, width: 2),
-            //         ),
-            //         child: Column(
-            //           crossAxisAlignment: CrossAxisAlignment.start,
-            //           children: [
-            //             // Top Row
-            //             Row(
-            //               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            //               children: [
-            //                 Row(
-            //                   children: [
-            //                     const Text(
-            //                       "\$1500",
-            //                       style: TextStyle(
-            //                         fontSize: 20,
-            //                         fontWeight: FontWeight.bold,
-            //                         color: Colors.green,
-            //                       ),
-            //                     ),
-            //                     const SizedBox(width: 12),
-            //                     const Text(
-            //                       "215 (mi)",
-            //                       style: TextStyle(fontSize: 16),
-            //                     ),
-            //                   ],
-            //                 ),
-            //                 Container(
-            //                   padding:
-            //                       const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            //                   decoration: BoxDecoration(
-            //                     color: Colors.green,
-            //                     borderRadius: BorderRadius.circular(12),
-            //                   ),
-            //                   child: const Text(
-            //                     "Available",
-            //                     style: TextStyle(color: Colors.white),
-            //                   ),
-            //                 ),
-            //               ],
-            //             ),
-            //
-            //             const SizedBox(height: 12),
-            //
-            //             // Route Info
-            //             Row(
-            //               children: [
-            //                 SvgPicture.asset("assets/icons/location.svg",
-            //                     width: 18, height: 18, color: Colors.green),
-            //                 const SizedBox(width: 8),
-            //                 const Text("From : Toronto, ON"),
-            //               ],
-            //             ),
-            //             const SizedBox(height: 6),
-            //             Row(
-            //               children: [
-            //                 SvgPicture.asset("assets/icons/location.svg",
-            //                     width: 18, height: 18, color: Colors.green),
-            //                 const SizedBox(width: 8),
-            //                 const Text("To : Montreal, QC"),
-            //                 const Spacer(),
-            //                 const Text(
-            //                   "Load ID #1234",
-            //                   style: TextStyle(fontWeight: FontWeight.bold),
-            //                 ),
-            //               ],
-            //             ),
-            //
-            //             const SizedBox(height: 12),
-            //
-            //             // Pickup & Delivery Dates
-            //             Row(
-            //               children: [
-            //                 SvgPicture.asset("assets/icons/calendar.svg",
-            //                     width: 18, height: 18, color: Colors.green),
-            //                 const SizedBox(width: 8),
-            //                 const Text("Pickup : Sep 1st, 2025"),
-            //               ],
-            //             ),
-            //             const SizedBox(height: 6),
-            //             Row(
-            //               children: [
-            //                 SvgPicture.asset("assets/icons/calendar.svg",
-            //                     width: 18, height: 18, color: Colors.green),
-            //                 const SizedBox(width: 8),
-            //                 const Text("Delivery : Sep 3rd, 2025"),
-            //                 const Spacer(),
-            //                 ElevatedButton(
-            //                   onPressed: () {},
-            //                   style: ElevatedButton.styleFrom(
-            //                     backgroundColor: Colors.green,
-            //                     shape: RoundedRectangleBorder(
-            //                         borderRadius: BorderRadius.circular(12)),
-            //                   ),
-            //                   child: const Text("Book Now"),
-            //                 ),
-            //               ],
-            //             ),
-            //
-            //             const SizedBox(height: 12),
-            //             const Divider(),
-            //
-            //             // Bottom Row
-            //             Row(
-            //               children: [
-            //                 SvgPicture.asset("assets/icons/truck.svg",
-            //                     width: 20, height: 20, color: Colors.green),
-            //                 const SizedBox(width: 8),
-            //                 const Text("15,000 lb"),
-            //                 const Spacer(),
-            //                 const Text("Equipment Needed: Flatbed"),
-            //                 const Spacer(),
-            //                 const Text(
-            //                   "2 Docs",
-            //                   style: TextStyle(
-            //                       fontWeight: FontWeight.bold, color: Colors.green),
-            //                 ),
-            //               ],
-            //             ),
-            //           ],
-            //         ),
-            //       ),
-            //     );
-            //   }
-            // }rd
-            RecommendedLoad(),
-            // Padding(
-            //   padding: const EdgeInsets.all(23.0),
-            //   child: aiMatchCard(
-            //     context,
-            //     recommended: true,
-            //     matchPercent: 97,
-            //     loadId: '#1234',
-            //     from: 'Toronto, ON',
-            //     to: 'Montreal. QC',
-            //     pickup: 'Sep 1st, 2025',
-            //     delivery: 'Sep 3rd, 2025',
-            //     weight: '15,000 lb',
-            //     docs: '2 Docs',
-            //     equipment: 'Flatbed',
-            //   ),
-            // ),
+            /// Recommended Loads Section
+            _buildRecommendedLoadsSection(),
             const SizedBox(height: 20),
 
             /// View All Button
@@ -344,215 +266,209 @@ class CarrierDashboardScreen extends StatelessWidget {
                 mainAxisSpacing: 12,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFFFF),
-                        borderRadius: const BorderRadius.all(
-                            Radius.circular(26)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6CA78A)
-                                .withOpacity(0.5),
-                            spreadRadius: 0,
-                            blurRadius: 10,
-                            offset: const Offset(0, 7),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.center,
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 46,
-                                height: 46,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color(0xFFBFF497),
-                                ),
-                                child:  Center(
-                                  child:Icon(Icons.attach_money_outlined),
-                                ),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFFFF),
+                      borderRadius: const BorderRadius.all(
+                          Radius.circular(26)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6CA78A)
+                              .withOpacity(0.5),
+                          spreadRadius: 0,
+                          blurRadius: 10,
+                          offset: const Offset(0, 7),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.center,
+                      mainAxisAlignment:
+                      MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment:
+                          MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFFBFF497),
                               ),
-                              const SizedBox(width: 12),
-                              const Flexible(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    '2000',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight
-                                          .bold, // Updated font weight
-                                    ),
+                              child:  Center(
+                                child:Icon(Icons.attach_money_outlined),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '2000',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight
+                                        .bold, // Updated font weight
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Total Revenue',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight
-                                  .bold, // Updated font weight
-                              fontSize: 14,
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Total Revenue',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight
+                                .bold, // Updated font weight
+                            fontSize: 14,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
 
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFFFF),
-                        borderRadius: const BorderRadius.all(
-                            Radius.circular(26)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6CA78A)
-                                .withOpacity(0.5),
-                            spreadRadius: 0,
-                            blurRadius: 10,
-                            offset: const Offset(0, 7),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.center,
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 46,
-                                height: 46,
-                                decoration:  BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color(0xFFFFE0B3),
-                                ),
-                                child:  Center(
-                                  child: Icon(Icons.check),
-                                ),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFFFF),
+                      borderRadius: const BorderRadius.all(
+                          Radius.circular(26)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6CA78A)
+                              .withOpacity(0.5),
+                          spreadRadius: 0,
+                          blurRadius: 10,
+                          offset: const Offset(0, 7),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.center,
+                      mainAxisAlignment:
+                      MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment:
+                          MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 46,
+                              height: 46,
+                              decoration:  BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFFFFE0B3),
                               ),
-                              const SizedBox(width: 12),
-                              const Flexible(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    '50',
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight
-                                          .bold, // Updated font weight
-                                    ),
+                              child:  Center(
+                                child: Icon(Icons.check),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            const Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  '50',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight
+                                        .bold, // Updated font weight
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            'Loads Delivered',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight
-                                  .bold, // Updated font weight
-                              fontSize: 14,
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Loads Delivered',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight
+                                .bold, // Updated font weight
+                            fontSize: 14,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                   _statCard(Icons.card_giftcard, "", "Special Offers"),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFFFF),
-                        borderRadius: const BorderRadius.all(
-                            Radius.circular(26)),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF6CA78A)
-                                .withOpacity(0.5),
-                            spreadRadius: 0,
-                            blurRadius: 10,
-                            offset: const Offset(0, 7),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment:
-                        CrossAxisAlignment.center,
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisAlignment:
-                            MainAxisAlignment.center,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                child:  Center(
-                                  child:Icon(Icons.star, color: Colors.amber, ),
-                                ),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFFFF),
+                      borderRadius: const BorderRadius.all(
+                          Radius.circular(26)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6CA78A)
+                              .withOpacity(0.5),
+                          spreadRadius: 0,
+                          blurRadius: 10,
+                          offset: const Offset(0, 7),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment:
+                      CrossAxisAlignment.center,
+                      mainAxisAlignment:
+                      MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisAlignment:
+                          MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              child:  Center(
+                                child:Icon(Icons.star, color: Colors.amber, ),
                               ),
-                              const SizedBox(width: 0),
-                              const Flexible(
-                                child: FittedBox(
-                                  fit: BoxFit.scaleDown,
-                                  child: Text(
-                                    "3.8/5",
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight
-                                          .bold, // Updated font weight
-                                    ),
+                            ),
+                            const SizedBox(width: 0),
+                            const Flexible(
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  "3.8/5",
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight
+                                        .bold, // Updated font weight
                                   ),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            "Carrier Ratings",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight
-                                  .bold, // Updated font weight
-                              fontSize: 14,
                             ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          "Carrier Ratings",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontWeight: FontWeight
+                                .bold, // Updated font weight
+                            fontSize: 14,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -610,5 +526,216 @@ class CarrierDashboardScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildRecommendedLoadsSection() {
+    if (_isLoading) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.red.shade200),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.error_outline, color: Colors.red.shade600),
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                style: TextStyle(color: Colors.red.shade700),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: _loadRecommendedLoads,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red.shade600,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_recommendedLoads.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.inbox_outlined, size: 48, color: Colors.grey.shade400),
+              const SizedBox(height: 12),
+              Text(
+                'No recommended loads available',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Check back later for new opportunities',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // Show the top recommended load (highest match percentage)
+        if (_recommendedLoads.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: RecommendedLoad(load: _recommendedLoads.first),
+          ),
+        
+        // Show additional loads if available
+        if (_recommendedLoads.length > 1) ...[
+          const SizedBox(height: 12),
+          ...(_recommendedLoads.skip(1).take(2).map((load) => 
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: _buildLoadPreviewCard(load),
+            ),
+          ).toList()),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildLoadPreviewCard(LoadModel load) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.shade200, width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: primaryColor.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      "\$${load.price.toStringAsFixed(0)}",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: primaryColor,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      "${load.distance.toStringAsFixed(0)} mi",
+                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                    ),
+                    const Spacer(),
+                    if (load.matchPercentage != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: load.matchPercentage! >= 90 
+                            ? Colors.green 
+                            : load.matchPercentage! >= 70 
+                              ? Colors.orange 
+                              : Colors.red,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          "${load.matchPercentage!.toStringAsFixed(0)}%",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "${load.originCity}, ${load.originState} → ${load.destinationCity}, ${load.destinationState}",
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Pickup: ${_formatDate(load.pickupDate)}",
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ManageLoadScreen(),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'View',
+              style: TextStyle(color: Colors.white, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}';
   }
 }

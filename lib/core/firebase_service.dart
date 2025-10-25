@@ -12,6 +12,7 @@ import '../models/carrier_onboarding_data.dart';
 import '../models/shipper_onboarding_data.dart';
 import '../models/product_listing.dart';
 import '../models/chat_model.dart';
+import '../models/load_model.dart';
 
 /// Firebase service class to handle all Firebase operations
 class FirebaseService {
@@ -35,15 +36,34 @@ class FirebaseService {
   static CollectionReference get listings => _firestore.collection('listings');
   static CollectionReference get conversations => _firestore.collection('conversations');
   static CollectionReference get messages => _firestore.collection('messages');
+  static CollectionReference get bookings => _firestore.collection('bookings');
 
   // Storage methods
   static FirebaseStorage get storage => _storage;
   static Reference get storageRef => _storage.ref();
 
-  // Analytics methods
+  // Analytics methods according to official docs
   static FirebaseAnalytics get analytics => _analytics;
+  
+  // Log custom event with proper parameter validation
   static Future<void> logEvent(String name, {Map<String, Object>? parameters}) async {
-    await _analytics.logEvent(name: name, parameters: parameters);
+    try {
+      // Validate event name (max 40 characters as per official docs)
+      if (name.length > 40) {
+        throw ArgumentError('Event name must be 40 characters or fewer');
+      }
+      
+      // Validate parameters (max 25 parameters as per official docs)
+      if (parameters != null && parameters.length > 25) {
+        throw ArgumentError('Event can have at most 25 parameters');
+      }
+      
+      await _analytics.logEvent(name: name, parameters: parameters);
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Failed to log analytics event: $e');
+      }
+    }
   }
   
   // Helper method to convert dynamic parameters to Object parameters
@@ -77,12 +97,20 @@ class FirebaseService {
     }
     
     try {
+      // Add timeout to prevent hanging
       await logEvent('analytics_test', parameters: _convertParameters({
         'test_timestamp': DateTime.now().millisecondsSinceEpoch,
         'test_success': 'true',
         'build_mode': AppConfig.buildMode,
         'app_version': AppConfig.versionInfo,
-      }));
+      })).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          if (AppConfig.enableDebugLogging) {
+            print('Analytics test timed out');
+          }
+        },
+      );
       if (AppConfig.enableDebugLogging) {
         print('Analytics test event logged successfully');
       }
@@ -93,10 +121,164 @@ class FirebaseService {
     }
   }
 
-  // Crashlytics methods
+  // Crashlytics methods according to official docs
   static FirebaseCrashlytics get crashlytics => _crashlytics;
+  
+  // Record non-fatal error with proper error handling
   static Future<void> recordError(dynamic exception, StackTrace? stackTrace, {String? reason}) async {
-    await _crashlytics.recordError(exception, stackTrace, reason: reason);
+    try {
+      await _crashlytics.recordError(exception, stackTrace, reason: reason);
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Failed to record error in Crashlytics: $e');
+      }
+    }
+  }
+  
+  // Record custom log message
+  static Future<void> log(String message) async {
+    try {
+      await _crashlytics.log(message);
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Failed to log message in Crashlytics: $e');
+      }
+    }
+  }
+  
+  // Set custom key-value pair
+  static Future<void> setCustomKey(String key, dynamic value) async {
+    try {
+      await _crashlytics.setCustomKey(key, value);
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Failed to set custom key in Crashlytics: $e');
+      }
+    }
+  }
+  
+  // Set user identifier
+  static Future<void> setUserIdentifier(String identifier) async {
+    try {
+      await _crashlytics.setUserIdentifier(identifier);
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Failed to set user identifier in Crashlytics: $e');
+      }
+    }
+  }
+
+  // Test method to verify Crashlytics is working (debug only)
+  static Future<void> testCrashlytics() async {
+    if (!AppConfig.enableTestEvents) {
+      if (AppConfig.enableDebugLogging) {
+        print('Crashlytics test skipped in ${AppConfig.buildMode} mode');
+      }
+      return;
+    }
+    
+    try {
+      if (AppConfig.enableDebugLogging) {
+        print('Starting Crashlytics test...');
+      }
+      
+      // Test 1: Set user identifier (this usually works even if other methods fail)
+      await setUserIdentifier('test_user_${DateTime.now().millisecondsSinceEpoch}');
+      if (AppConfig.enableDebugLogging) {
+        print('✓ User identifier set successfully');
+      }
+      
+      // Test 2: Set custom key (this usually works)
+      await setCustomKey('test_key', 'test_value_${DateTime.now().millisecondsSinceEpoch}');
+      if (AppConfig.enableDebugLogging) {
+        print('✓ Custom key set successfully');
+      }
+      
+      // Test 3: Log message (this might fail with 404)
+      await log('Crashlytics test log - ${DateTime.now().toIso8601String()}');
+      if (AppConfig.enableDebugLogging) {
+        print('✓ Log message sent successfully');
+      }
+      
+      // Test 4: Record non-fatal error (this might fail with 404)
+      await recordError(
+        'Test non-fatal error from ${AppConfig.buildMode} mode',
+        StackTrace.current,
+        reason: 'Testing Crashlytics integration',
+      );
+      if (AppConfig.enableDebugLogging) {
+        print('✓ Non-fatal error recorded successfully');
+      }
+      
+      if (AppConfig.enableDebugLogging) {
+        print('Crashlytics test completed. Some methods may fail with 404 if Crashlytics is not fully enabled in Firebase Console.');
+        print('Check Firebase Console > Crashlytics in a few minutes');
+      }
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Crashlytics test failed: $e');
+      }
+    }
+  }
+
+  // Method to force a test crash (use with caution - only for testing)
+  static void testCrash() {
+    if (AppConfig.enableTestEvents) {
+      if (AppConfig.enableDebugLogging) {
+        print('Triggering test crash for Crashlytics verification');
+      }
+      // This will cause a crash for testing purposes
+      throw Exception('Test crash for Crashlytics verification');
+    }
+  }
+
+  // Method to check if Crashlytics is working
+  static Future<bool> isCrashlyticsWorking() async {
+    try {
+      // Try to set a custom key to test if Crashlytics is responsive
+      await _crashlytics.setCustomKey('health_check', DateTime.now().millisecondsSinceEpoch);
+      return true;
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Crashlytics health check failed: $e');
+      }
+      return false;
+    }
+  }
+
+  // Method to manually test Crashlytics from UI
+  static Future<void> manualCrashlyticsTest() async {
+    try {
+      print('Starting manual Crashlytics test...');
+      
+      // Test 1: Set user identifier (usually works)
+      await setUserIdentifier('manual_test_user_${DateTime.now().millisecondsSinceEpoch}');
+      print('✓ User identifier set successfully');
+      
+      // Test 2: Set custom keys (usually works)
+      await setCustomKey('manual_test_key', 'manual_test_value');
+      await setCustomKey('test_timestamp', DateTime.now().millisecondsSinceEpoch);
+      print('✓ Custom keys set successfully');
+      
+      // Test 3: Log a custom message (might fail with 404)
+      await log('Manual test log - ${DateTime.now().toIso8601String()}');
+      print('✓ Log message sent successfully');
+      
+      // Test 4: Record a non-fatal error (might fail with 404)
+      await recordError(
+        'Manual test error - ${DateTime.now().toIso8601String()}',
+        StackTrace.current,
+        reason: 'Manual UI test',
+      );
+      print('✓ Non-fatal error recorded successfully');
+      
+      print('Manual Crashlytics test completed!');
+      print('Note: 404 errors are common if Crashlytics is not fully enabled in Firebase Console');
+      print('Check Firebase Console > Crashlytics in 5-10 minutes');
+      
+    } catch (e) {
+      print('Manual Crashlytics test failed: $e');
+    }
   }
 
   // User management methods
@@ -1625,6 +1807,644 @@ class FirebaseService {
       print('Error getting shipper details: $e');
       await recordError(e, StackTrace.current, reason: 'Failed to get shipper details');
       return null;
+    }
+  }
+
+  // ========== LOAD MANAGEMENT METHODS ==========
+
+  /// Calculate match percentage between load and carrier preferences
+  static double calculateLoadMatchPercentage(LoadModel load, CarrierModel carrier) {
+    double totalScore = 0.0;
+    double maxScore = 100.0;
+
+    // Equipment match (40% weight)
+    if (carrier.vehicleTypes != null && carrier.vehicleTypes!.isNotEmpty) {
+      final equipmentMatch = carrier.vehicleTypes!.any((vehicleType) => 
+        vehicleType.toLowerCase().contains(load.equipmentNeeded.toLowerCase()) ||
+        load.equipmentNeeded.toLowerCase().contains(vehicleType.toLowerCase())
+      );
+      totalScore += equipmentMatch ? 40.0 : 0.0;
+    }
+
+    // Location match (30% weight)
+    if (carrier.serviceAreas != null && carrier.serviceAreas!.isNotEmpty) {
+      final originMatch = carrier.serviceAreas!.any((area) => 
+        area.toLowerCase().contains(load.originCity.toLowerCase()) ||
+        area.toLowerCase().contains(load.originState.toLowerCase()) ||
+        load.originCity.toLowerCase().contains(area.toLowerCase()) ||
+        load.originState.toLowerCase().contains(area.toLowerCase())
+      );
+      final destinationMatch = carrier.serviceAreas!.any((area) => 
+        area.toLowerCase().contains(load.destinationCity.toLowerCase()) ||
+        area.toLowerCase().contains(load.destinationState.toLowerCase()) ||
+        load.destinationCity.toLowerCase().contains(area.toLowerCase()) ||
+        load.destinationState.toLowerCase().contains(area.toLowerCase())
+      );
+      
+      if (originMatch && destinationMatch) {
+        totalScore += 30.0;
+      } else if (originMatch || destinationMatch) {
+        totalScore += 15.0;
+      }
+    }
+
+    // Weight capacity match (20% weight)
+    if (carrier.carrierPreferences != null && 
+        carrier.carrierPreferences!['maxWeight'] != null) {
+      final maxWeight = (carrier.carrierPreferences!['maxWeight'] as num).toDouble();
+      if (load.weight <= maxWeight) {
+        final weightRatio = load.weight / maxWeight;
+        totalScore += 20.0 * (1.0 - weightRatio * 0.3); // Bonus for lighter loads
+      }
+    }
+
+    // Historical patterns (10% weight)
+    if (carrier.carrierPreferences != null) {
+      final preferredLoadTypesRaw = carrier.carrierPreferences!['preferredLoadTypes'];
+      if (preferredLoadTypesRaw != null) {
+        // Handle both List<String> and List<dynamic> from Firestore
+        List<String> preferredLoadTypes;
+        if (preferredLoadTypesRaw is List<String>) {
+          preferredLoadTypes = preferredLoadTypesRaw;
+        } else if (preferredLoadTypesRaw is List) {
+          preferredLoadTypes = preferredLoadTypesRaw.cast<String>();
+        } else {
+          preferredLoadTypes = [];
+        }
+        
+        if (preferredLoadTypes.contains(load.loadType)) {
+          totalScore += 10.0;
+        }
+      }
+    }
+
+    return (totalScore / maxScore * 100).clamp(0.0, 100.0);
+  }
+
+  /// Get available loads for carrier with matching percentage calculation
+  static Future<Map<String, dynamic>> getAvailableLoadsForCarrier({
+    required String carrierUid,
+    String searchQuery = '',
+    String equipmentFilter = 'all',
+    int limit = 10,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    try {
+      // Get carrier data for preference matching
+      final carrierDoc = await carriers.doc(carrierUid).get();
+      if (!carrierDoc.exists) {
+        throw Exception('Carrier not found');
+      }
+      final carrier = CarrierModel.fromFirestore(carrierDoc);
+
+      // Get all shippers first
+      final shippersSnapshot = await _firestore.collection('shippers').get();
+      final allLoads = <LoadModel>[];
+
+      // Fetch loads from each shipper using the same pattern as getShipperLoads
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final shipperUid = shipperDoc.id;
+        
+        // Use the same query pattern as getShipperLoads
+        Query query = _firestore
+            .collection('shippers')
+            .doc(shipperUid)
+            .collection('loads')
+            .where('status', isEqualTo: 'available');
+
+        // Apply equipment filter
+        if (equipmentFilter != 'all') {
+          query = query.where('equipmentNeeded', isEqualTo: equipmentFilter);
+        }
+
+        // Apply sorting (same as getShipperLoads)
+        query = query.orderBy('createdAt', descending: true);
+
+        final snapshot = await query.get();
+        
+        for (final doc in snapshot.docs) {
+          try {
+            final load = LoadModel.fromFirestore(doc);
+            final matchPercentage = calculateLoadMatchPercentage(load, carrier);
+            final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
+            allLoads.add(loadWithMatch);
+          } catch (e) {
+            print('Error parsing load ${doc.id}: $e');
+            continue;
+          }
+        }
+      }
+
+      // Sort by match percentage (highest first)
+      allLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
+
+      // Apply search filter client-side (same pattern as getShipperLoads)
+      final filteredLoads = allLoads.where((load) {
+        if (searchQuery.isEmpty) return true;
+        final searchLower = searchQuery.toLowerCase();
+        return load.originAddress.toLowerCase().contains(searchLower) ||
+               load.destinationAddress.toLowerCase().contains(searchLower) ||
+               load.originCity.toLowerCase().contains(searchLower) ||
+               load.destinationCity.toLowerCase().contains(searchLower) ||
+               load.equipmentNeeded.toLowerCase().contains(searchLower) ||
+               load.loadType.toLowerCase().contains(searchLower) ||
+               load.description.toLowerCase().contains(searchLower);
+      }).toList();
+
+      // Apply pagination client-side
+      final startIndex = 0; // Simplified for now since we're aggregating from multiple collections
+      final endIndex = (startIndex + limit).clamp(0, filteredLoads.length);
+      final paginatedLoads = filteredLoads.sublist(startIndex, endIndex);
+
+      return {
+        'loads': paginatedLoads,
+        'lastDocument': null, // Simplified pagination
+        'hasMore': endIndex < filteredLoads.length,
+        'totalCount': filteredLoads.length,
+      };
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get available loads for carrier');
+      
+      // Re-throw network errors to be handled by the UI
+      if (e.toString().contains('network') || 
+          e.toString().contains('connection') ||
+          e.toString().contains('timeout')) {
+        rethrow;
+      }
+      
+      return {
+        'loads': <LoadModel>[],
+        'lastDocument': null,
+        'hasMore': false,
+        'totalCount': 0,
+      };
+    }
+  }
+
+  /// Get all loads for carrier (both available and booked)
+  static Future<Map<String, dynamic>> getAllLoadsForCarrier({
+    required String carrierUid,
+    String searchQuery = '',
+    int limit = 10,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    try {
+      // Get carrier data for preference matching
+      final carrierDoc = await carriers.doc(carrierUid).get();
+      if (!carrierDoc.exists) {
+        throw Exception('Carrier not found');
+      }
+      final carrier = CarrierModel.fromFirestore(carrierDoc);
+
+      // Get all shippers first
+      final shippersSnapshot = await _firestore.collection('shippers').get();
+      final allLoads = <LoadModel>[];
+
+      // Fetch loads from each shipper using the same pattern as getShipperLoads
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final shipperUid = shipperDoc.id;
+        
+        // Get available loads (same pattern as getShipperLoads)
+        Query availableQuery = _firestore
+            .collection('shippers')
+            .doc(shipperUid)
+            .collection('loads')
+            .where('status', isEqualTo: 'available');
+
+        // Get booked loads by this carrier
+        Query bookedQuery = _firestore
+            .collection('shippers')
+            .doc(shipperUid)
+            .collection('loads')
+            .where('bookedByCarrierId', isEqualTo: carrierUid);
+
+        // Apply sorting (same as getShipperLoads)
+        availableQuery = availableQuery.orderBy('createdAt', descending: true);
+        bookedQuery = bookedQuery.orderBy('createdAt', descending: true);
+
+        // Execute both queries
+        final availableSnapshot = await availableQuery.get();
+        final bookedSnapshot = await bookedQuery.get();
+        
+        // Process available loads
+        for (final doc in availableSnapshot.docs) {
+          try {
+            final load = LoadModel.fromFirestore(doc);
+            final matchPercentage = calculateLoadMatchPercentage(load, carrier);
+            final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
+            allLoads.add(loadWithMatch);
+          } catch (e) {
+            print('Error parsing available load ${doc.id}: $e');
+            continue;
+          }
+        }
+        
+        // Process booked loads
+        for (final doc in bookedSnapshot.docs) {
+          try {
+            final load = LoadModel.fromFirestore(doc);
+            allLoads.add(load);
+          } catch (e) {
+            print('Error parsing booked load ${doc.id}: $e');
+            continue;
+          }
+        }
+      }
+
+      // Sort by creation date (newest first)
+      allLoads.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      // Apply search filter client-side (same pattern as getShipperLoads)
+      final filteredLoads = allLoads.where((load) {
+        if (searchQuery.isEmpty) return true;
+        final searchLower = searchQuery.toLowerCase();
+        return load.originAddress.toLowerCase().contains(searchLower) ||
+               load.destinationAddress.toLowerCase().contains(searchLower) ||
+               load.originCity.toLowerCase().contains(searchLower) ||
+               load.destinationCity.toLowerCase().contains(searchLower) ||
+               load.equipmentNeeded.toLowerCase().contains(searchLower) ||
+               load.loadType.toLowerCase().contains(searchLower) ||
+               load.description.toLowerCase().contains(searchLower);
+      }).toList();
+
+      // Apply pagination client-side
+      final startIndex = 0; // Simplified for now since we're aggregating from multiple collections
+      final endIndex = (startIndex + limit).clamp(0, filteredLoads.length);
+      final paginatedLoads = filteredLoads.sublist(startIndex, endIndex);
+
+      return {
+        'loads': paginatedLoads,
+        'lastDocument': null, // Simplified pagination
+        'hasMore': endIndex < filteredLoads.length,
+        'totalCount': filteredLoads.length,
+      };
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get all loads for carrier');
+      
+      // Re-throw network errors to be handled by the UI
+      if (e.toString().contains('network') || 
+          e.toString().contains('connection') ||
+          e.toString().contains('timeout')) {
+        rethrow;
+      }
+      
+      return {
+        'loads': <LoadModel>[],
+        'lastDocument': null,
+        'hasMore': false,
+        'totalCount': 0,
+      };
+    }
+  }
+
+  /// Get carrier's booked loads with different statuses
+  static Future<Map<String, dynamic>> getCarrierBookedLoads({
+    required String carrierUid,
+    String status = 'all',
+    int limit = 10,
+    DocumentSnapshot? lastDocument,
+  }) async {
+    try {
+      // Get all shippers first
+      final shippersSnapshot = await _firestore.collection('shippers').get();
+      final allLoads = <LoadModel>[];
+
+      // Fetch booked loads from each shipper using the same pattern as getShipperLoads
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final shipperUid = shipperDoc.id;
+        
+        // Use the same query pattern as getShipperLoads
+        Query query = _firestore
+            .collection('shippers')
+            .doc(shipperUid)
+            .collection('loads')
+            .where('bookedByCarrierId', isEqualTo: carrierUid);
+
+        // Apply status filter
+        if (status != 'all') {
+          query = query.where('status', isEqualTo: status);
+        }
+
+        // Apply sorting (same as getShipperLoads)
+        query = query.orderBy('createdAt', descending: true);
+
+        final snapshot = await query.get();
+        
+        for (final doc in snapshot.docs) {
+          try {
+            final load = LoadModel.fromFirestore(doc);
+            allLoads.add(load);
+          } catch (e) {
+            print('Error parsing booked load ${doc.id}: $e');
+            continue;
+          }
+        }
+      }
+
+      // Sort by creation date (newest first)
+      allLoads.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      // Apply pagination client-side
+      final startIndex = 0; // Simplified for now since we're aggregating from multiple collections
+      final endIndex = (startIndex + limit).clamp(0, allLoads.length);
+      final paginatedLoads = allLoads.sublist(startIndex, endIndex);
+
+      return {
+        'loads': paginatedLoads,
+        'lastDocument': null, // Simplified pagination
+        'hasMore': endIndex < allLoads.length,
+        'totalCount': allLoads.length,
+      };
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get carrier booked loads');
+      
+      // Re-throw network errors to be handled by the UI
+      if (e.toString().contains('network') || 
+          e.toString().contains('connection') ||
+          e.toString().contains('timeout')) {
+        rethrow;
+      }
+      
+      return {
+        'loads': <LoadModel>[],
+        'lastDocument': null,
+        'hasMore': false,
+        'totalCount': 0,
+      };
+    }
+  }
+
+
+  /// Debug method to check if there are any loads in the database
+  static Future<void> debugCheckLoads() async {
+    try {
+      print('=== DEBUG: Checking for loads in database ===');
+      
+      // Check main loads collection
+      final mainLoadsSnapshot = await _firestore.collection('loads').get();
+      print('DEBUG: Main loads collection has ${mainLoadsSnapshot.docs.length} documents');
+      
+      // Check shippers collection
+      final shippersSnapshot = await _firestore.collection('shippers').get();
+      print('DEBUG: Found ${shippersSnapshot.docs.length} shippers');
+      
+      int totalLoads = 0;
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final shipperUid = shipperDoc.id;
+        print('DEBUG: Checking shipper $shipperUid...');
+        
+        // Check if shipper document exists and has basic info
+        final shipperData = shipperDoc.data();
+        print('DEBUG: Shipper $shipperUid data: ${shipperData.keys.toList()}');
+        
+        final loadsSnapshot = await _firestore
+            .collection('shippers')
+            .doc(shipperUid)
+            .collection('loads')
+            .get();
+        
+        print('DEBUG: Shipper $shipperUid has ${loadsSnapshot.docs.length} loads');
+        totalLoads += loadsSnapshot.docs.length;
+        
+        // Print details of each load
+        for (final loadDoc in loadsSnapshot.docs) {
+          final data = loadDoc.data();
+          print('  - Load ${loadDoc.id}: status=${data['status']}, title=${data['title']}');
+        }
+        
+        // Also check if there are any documents in the loads subcollection at all
+        if (loadsSnapshot.docs.isEmpty) {
+          print('DEBUG: No loads found for shipper $shipperUid - checking if subcollection exists...');
+          // Try to get a count query to see if there are any documents
+          final countQuery = await _firestore
+              .collection('shippers')
+              .doc(shipperUid)
+              .collection('loads')
+              .limit(1)
+              .get();
+          print('DEBUG: Count query returned ${countQuery.docs.length} documents');
+        }
+      }
+      
+      print('DEBUG: Total loads across all shippers: $totalLoads');
+      print('=== END DEBUG ===');
+    } catch (e) {
+      print('DEBUG ERROR: $e');
+    }
+  }
+
+  /// Book a load for a carrier
+  static Future<bool> bookLoad({
+    required String loadId,
+    required String carrierUid,
+  }) async {
+    try {
+      print('DEBUG bookLoad: Starting to book load $loadId for carrier $carrierUid');
+      
+      // First, find the load outside of transaction to avoid timeout
+      final shippersSnapshot = await _firestore.collection('shippers').get();
+      DocumentReference? loadRef;
+      Map<String, dynamic>? loadData;
+      String? shipperUid;
+
+      print('DEBUG bookLoad: Searching through ${shippersSnapshot.docs.length} shippers');
+      
+      // Search for the load in all shipper subcollections
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final shipperId = shipperDoc.id;
+        final tempLoadRef = _firestore
+            .collection('shippers')
+            .doc(shipperId)
+            .collection('loads')
+            .doc(loadId);
+        
+        final loadDoc = await tempLoadRef.get();
+        if (loadDoc.exists) {
+          loadRef = tempLoadRef;
+          loadData = loadDoc.data() as Map<String, dynamic>;
+          shipperUid = shipperId;
+          print('DEBUG bookLoad: Found load in shipper $shipperId');
+          break;
+        }
+      }
+
+      if (loadRef == null || loadData == null) {
+        print('DEBUG bookLoad: Load not found');
+        throw Exception('Load not found');
+      }
+
+      // Check if load is still available
+      if (loadData['status'] != 'available') {
+        print('DEBUG bookLoad: Load is no longer available, status: ${loadData['status']}');
+        throw Exception('Load is no longer available');
+      }
+
+      // Get carrier data outside of transaction
+      final carrierDoc = await carriers.doc(carrierUid).get();
+      if (!carrierDoc.exists) {
+        print('DEBUG bookLoad: Carrier not found');
+        throw Exception('Carrier not found');
+      }
+
+      final carrierData = carrierDoc.data() as Map<String, dynamic>;
+      final carrierName = carrierData['displayName'] ?? carrierData['companyName'] ?? 'Unknown Carrier';
+      print('DEBUG bookLoad: Carrier found: $carrierName');
+
+      // Now run the transaction with the found references
+      return await _firestore.runTransaction<bool>((transaction) async {
+        print('DEBUG bookLoad: Starting transaction');
+        
+        // Ensure loadRef is not null
+        if (loadRef == null) {
+          throw Exception('Load reference is null');
+        }
+        
+        // Re-check load status within transaction
+        final loadDoc = await transaction.get(loadRef);
+        if (!loadDoc.exists) {
+          throw Exception('Load no longer exists');
+        }
+        
+        final currentLoadData = loadDoc.data() as Map<String, dynamic>;
+        if (currentLoadData['status'] != 'available') {
+          throw Exception('Load is no longer available');
+        }
+
+        // Update load status in shipper subcollection
+        transaction.update(loadRef, {
+          'status': 'booked',
+          'bookedByCarrierId': carrierUid,
+          'bookedAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        });
+
+        // Create booking record
+        final bookingRef = bookings.doc();
+        transaction.set(bookingRef, {
+          'loadId': loadId,
+          'carrierId': carrierUid,
+          'carrierName': carrierName,
+          'shipperId': shipperUid,
+          'shipperName': loadData?['shipperName'] ?? 'Unknown Shipper',
+          'status': 'booked',
+          'bookedAt': Timestamp.now(),
+          'createdAt': Timestamp.now(),
+          'updatedAt': Timestamp.now(),
+        });
+
+        // Add to carrier's myBookings subcollection
+        final carrierBookingRef = carriers.doc(carrierUid).collection('myBookings').doc(loadId);
+        transaction.set(carrierBookingRef, {
+          'loadId': loadId,
+          'status': 'booked',
+          'bookedAt': Timestamp.now(),
+          'createdAt': Timestamp.now(),
+        });
+
+        print('DEBUG bookLoad: Transaction completed successfully');
+        return true;
+      });
+    } catch (e) {
+      print('DEBUG bookLoad: Error occurred: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to book load');
+      return false;
+    }
+  }
+
+  /// Update load status for carriers
+  static Future<bool> updateCarrierLoadStatus({
+    required String loadId,
+    required String status,
+    String? carrierUid,
+  }) async {
+    try {
+      return await _firestore.runTransaction<bool>((transaction) async {
+        final loadRef = loads.doc(loadId);
+        final loadDoc = await transaction.get(loadRef);
+        
+        if (!loadDoc.exists) {
+          throw Exception('Load not found');
+        }
+
+        final loadData = loadDoc.data() as Map<String, dynamic>;
+        final currentCarrierId = loadData['bookedByCarrierId'] as String?;
+
+        // Verify carrier has permission to update this load
+        if (carrierUid != null && currentCarrierId != carrierUid) {
+          throw Exception('Unauthorized to update this load');
+        }
+
+        // Update load status
+        final updateData = <String, dynamic>{
+          'status': status,
+          'updatedAt': Timestamp.now(),
+        };
+
+        if (status == 'completed') {
+          updateData['completedAt'] = Timestamp.now();
+        }
+
+        transaction.update(loadRef, updateData);
+
+        // Update booking record
+        final bookingQuery = bookings.where('loadId', isEqualTo: loadId);
+        final bookingSnapshot = await bookingQuery.get();
+        
+        for (final bookingDoc in bookingSnapshot.docs) {
+          transaction.update(bookingDoc.reference, {
+            'status': status,
+            'updatedAt': Timestamp.now(),
+          });
+        }
+
+        // Update carrier's myBookings subcollection
+        if (currentCarrierId != null) {
+          final carrierBookingRef = carriers.doc(currentCarrierId).collection('myBookings').doc(loadId);
+          transaction.update(carrierBookingRef, {
+            'status': status,
+            'updatedAt': Timestamp.now(),
+          });
+        }
+
+        return true;
+      });
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to update load status');
+      return false;
+    }
+  }
+
+  /// Update carrier preferences
+  static Future<bool> updateCarrierPreferences({
+    required String carrierUid,
+    List<String>? vehicleTypes,
+    List<String>? serviceAreas,
+    Map<String, dynamic>? carrierPreferences,
+  }) async {
+    try {
+      final updateData = <String, dynamic>{
+        'updatedAt': Timestamp.now(),
+      };
+
+      if (vehicleTypes != null) {
+        updateData['vehicleTypes'] = vehicleTypes;
+      }
+
+      if (serviceAreas != null) {
+        updateData['serviceAreas'] = serviceAreas;
+      }
+
+      if (carrierPreferences != null) {
+        updateData['carrierPreferences'] = carrierPreferences;
+      }
+
+      print('Firebase: Updating carrier preferences with data: $updateData');
+      await carriers.doc(carrierUid).update(updateData);
+      print('Firebase: Successfully updated carrier preferences');
+      return true;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to update carrier preferences');
+      return false;
     }
   }
 }

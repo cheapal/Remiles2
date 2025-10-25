@@ -4,6 +4,7 @@ import '../../../../../providers/auth_provider.dart';
 import '../../../../../providers/app_state_provider.dart';
 import '../../../../../core/auth_wrapper.dart';
 import '../../common/widgets/top_navigation_bar.dart';
+import 'carrier_preferences.dart';
 
 class Profile extends StatelessWidget {
   const Profile({super.key});
@@ -126,19 +127,26 @@ class Profile extends StatelessWidget {
                 const SizedBox(height: 20),
 
                 // Profile Options
-                _buildProfileOption('Account Details', Icons.account_circle),
+                _buildProfileOption('Account Details', Icons.account_circle, () {}),
                 const SizedBox(height: 16),
-                _buildProfileOption('Payment Method', Icons.credit_card),
+                _buildProfileOption('Payment Method', Icons.credit_card, () {}),
                 const SizedBox(height: 16),
-                _buildProfileOption('Load Preferences', Icons.tune),
+                _buildProfileOption('Load Preferences', Icons.tune, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CarrierPreferencesPage(),
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
-                _buildProfileOption('Documents', Icons.description),
+                _buildProfileOption('Documents', Icons.description, () {}),
                 const SizedBox(height: 16),
-                _buildProfileOption('Boost My Load', Icons.rocket_launch),
+                _buildProfileOption('Boost My Load', Icons.rocket_launch, () {}),
                 const SizedBox(height: 16),
-                _buildProfileOption('Settings', Icons.settings),
+                _buildProfileOption('Settings', Icons.settings, () {}),
                 const SizedBox(height: 16),
-                _buildProfileOption('Help & Legal', Icons.help_outline),
+                _buildProfileOption('Help & Legal', Icons.help_outline, () {}),
                 const SizedBox(height: 16),
                 // Logout button
                 GestureDetector(
@@ -268,40 +276,43 @@ class Profile extends StatelessWidget {
   }
 }
 
-Widget _buildProfileOption(String text, IconData icon) {
-  return Container(
-    width: double.infinity,
-    height: 41,
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(7.29),
-      border: Border.all(color: const Color(0xFF43975A), width: 2),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.25),
-          blurRadius: 4,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFF186230)),
-          const SizedBox(width: 10),
-          Text(
-            text,
-            style: const TextStyle(
-              fontFamily: 'Roboto',
-              fontWeight: FontWeight.w500,
-              fontSize: 14,
-              color: Color(0xFF186230),
-            ),
+Widget _buildProfileOption(String text, IconData icon, VoidCallback onTap) {
+  return GestureDetector(
+    onTap: onTap,
+    child: Container(
+      width: double.infinity,
+      height: 41,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(7.29),
+        border: Border.all(color: const Color(0xFF43975A), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.25),
+            blurRadius: 4,
+            offset: const Offset(0, 4),
           ),
-          const Spacer(),
-          Icon(Icons.arrow_forward_ios, color: Colors.grey[400]),
         ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFF186230)),
+            const SizedBox(width: 10),
+            Text(
+              text,
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                color: Color(0xFF186230),
+              ),
+            ),
+            const Spacer(),
+            Icon(Icons.arrow_forward_ios, color: Colors.grey[400]),
+          ],
+        ),
       ),
     ),
   );

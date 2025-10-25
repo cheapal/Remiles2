@@ -20,30 +20,80 @@ void main() async {
   // Ensure that plugin services are initialized
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
-  // Initialize Firebase Analytics
-  await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(AppConfig.enableAnalytics);
-  
-  // Test analytics only in debug mode
-  if (AppConfig.enableTestEvents) {
-    print('${AppConfig.versionInfo} - Running analytics test...');
-    await FirebaseService.testAnalytics();
+  try {
+    // Initialize Firebase
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    
+    // Initialize Firebase Analytics according to official docs
+    try {
+      final analytics = FirebaseAnalytics.instance;
+      await analytics.setAnalyticsCollectionEnabled(AppConfig.enableAnalytics);
+      
+      // Set session timeout (30 minutes as per official docs)
+      await analytics.setSessionTimeoutDuration(const Duration(minutes: 30));
+      
+      if (AppConfig.enableDebugLogging) {
+        print('Firebase Analytics initialized successfully');
+        print('Analytics collection enabled: ${AppConfig.enableAnalytics}');
+      }
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Firebase Analytics initialization failed: $e');
+      }
+    }
+    
+    // Initialize Firebase Crashlytics according to official docs
+    try {
+      final crashlytics = FirebaseCrashlytics.instance;
+      await crashlytics.setCrashlyticsCollectionEnabled(AppConfig.enableCrashlytics);
+      
+      // Set user identifier for better crash reporting
+      await crashlytics.setUserIdentifier('app_user_${DateTime.now().millisecondsSinceEpoch}');
+      
+      if (AppConfig.enableDebugLogging) {
+        print('Firebase Crashlytics initialized successfully');
+        print('Crashlytics collection enabled: ${AppConfig.enableCrashlytics}');
+      }
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Firebase Crashlytics initialization failed: $e');
+      }
+    }
+    
+    // Test analytics and crashlytics only in debug mode
+    if (AppConfig.enableTestEvents) {
+      print('${AppConfig.versionInfo} - Running analytics test...');
+      await FirebaseService.testAnalytics();
+      
+      print('${AppConfig.versionInfo} - Checking crashlytics health...');
+      final isCrashlyticsWorking = await FirebaseService.isCrashlyticsWorking();
+      if (isCrashlyticsWorking) {
+        print('Crashlytics is working properly');
+        print('${AppConfig.versionInfo} - Running crashlytics test...');
+        await FirebaseService.testCrashlytics();
+      } else {
+        print('Crashlytics health check failed');
+      }
+    }
+    
+    // Set up error handlers
+    FlutterError.onError = (errorDetails) {
+      FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
+    };
+    
+    // Pass all uncaught asynchronous errors to Crashlytics
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+    
+  } catch (e) {
+    if (AppConfig.enableDebugLogging) {
+      print('Firebase initialization error: $e');
+    }
   }
-  
-  // Initialize Firebase Crashlytics
-  FlutterError.onError = (errorDetails) {
-    FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
-  };
-  
-  // Pass all uncaught asynchronous errors to Crashlytics
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
   
   // The main function is the entry point for all Flutter apps.
   // It calls the runApp() function, which takes the root widget of the app.
@@ -56,6 +106,8 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+     FirebaseService.manualCrashlyticsTest();
+ FirebaseService.isCrashlyticsWorking();
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),

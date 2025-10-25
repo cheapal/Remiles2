@@ -1,12 +1,24 @@
 
 import 'package:Remiles/core/theme/colors.dart';
+import 'package:Remiles/core/firebase_service.dart';
+import 'package:Remiles/models/load_model.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 
-class LoadCardInfo extends StatelessWidget {
-  const LoadCardInfo({super.key});
+class LoadCardInfo extends StatefulWidget {
+  final LoadModel load;
+  final VoidCallback? onLoadBooked;
+  
+  const LoadCardInfo({super.key, required this.load, this.onLoadBooked});
+
+  @override
+  State<LoadCardInfo> createState() => _LoadCardInfoState();
+}
+
+class _LoadCardInfoState extends State<LoadCardInfo> {
+  bool _isBooking = false;
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +57,7 @@ class LoadCardInfo extends StatelessWidget {
                 Row(
                   children: [
                      Text(
-                      "\$1500",
+                      "\$${widget.load.price.toStringAsFixed(0)}",
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -54,22 +66,44 @@ class LoadCardInfo extends StatelessWidget {
                     ),
                     const SizedBox(width: 12),
                      Text(
-                      "215 (mi)",
+                      "${widget.load.distance.toStringAsFixed(0)} (mi)",
                       style: TextStyle(fontSize: 16,color: primaryColor,),
                     ),
                   ],
                 ),
-                Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Text(
-                    "Available",
-                    style: TextStyle(color: Colors.white),
-                  ),
+                Row(
+                  children: [
+                    if (widget.load.matchPercentage != null) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: _getMatchColor(widget.load.matchPercentage!),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          "${widget.load.matchPercentage!.toStringAsFixed(0)}% Match",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    Container(
+                      padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor(widget.load.status),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        _getStatusText(widget.load.status),
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -81,7 +115,7 @@ class LoadCardInfo extends StatelessWidget {
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                 Text("From : Toronto, ON", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
+                 Text("From : ${widget.load.originCity}, ${widget.load.originState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
               ],
             ),
             const SizedBox(height: 6),
@@ -89,11 +123,11 @@ class LoadCardInfo extends StatelessWidget {
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                 Text("To : Montreal, QC", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
+                 Text("To : ${widget.load.destinationCity}, ${widget.load.destinationState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
                 const Spacer(),
-                const Text(
-                  "Load ID #1234",
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                Text(
+                  "Load ID #${widget.load.id.substring(0, 8)}",
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -106,7 +140,7 @@ class LoadCardInfo extends StatelessWidget {
                 SvgPicture.asset("assets/calender.svg",
                     width: 18, height: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                 Text("Pickup : Sep 1st, 2025", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
+                 Text("Pickup : ${_formatDate(widget.load.pickupDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
               ],
             ),
             Row(
@@ -114,37 +148,40 @@ class LoadCardInfo extends StatelessWidget {
                 SvgPicture.asset("assets/calender.svg",
                     width: 18, height: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                Text("Delivery : Sep 3rd, 2025", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                Text("Delivery : ${_formatDate(widget.load.deliveryDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
                 const Spacer(),
-                ElevatedButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) {
-                        final screenHeight = MediaQuery.of(ctx).size.height;
-                        return Dialog(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          insetPadding: const EdgeInsets.all(16), // margin from screen edges
-                          child:
-                          // SizedBox(
-                          //   height: screenHeight * 0.7, // 90% of screen height
-                          //   child:
-                            const SingleChildScrollView(
-                              child: BookedNow(),
-                          //   ),
-                           ),
-                        );
-                      },
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: const Text("Book Now", style: TextStyle(color: Colors.white),),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Single button that handles both view details and booking
+                    ElevatedButton(
+                      onPressed: widget.load.status == 'available' && !_isBooking 
+                          ? () => _handleLoadAction(context)
+                          : widget.load.status == 'available' && _isBooking
+                              ? null
+                              : () => _showLoadDetails(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: widget.load.status == 'available' 
+                            ? (_isBooking ? Colors.grey : primaryColor)
+                            : _getStatusColor(widget.load.status),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: widget.load.status == 'available' && _isBooking
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              widget.load.status == 'available' ? "Book Now" : _getActionText(widget.load.status), 
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -158,12 +195,12 @@ class LoadCardInfo extends StatelessWidget {
                 SvgPicture.asset("assets/truck.svg",
                     width: 20, height: 20, color: primaryColor),
                 const SizedBox(width: 8),
-                const Text("15,000 lb"),
+                Text("${widget.load.weight.toStringAsFixed(0)} lb"),
                 const Spacer(),
-                const Text("Equipment Needed: Flatbed"),
+                Text("Equipment: ${widget.load.equipmentNeeded}"),
                 const Spacer(),
                  Text(
-                  "2 Docs",
+                  "${widget.load.loadType}",
                   style: TextStyle(
                       fontWeight: FontWeight.bold, color: primaryColor),
                 ),
@@ -174,4 +211,149 @@ class LoadCardInfo extends StatelessWidget {
       ),
     );
   }
+
+  Color _getMatchColor(double percentage) {
+    if (percentage >= 90) return Colors.green;
+    if (percentage >= 70) return Colors.orange;
+    return Colors.red;
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'available':
+        return primaryColor;
+      case 'booked':
+        return Colors.blue;
+      case 'in-transit':
+        return Colors.orange;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getStatusText(String status) {
+    switch (status) {
+      case 'available':
+        return 'Available';
+      case 'booked':
+        return 'Booked';
+      case 'in-transit':
+        return 'In-Transit';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  }
+
+  String _getActionText(String status) {
+    switch (status) {
+      case 'booked':
+        return 'View Details';
+      case 'in-transit':
+        return 'Track Load';
+      case 'completed':
+        return 'View Details';
+      case 'cancelled':
+        return 'View Details';
+      default:
+        return 'View';
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  Future<void> _handleLoadAction(BuildContext context) async {
+    // Direct booking for available loads (instant booking)
+    try {
+      setState(() {
+        _isBooking = true;
+      });
+
+      final user = FirebaseService.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to book loads')),
+        );
+        setState(() {
+          _isBooking = false;
+        });
+        return;
+      }
+
+      print('DEBUG: Starting instant booking for load ${widget.load.id}');
+      final success = await FirebaseService.bookLoad(
+        loadId: widget.load.id,
+        carrierUid: user.uid,
+      );
+      print('DEBUG: Instant booking result: $success');
+
+      setState(() {
+        _isBooking = false;
+      });
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Load booked successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Notify parent to refresh
+        if (widget.onLoadBooked != null) {
+          widget.onLoadBooked!();
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Load is no longer available or booking failed. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isBooking = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _showLoadDetails(BuildContext context) {
+    // Show details for non-available loads
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          insetPadding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            child: BookedNow(load: widget.load),
+          ),
+        );
+      },
+    );
+  }
+
 }

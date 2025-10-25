@@ -1,8 +1,27 @@
 import 'package:Remiles/core/theme/colors.dart';
+import 'package:Remiles/core/firebase_service.dart';
+import 'package:Remiles/models/load_model.dart';
 import 'package:flutter/material.dart';
 
-class BookedNow extends StatelessWidget {
-  const BookedNow({super.key});
+class BookedNow extends StatefulWidget {
+  final LoadModel load;
+  final VoidCallback? onLoadBooked;
+  
+  const BookedNow({super.key, required this.load, this.onLoadBooked});
+
+  @override
+  State<BookedNow> createState() => _BookedNowState();
+}
+
+class _BookedNowState extends State<BookedNow> {
+  bool _isBooking = false;
+  String _currentStatus = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStatus = widget.load.status;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,9 +49,9 @@ class BookedNow extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                DateChip(text: "Sep 1st, 5:00 PM"),
+                DateChip(text: _formatDate(widget.load.pickupDate)),
                 Text(
-                    "Load ID #1234",
+                    "Load ID #${widget.load.id.substring(0, 8)}",
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -50,14 +69,14 @@ class BookedNow extends StatelessWidget {
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    "From : Fredericton, NB E1C 8DG",
+                    "From : ${widget.load.originAddress}",
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: primaryColor),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            DateChip(text: "Sep 3st, 10:00 AM"),
+            DateChip(text: _formatDate(widget.load.deliveryDate)),
             const SizedBox(height: 12),
             /// To
             Row(
@@ -66,7 +85,7 @@ class BookedNow extends StatelessWidget {
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    "To : Truro, NS BOP 1RO",
+                    "To : ${widget.load.destinationAddress}",
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: primaryColor),
                   ),
                 ),
@@ -79,11 +98,11 @@ class BookedNow extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children:  [
                 Text(
-                  "Distance : 215 (mi)",
+                  "Distance : ${widget.load.distance.toStringAsFixed(0)} (mi)",
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
                 ),
                 Text(
-                  "Weight : 15,000 lb",
+                  "Weight : ${widget.load.weight.toStringAsFixed(0)} lb",
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
                 ),
               ],
@@ -92,21 +111,21 @@ class BookedNow extends StatelessWidget {
 
             /// Equipment
              Text(
-              "Equipment Needed: Reefer",
+              "Equipment Needed: ${widget.load.equipmentNeeded}",
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
             ),
             const SizedBox(height: 8),
 
-            /// Declared Value
+            /// Load Type
              Text(
-              "Declared Value : \$5000 CAD",
+              "Load Type : ${widget.load.loadType}",
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
             ),
             const SizedBox(height: 8),
 
-            /// Dimensions
+            /// Shipper
              Text(
-              "Dimensions : 10 by 7 ft",
+              "Shipper : ${widget.load.shipperName}",
               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
             ),
             const SizedBox(height: 8),
@@ -123,7 +142,7 @@ class BookedNow extends StatelessWidget {
                     ),
                   ),
                   TextSpan(
-                    text: "Fresh Produce handle with care",
+                    text: widget.load.description.isNotEmpty ? widget.load.description : "No description provided",
                     style: TextStyle(
                       fontWeight: FontWeight.w500,
                       color: Colors.black,
@@ -195,17 +214,45 @@ class BookedNow extends StatelessWidget {
                     color: Colors.blue,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const Text(
-                    "\$1500",
+                  child: Text(
+                    "\$${widget.load.price.toStringAsFixed(0)}",
                     style: TextStyle(
                         color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
-                const SizedBox(width: 70),
-                 Text(
-                  "Open Docs",
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: Colors.red),
+            /// Status Section
+            Row(
+              children: [
+                const Text(
+                  "Status:",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(_currentStatus),
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _getStatusColor(_currentStatus).withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    _currentStatus.toUpperCase(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -215,52 +262,154 @@ class BookedNow extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
+                onPressed: _currentStatus == 'available' && !_isBooking ? _bookLoad : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor ,
+                  backgroundColor: _currentStatus == 'available' ? primaryColor : Colors.grey,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  "Accept",
-                  style: TextStyle(fontSize: 16, color: Colors.white),
-                ),
+                child: _isBooking 
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      _currentStatus == 'available' ? "Accept" : "Already ${_currentStatus.toUpperCase()}",
+                      style: const TextStyle(fontSize: 16, color: Colors.white),
+                    ),
               ),
             ),
 
-            const SizedBox(height: 20),
+            // Only show negotiate button for available loads
+            if (_currentStatus == 'available') ...[
+              const SizedBox(height: 20),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  // Navigator.push(
-                  //   context,
-                  //   MaterialPageRoute(builder: (context) => const NegotiateLoad()),
-                  // );
-                  Navigator.of(context).pop();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.greenAccent.shade200 ,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(builder: (context) => const NegotiateLoad()),
+                    // );
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.greenAccent.shade200 ,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    "Negotiate",
+                    style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),
-                child: const Text(
-                  "Negotiate",
-                  style: TextStyle(fontSize: 16, color: Colors.white),
-                ),
               ),
-            ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'available':
+        return primaryColor;
+      case 'booked':
+        return Colors.blue;
+      case 'in-transit':
+        return Colors.orange;
+      case 'completed':
+        return Colors.green;
+      case 'cancelled':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Future<void> _bookLoad() async {
+    try {
+      setState(() {
+        _isBooking = true;
+      });
+
+      final user = FirebaseService.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to book loads')),
+        );
+        return;
+      }
+
+      print('DEBUG: Starting to book load ${widget.load.id}');
+      final success = await FirebaseService.bookLoad(
+        loadId: widget.load.id,
+        carrierUid: user.uid,
+      );
+      print('DEBUG: Booking result: $success');
+
+      if (success) {
+        setState(() {
+          _currentStatus = 'booked';
+          _isBooking = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Load booked successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Notify parent widget to refresh
+        if (widget.onLoadBooked != null) {
+          widget.onLoadBooked!();
+        }
+        
+        // Close the dialog
+        Navigator.of(context).pop();
+      } else {
+        setState(() {
+          _isBooking = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to book load. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isBooking = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
 
@@ -290,5 +439,6 @@ class DateChip extends StatelessWidget {
       ),
     );
   }
+
 }
 

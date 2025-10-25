@@ -65,4 +65,5 @@ class DefaultFirebaseOptions {
     storageBucket: 're-miles-dfm.firebasestorage.app',
     iosBundleId: 'com.example.majh',
   );
+
 }

@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/product_listing.dart';
+import 'package:Remiles/models/chat_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -29,6 +31,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
   List<ProductListing> _myListings = [];
   List<ProductListing> _savedListings = [];
   List<ProductListing> _recentlyViewed = [];
+  List<ChatConversation> _conversations = [];
 
   late final AnimationController _shimmerCtrl;
 
@@ -261,7 +264,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
       case 1:
         return _buildSavedItems();
       case 2:
-        return _buildInbox();
+        return _buildConversations();
       case 3:
         return _buildReviews();
       case 4:
@@ -316,11 +319,55 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
     return _buildListingsGrid(_savedListings);
   }
 
-  Widget _buildInbox() {
-    return _buildEmptyState(
-      icon: Icons.inbox_outlined,
-      title: 'No messages',
-      subtitle: 'Your messages will appear here',
+  Widget _buildConversations() {
+    if (_isLoading) {
+      return _buildLoadingGrid();
+    }
+
+    if (_errorMessage != null) {
+      return _buildErrorState();
+    }
+
+    if (_conversations.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.chat_bubble_outline,
+        title: 'No conversations',
+        subtitle: 'Your conversations will appear here',
+      );
+    }
+
+    return ListView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: _conversations.length,
+      itemBuilder: (context, index) {
+        final conversation = _conversations[index];
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final user = authProvider.currentUser;
+        final otherUserId = conversation.getOtherParticipant(user?.uid ?? '');
+        
+        return _ConversationCard(
+          conversation: conversation,
+          otherUserId: otherUserId,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(
+                  conversationId: conversation.id,
+                  otherUserId: otherUserId,
+                  otherUserName: conversation.participants.contains(otherUserId) 
+                      ? 'User' // You might want to fetch the actual name
+                      : 'Unknown User',
+                  listingTitle: conversation.listingTitle,
+                  listingImageUrl: conversation.listingImageUrl,
+                  listingId: conversation.listingId,
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -539,6 +586,29 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
     }
   }
 
+  Future<void> _loadConversations() async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.currentUser;
+      
+      if (user == null) {
+        setState(() {
+          _errorMessage = 'User not logged in';
+        });
+        return;
+      }
+
+      final conversations = await FirebaseService.getUserConversations(user.uid);
+      setState(() {
+        _conversations = conversations;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+      });
+    }
+  }
+
   Future<void> _loadTabData() async {
     setState(() {
       _isLoading = true;
@@ -550,6 +620,8 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
         await _loadUserData();
       } else if (_selectedTab == 1) {
         await _loadSavedListings();
+      } else if (_selectedTab == 2) {
+        await _loadConversations();
       }
       // Other tabs can be implemented later
     } catch (e) {
@@ -817,5 +889,123 @@ class Shimmer extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Conversation card widget
+class _ConversationCard extends StatelessWidget {
+  final ChatConversation conversation;
+  final String otherUserId;
+  final VoidCallback onTap;
+
+  const _ConversationCard({
+    required this.conversation,
+    required this.otherUserId,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Avatar
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: brandGreen,
+              child: Text(
+                conversation.listingTitle?.substring(0, 1).toUpperCase() ?? 'U',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          conversation.listingTitle ?? 'Product Inquiry',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (conversation.lastMessage != null)
+                        Text(
+                          _formatTime(conversation.lastMessage!.timestamp),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    conversation.lastMessage?.content ?? 'No messages yet',
+                    style: const TextStyle(
+                      color: Colors.grey,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // Unread indicator
+            if (conversation.unreadCount[otherUserId] == true)
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: brandGreen,
+                  shape: BoxShape.circle,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatTime(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
 }

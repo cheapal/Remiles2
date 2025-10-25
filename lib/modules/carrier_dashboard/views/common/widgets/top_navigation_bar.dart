@@ -17,8 +17,8 @@ Widget TopNavigationBar(BuildContext context) {
         fit: BoxFit.cover,
       ),
       borderRadius: BorderRadius.only(
-        bottomLeft: Radius.circular(24),
-        bottomRight: Radius.circular(24),
+        topLeft: Radius.circular(1),
+        topRight: Radius.circular(1),
       ),
     ),
     child: SafeArea(

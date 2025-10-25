@@ -11,6 +11,7 @@ import '../models/carrier_model.dart';
 import '../models/carrier_onboarding_data.dart';
 import '../models/shipper_onboarding_data.dart';
 import '../models/product_listing.dart';
+import '../models/chat_model.dart';
 
 /// Firebase service class to handle all Firebase operations
 class FirebaseService {
@@ -32,6 +33,8 @@ class FirebaseService {
   static CollectionReference get carriers => _firestore.collection('carriers');
   static CollectionReference get loads => _firestore.collection('loads');
   static CollectionReference get listings => _firestore.collection('listings');
+  static CollectionReference get conversations => _firestore.collection('conversations');
+  static CollectionReference get messages => _firestore.collection('messages');
 
   // Storage methods
   static FirebaseStorage get storage => _storage;
@@ -1389,6 +1392,239 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to get saved listings');
       rethrow;
+    }
+  }
+
+  // Chat functionality
+  static Future<String> createOrGetConversation({
+    required String senderId,
+    required String receiverId,
+    String? listingId,
+    String? listingTitle,
+    String? listingImageUrl,
+  }) async {
+    try {
+      print('Creating/getting conversation between $senderId and $receiverId');
+      
+      // Check if conversation already exists
+      final existingConversation = await conversations
+          .where('participants', arrayContains: senderId)
+          .get();
+
+      print('Found ${existingConversation.docs.length} existing conversations for sender');
+
+      for (final doc in existingConversation.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final participants = List<String>.from(data['participants'] ?? []);
+        print('Checking conversation ${doc.id} with participants: $participants');
+        if (participants.contains(receiverId)) {
+          print('Found existing conversation: ${doc.id}');
+          return doc.id;
+        }
+      }
+
+      // Create new conversation
+      final conversationId = conversations.doc().id;
+      print('Creating new conversation: $conversationId');
+      
+      final conversation = ChatConversation(
+        id: conversationId,
+        participants: [senderId, receiverId],
+        listingId: listingId,
+        listingTitle: listingTitle,
+        listingImageUrl: listingImageUrl,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      print('Conversation data: ${conversation.toFirestore()}');
+      await conversations.doc(conversationId).set(conversation.toFirestore());
+      print('Conversation created successfully');
+      return conversationId;
+    } catch (e) {
+      print('Error creating conversation: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to create conversation');
+      rethrow;
+    }
+  }
+
+  static Future<void> sendMessage({
+    required String conversationId,
+    required String senderId,
+    required String receiverId,
+    required String content,
+    String? listingId,
+  }) async {
+    try {
+      print('Sending message to conversation: $conversationId');
+      print('Sender: $senderId, Receiver: $receiverId');
+      print('Content: $content');
+      
+      final messageId = messages.doc().id;
+      final message = ChatMessage(
+        id: messageId,
+        conversationId: conversationId,
+        senderId: senderId,
+        receiverId: receiverId,
+        content: content,
+        timestamp: DateTime.now(),
+        listingId: listingId,
+      );
+
+      print('Message data: ${message.toFirestore()}');
+
+      // Add message to messages collection
+      await messages.doc(messageId).set(message.toFirestore());
+      print('Message saved to messages collection');
+
+      // Update conversation with last message
+      await conversations.doc(conversationId).update({
+        'lastMessage': message.toFirestore(),
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+        'unreadCount.$receiverId': true,
+      });
+      print('Conversation updated with last message');
+    } catch (e) {
+      print('Error sending message: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to send message');
+      rethrow;
+    }
+  }
+
+  static Future<List<ChatConversation>> getUserConversations(String userId) async {
+    try {
+      print('Getting conversations for user: $userId');
+      final snapshot = await conversations
+          .where('participants', arrayContains: userId)
+          .orderBy('updatedAt', descending: true)
+          .get();
+
+      print('Found ${snapshot.docs.length} conversation documents');
+      
+      final conversationList = snapshot.docs.map((doc) {
+        print('Processing conversation doc: ${doc.id}');
+        print('Doc data: ${doc.data()}');
+        return ChatConversation.fromFirestore(doc);
+      }).toList();
+      
+      print('Created ${conversationList.length} conversation objects');
+      return conversationList;
+    } catch (e) {
+      print('Error getting conversations: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to get conversations');
+      rethrow;
+    }
+  }
+
+  static Stream<List<ChatMessage>> getConversationMessages(String conversationId) {
+    print('Getting messages for conversation: $conversationId');
+    return messages
+        .where('conversationId', isEqualTo: conversationId)
+        .snapshots()
+        .map((snapshot) {
+          print('Message snapshot received: ${snapshot.docs.length} messages');
+          final messageList = snapshot.docs.map((doc) {
+            print('Processing message doc: ${doc.id}');
+            return ChatMessage.fromFirestore(doc);
+          }).toList();
+          
+          // Sort messages by timestamp in ascending order (oldest first)
+          messageList.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          
+          print('Created ${messageList.length} message objects');
+          return messageList;
+        });
+  }
+
+  static Future<List<ChatMessage>> getConversationMessagesOnce(String conversationId) async {
+    try {
+      print('Getting messages once for conversation: $conversationId');
+      final snapshot = await messages
+          .where('conversationId', isEqualTo: conversationId)
+          .get();
+      
+      print('Found ${snapshot.docs.length} messages in one-time query');
+      final messageList = snapshot.docs.map((doc) {
+        print('Processing message doc: ${doc.id}');
+        return ChatMessage.fromFirestore(doc);
+      }).toList();
+      
+      // Sort messages by timestamp in ascending order (oldest first)
+      messageList.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      
+      print('Created ${messageList.length} message objects');
+      return messageList;
+    } catch (e) {
+      print('Error getting messages once: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to get messages once');
+      rethrow;
+    }
+  }
+
+  static Future<void> markMessagesAsRead(String conversationId, String userId) async {
+    try {
+      // Mark all unread messages as read
+      final unreadMessages = await messages
+          .where('conversationId', isEqualTo: conversationId)
+          .where('receiverId', isEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      final batch = _firestore.batch();
+      for (final doc in unreadMessages.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+
+      // Update conversation unread count
+      await conversations.doc(conversationId).update({
+        'unreadCount.$userId': false,
+      });
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to mark messages as read');
+      rethrow;
+    }
+  }
+
+  // Get a single product listing by ID
+  static Future<ProductListing?> getProductListingById(String listingId) async {
+    try {
+      print('Getting product listing by ID: $listingId');
+      final doc = await listings.doc(listingId).get();
+      
+      if (doc.exists && doc.data() != null) {
+        final listing = ProductListing.fromFirestore(doc);
+        print('Found listing: ${listing.title}');
+        return listing;
+      } else {
+        print('Listing not found with ID: $listingId');
+        return null;
+      }
+    } catch (e) {
+      print('Error getting product listing by ID: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to get product listing by ID');
+      return null;
+    }
+  }
+
+  // Get shipper details by UID
+  static Future<Map<String, dynamic>?> getShipperDetails(String shipperUid) async {
+    try {
+      print('Getting shipper details for UID: $shipperUid');
+      final doc = await _firestore.collection('shippers').doc(shipperUid).get();
+      
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        print('Found shipper: ${data['name'] ?? 'Unknown'}');
+        return data;
+      } else {
+        print('Shipper not found with UID: $shipperUid');
+        return null;
+      }
+    } catch (e) {
+      print('Error getting shipper details: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to get shipper details');
+      return null;
     }
   }
 }

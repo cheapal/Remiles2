@@ -13,7 +13,7 @@ Widget RecommendedLoad() {
         border: Border.all(color: Colors.green.shade200, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.green.withOpacity(0.2),
+            color: primaryColor.withOpacity(0.2),
             spreadRadius: 2,
             blurRadius: 5,
             offset: const Offset(0, 3), // changes position of shadow

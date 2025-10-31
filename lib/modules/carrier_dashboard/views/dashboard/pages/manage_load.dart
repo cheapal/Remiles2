@@ -171,7 +171,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
     }
   }
 
-  void _onSearchChanged(String query) {
+  void _onSearchChanged(String query, {bool immediate = false}) {
     if (query != _searchQuery) {
       setState(() {
         _searchQuery = query;
@@ -180,18 +180,30 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
       // Cancel previous debounce timer
       _searchDebounce?.cancel();
       
-      // Set new debounce timer
-      _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          setState(() {
-            _loads = [];
-            _lastDocument = null;
-            _hasMore = true;
-            _error = null;
-          });
-          _loadLoads(reset: true);
-        }
-      });
+      // If immediate is true (e.g., when clearing), reload right away
+      // Otherwise, use debounce timer
+      if (immediate) {
+        setState(() {
+          _loads = [];
+          _lastDocument = null;
+          _hasMore = true;
+          _error = null;
+        });
+        _loadLoads(reset: true);
+      } else {
+        // Set new debounce timer
+        _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            setState(() {
+              _loads = [];
+              _lastDocument = null;
+              _hasMore = true;
+              _error = null;
+            });
+            _loadLoads(reset: true);
+          }
+        });
+      }
     }
   }
 
@@ -247,9 +259,9 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
 
             const SizedBox(height: 16),
 
-                  /// Recommended Load (only show for Available Loads and All)
-                  if ((_selectedFilter == 'Available Loads' || _selectedFilter == 'All') && _loads.isNotEmpty) ...[
-                    RecommendedLoad(load: _loads.first),
+                  /// Recommended Load (only show matched loads with matchPercentage for Available Loads and All)
+                  if ((_selectedFilter == 'Available Loads' || _selectedFilter == 'All')) ...[
+                    ..._buildRecommendedLoads(),
             const SizedBox(height: 20),
                   ],
                 ],
@@ -307,9 +319,16 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
                   IconButton(
                     onPressed: () {
                       _searchController.clear();
+                      // Always reload when clearing - reset state and reload immediately
+                      _searchDebounce?.cancel();
                       setState(() {
                         _searchQuery = '';
+                        _loads = [];
+                        _lastDocument = null;
+                        _hasMore = true;
+                        _error = null;
                       });
+                      _loadLoads(reset: true);
                     },
                     icon: Icon(Icons.clear, color: Colors.grey.shade600),
                   ),
@@ -354,6 +373,32 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
         ),
       ],
     );
+  }
+
+  /// Get loads that have matchPercentage (matched/recommended loads)
+  List<LoadModel> _getMatchedLoads() {
+    return _loads.where((load) => load.matchPercentage != null).toList();
+  }
+
+  /// Get loads that don't have matchPercentage (regular loads)
+  List<LoadModel> _getNonMatchedLoads() {
+    return _loads.where((load) => load.matchPercentage == null).toList();
+  }
+
+  /// Build recommended loads section (only matched loads)
+  List<Widget> _buildRecommendedLoads() {
+    final matchedLoads = _getMatchedLoads();
+    
+    if (matchedLoads.isEmpty) {
+      return [];
+    }
+    
+    // Sort by match percentage (highest first) and take the first one
+    matchedLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
+    
+    return [
+      RecommendedLoad(load: matchedLoads.first),
+    ];
   }
 
   Widget _buildFilterButton(String text, int index) {
@@ -431,6 +476,9 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
       );
     }
 
+    // Filter out matched loads from regular load cards
+    final nonMatchedLoads = _getNonMatchedLoads();
+
     if (_loads.isEmpty && _isLoading) {
       return SliverList(
         delegate: SliverChildBuilderDelegate(
@@ -440,7 +488,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
       );
     }
 
-    if (_loads.isEmpty && !_isLoading) {
+    if (nonMatchedLoads.isEmpty && !_isLoading) {
       return SliverToBoxAdapter(
         child: Center(
           child: Container(
@@ -484,14 +532,14 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
         ),
       );
     }
-
+    
     return SliverList(
       delegate: SliverChildBuilderDelegate(
         (context, index) {
-          if (index < _loads.length) {
+          if (index < nonMatchedLoads.length) {
             return Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: LoadCardInfo(load: _loads[index], onLoadBooked: _refreshLoads),
+              child: LoadCardInfo(load: nonMatchedLoads[index], onLoadBooked: _refreshLoads),
             );
           } else if (_hasMore && !_isLoading) {
             // Load more when reaching the end
@@ -516,7 +564,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
           }
           return const SizedBox.shrink();
         },
-        childCount: _loads.length + (_hasMore ? 1 : 0),
+        childCount: nonMatchedLoads.length + (_hasMore ? 1 : 0),
       ),
     );
   }

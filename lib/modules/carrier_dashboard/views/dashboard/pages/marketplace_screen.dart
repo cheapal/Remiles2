@@ -49,12 +49,22 @@ class MarketplaceScreen extends StatelessWidget {
 
                       // --- Top status pills ---
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _StatusPill(label: "En Route", color: green),
-                          _StatusPill(label: "Pickup", color: green),
-                          _StatusPill(label: "In Transit", color: blue),
-                          _StatusPill(label: "Delivered", color: green),
+                          Expanded(
+                            child: _StatusPill(label: "En Route", color: green),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _StatusPill(label: "Pickup", color: green),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _StatusPill(label: "In Transit", color: blue),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _StatusPill(label: "Delivered", color: green),
+                          ),
                         ],
                       ),
 
@@ -227,9 +237,15 @@ class _StatusPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 375;
+    
     return Container(
-      // pill width flexible but consistent
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 8 : 12,
+        vertical: 12,
+      ),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(16),
@@ -247,12 +263,17 @@ class _StatusPill extends StatelessWidget {
           ),
         ],
       ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
+      child: Center(
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+              fontSize: isSmallScreen ? 12 : 14,
+            ),
+          ),
         ),
       ),
     );

@@ -106,8 +106,11 @@ class MyApp extends StatelessWidget {
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
-     FirebaseService.manualCrashlyticsTest();
- FirebaseService.isCrashlyticsWorking();
+    // Manual test logging disabled - Crashlytics is now working
+    if (AppConfig.enableTestEvents) {
+      FirebaseService.manualCrashlyticsTest();
+      FirebaseService.isCrashlyticsWorking();
+    }
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),

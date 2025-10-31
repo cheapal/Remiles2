@@ -1925,6 +1925,11 @@ class FirebaseService {
         for (final doc in snapshot.docs) {
           try {
             final load = LoadModel.fromFirestore(doc);
+            // Exclude loads that are booked by any carrier (even if status is still 'available')
+            // This ensures booked loads don't show to other carriers
+            if (load.bookedByCarrierId != null && load.bookedByCarrierId!.isNotEmpty) {
+              continue; // Skip this load as it's already booked
+            }
             final matchPercentage = calculateLoadMatchPercentage(load, carrier);
             final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
             allLoads.add(loadWithMatch);
@@ -2030,6 +2035,11 @@ class FirebaseService {
         for (final doc in availableSnapshot.docs) {
           try {
             final load = LoadModel.fromFirestore(doc);
+            // Exclude loads that are booked by any carrier (even if status is still 'available')
+            // This ensures booked loads don't show to other carriers
+            if (load.bookedByCarrierId != null && load.bookedByCarrierId!.isNotEmpty) {
+              continue; // Skip this load as it's already booked
+            }
             final matchPercentage = calculateLoadMatchPercentage(load, carrier);
             final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
             allLoads.add(loadWithMatch);

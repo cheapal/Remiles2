@@ -346,6 +346,50 @@ class _BookedNowState extends State<BookedNow> {
   }
 
   Future<void> _bookLoad() async {
+    // Show confirmation dialog first
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Confirm Booking',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Are you sure you want to accept this load?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryColor,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Accept',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // If user cancelled, return early
+    if (confirmed != true) {
+      return;
+    }
+
     try {
       setState(() {
         _isBooking = true;
@@ -356,6 +400,9 @@ class _BookedNowState extends State<BookedNow> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Please log in to book loads')),
         );
+        setState(() {
+          _isBooking = false;
+        });
         return;
       }
 

@@ -1,13 +1,28 @@
 import 'package:Remiles/core/theme/colors.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/load_model.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 
-class RecommendedLoad extends StatelessWidget {
+class RecommendedLoad extends StatefulWidget {
   final LoadModel load;
   
   const RecommendedLoad({super.key, required this.load});
+
+  @override
+  State<RecommendedLoad> createState() => _RecommendedLoadState();
+}
+
+class _RecommendedLoadState extends State<RecommendedLoad> {
+  bool _isBooking = false;
+  String _currentStatus = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _currentStatus = widget.load.status;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +61,7 @@ class RecommendedLoad extends StatelessWidget {
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  "${load.matchPercentage?.toStringAsFixed(0) ?? '0'}% Match",
+                  "${widget.load.matchPercentage?.toStringAsFixed(0) ?? '0'}% Match",
                   style: TextStyle(
                     fontSize: 17,
                     color: primaryColor,
@@ -62,11 +77,11 @@ class RecommendedLoad extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "\$${load.price.toStringAsFixed(0)}   ${load.distance.toStringAsFixed(0)}(mi)",
+                  "\$${widget.load.price.toStringAsFixed(0)}   ${widget.load.distance.toStringAsFixed(0)}(mi)",
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 Text(
-                  "Load ID #${load.id.substring(0, 8)}",
+                  "Load ID #${widget.load.id.substring(0, 8)}",
                   style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                 ),
               ],
@@ -78,14 +93,14 @@ class RecommendedLoad extends StatelessWidget {
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 6),
-                Text("From : ${load.originCity}, ${load.originState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                Text("From : ${widget.load.originCity}, ${widget.load.originState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
               ],
             ),
             Row(
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 6),
-                 Text("To : ${load.destinationCity}, ${load.destinationState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                 Text("To : ${widget.load.destinationCity}, ${widget.load.destinationState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
               ],
             ),
             Row(
@@ -93,7 +108,7 @@ class RecommendedLoad extends StatelessWidget {
                SvgPicture.asset("assets/calender.svg",
                     width: 18, height: 18, color: primaryColor),
                 const SizedBox(width: 6),
-                 Text("Pickup : ${_formatDate(load.pickupDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                 Text("Pickup : ${_formatDate(widget.load.pickupDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
               ],
             ),
             Row(
@@ -101,7 +116,7 @@ class RecommendedLoad extends StatelessWidget {
                 SvgPicture.asset("assets/calender.svg",
                     width: 18, height: 18, color: primaryColor),
                 const SizedBox(width: 6),
-                Text("Delivery : ${_formatDate(load.deliveryDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                Text("Delivery : ${_formatDate(widget.load.deliveryDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
               ],
             ),
             const SizedBox(height: 12),
@@ -114,20 +129,22 @@ class RecommendedLoad extends StatelessWidget {
                 SvgPicture.asset("assets/truck.svg",
                     width: 18, height: 18, color: primaryColor),
                 const SizedBox(width: 6),
-                Text("${load.weight.toStringAsFixed(0)} lb",style: TextStyle(fontWeight: FontWeight.w800,color:primaryColor),),
+                Text("${widget.load.weight.toStringAsFixed(0)} lb",style: TextStyle(fontWeight: FontWeight.w800,color:primaryColor),),
                 const Spacer(),
-                Text("Equipment: ${load.equipmentNeeded}",style: TextStyle(fontWeight: FontWeight.w500,color:primaryColor),),
+                Text("Equipment: ${widget.load.equipmentNeeded}",style: TextStyle(fontWeight: FontWeight.w500,color:primaryColor),),
               ],
             ),
 
             const SizedBox(height: 12),
 
-            /// Instant Booking
+            /// Instant Booking or View Details
             Align(
               alignment: Alignment.center,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFCA4D),
+                  backgroundColor: _currentStatus == 'booked' 
+                      ? Colors.blue 
+                      : (_isBooking ? Colors.grey : const Color(0xFFFFCA4D)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -136,11 +153,26 @@ class RecommendedLoad extends StatelessWidget {
                   padding:
                     const EdgeInsets.symmetric(horizontal: 22, vertical: 0),
                 ),
-                onPressed: () => _bookLoad(context),
-                child: const Text(
-                  "Instant Booking",
-                  style: TextStyle(color: Colors.black,fontWeight: FontWeight.bold,fontSize: 14),
-                ),
+                onPressed: _currentStatus == 'booked' 
+                    ? () => _showLoadDetails(context)
+                    : (_isBooking ? null : () => _bookLoad(context)),
+                child: _isBooking
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Text(
+                        _currentStatus == 'booked' ? "View Details" : "Instant Booking",
+                        style: TextStyle(
+                          color: _currentStatus == 'booked' ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14
+                        ),
+                      ),
               ),
             ),
           ],
@@ -158,56 +190,79 @@ class RecommendedLoad extends StatelessWidget {
   }
 
   Future<void> _bookLoad(BuildContext context) async {
-  try {
-    final user = FirebaseService.currentUser;
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please log in to book loads')),
+    try {
+      setState(() {
+        _isBooking = true;
+      });
+
+      final user = FirebaseService.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to book loads')),
+        );
+        setState(() {
+          _isBooking = false;
+        });
+        return;
+      }
+
+      final success = await FirebaseService.bookLoad(
+        loadId: widget.load.id,
+        carrierUid: user.uid,
       );
-      return;
-    }
 
-    // Show loading dialog
-    // showDialog(
-    //   context: context,
-    //   barrierDismissible: false,
-    //   builder: (context) => const Center(
-    //     child: CircularProgressIndicator(),
-    //   ),
-    // );
+      setState(() {
+        _isBooking = false;
+        if (success) {
+          _currentStatus = 'booked';
+        }
+      });
 
-    final success = await FirebaseService.bookLoad(
-      loadId: load.id,
-      carrierUid: user.uid,
-    );
-
-    // Hide loading dialog
-    // Navigator.of(context).pop();
-
-    if (success) {
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Load booked successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to book load. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isBooking = false;
+      });
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Load booked successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to book load. Please try again.'),
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
           backgroundColor: Colors.red,
         ),
       );
     }
-  } catch (e) {
-    // Hide loading dialog
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Error: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
-    );
   }
+
+  void _showLoadDetails(BuildContext context) {
+    // Show details for booked loads - create updated load with current status
+    final updatedLoad = widget.load.copyWith(status: _currentStatus);
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          insetPadding: const EdgeInsets.all(16),
+          child: SingleChildScrollView(
+            child: BookedNow(load: updatedLoad),
+          ),
+        );
+      },
+    );
   }
 }

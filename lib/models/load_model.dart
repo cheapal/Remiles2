@@ -71,15 +71,15 @@ class LoadModel {
         shipperName: data['shipperName'] ?? '',
         title: data['title'] ?? '',
         description: data['description'] ?? '',
-        price: (data['price'] ?? 0.0).toDouble(),
-        distance: (data['distance'] ?? 0.0).toDouble(),
+        price: _parseDouble(data['price']) ?? 0.0,
+        distance: _parseDouble(data['distance']) ?? 0.0,
         originAddress: data['originAddress'] ?? '',
         originCity: data['originCity'] ?? '',
         originState: data['originState'] ?? '',
         destinationAddress: data['destinationAddress'] ?? '',
         destinationCity: data['destinationCity'] ?? '',
         destinationState: data['destinationState'] ?? '',
-        weight: (data['weight'] ?? 0.0).toDouble(),
+        weight: _parseDouble(data['weight']) ?? 0.0,
         equipmentNeeded: data['equipmentNeeded'] ?? '',
         loadType: data['loadType'] ?? '',
         pickupDate: _parseDate(data['pickupDate']) ?? DateTime.now(),
@@ -92,7 +92,7 @@ class LoadModel {
         updatedAt: _parseDate(data['updatedAt']) ?? DateTime.now(),
         isActive: data['isActive'] ?? true,
         views: data['views'] ?? 0,
-        matchPercentage: data['matchPercentage']?.toDouble(),
+        matchPercentage: _parseDouble(data['matchPercentage']),
         additionalData: data['additionalData'],
       );
     } catch (e) {
@@ -110,15 +110,15 @@ class LoadModel {
       shipperName: json['shipperName'] ?? '',
       title: json['title'] ?? '',
       description: json['description'] ?? '',
-      price: (json['price'] ?? 0.0).toDouble(),
-      distance: (json['distance'] ?? 0.0).toDouble(),
+      price: _parseDouble(json['price']) ?? 0.0,
+      distance: _parseDouble(json['distance']) ?? 0.0,
       originAddress: json['originAddress'] ?? '',
       originCity: json['originCity'] ?? '',
       originState: json['originState'] ?? '',
       destinationAddress: json['destinationAddress'] ?? '',
       destinationCity: json['destinationCity'] ?? '',
       destinationState: json['destinationState'] ?? '',
-      weight: (json['weight'] ?? 0.0).toDouble(),
+      weight: _parseDouble(json['weight']) ?? 0.0,
       equipmentNeeded: json['equipmentNeeded'] ?? '',
       loadType: json['loadType'] ?? '',
       pickupDate: DateTime.parse(json['pickupDate']),
@@ -135,7 +135,7 @@ class LoadModel {
       updatedAt: DateTime.parse(json['updatedAt']),
       isActive: json['isActive'] ?? true,
       views: json['views'] ?? 0,
-      matchPercentage: json['matchPercentage']?.toDouble(),
+      matchPercentage: _parseDouble(json['matchPercentage']),
       additionalData: json['additionalData'],
     );
   }
@@ -284,6 +284,42 @@ class LoadModel {
       }
     } catch (e) {
       print('Error parsing date: $dateValue, error: $e');
+    }
+    
+    return null;
+  }
+
+  // Helper method to parse double values from various formats
+  static double? _parseDouble(dynamic value) {
+    if (value == null) return null;
+    
+    try {
+      // If it's already a number, convert it
+      if (value is num) {
+        return value.toDouble();
+      }
+      
+      // If it's a string, try to parse it
+      if (value is String) {
+        // Remove whitespace
+        String cleaned = value.trim();
+        
+        // Try direct parsing first
+        try {
+          return double.parse(cleaned);
+        } catch (e) {
+          // If that fails, try to extract the number from strings like "10tons", "100 lbs", etc.
+          // Use regex to extract the first number (including decimals and optional negative sign)
+          final RegExp numberPattern = RegExp(r'-?\d+(\.\d+)?');
+          final Match? match = numberPattern.firstMatch(cleaned);
+          
+          if (match != null) {
+            return double.parse(match.group(0)!);
+          }
+        }
+      }
+    } catch (e) {
+      print('Error parsing double: $value, error: $e');
     }
     
     return null;

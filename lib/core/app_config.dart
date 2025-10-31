@@ -25,7 +25,7 @@ class AppConfig {
   static bool get enableDebugLogging => _isDebug;
 
   /// Check if test events should be logged
-  static bool get enableTestEvents => _isDebug;
+  static bool get enableTestEvents => false;//_isDebug; - no need to enable as i restart a lot
 
   /// Get current build mode as string
   static String get buildMode {

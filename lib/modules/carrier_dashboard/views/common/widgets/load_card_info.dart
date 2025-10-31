@@ -1,6 +1,5 @@
 
 import 'package:Remiles/core/theme/colors.dart';
-import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/load_model.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
 import 'package:flutter/material.dart';
@@ -18,8 +17,6 @@ class LoadCardInfo extends StatefulWidget {
 }
 
 class _LoadCardInfoState extends State<LoadCardInfo> {
-  bool _isBooking = false;
-
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -72,35 +69,49 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                   ],
                 ),
                 Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     if (widget.load.matchPercentage != null) ...[
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: _getMatchColor(widget.load.matchPercentage!),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          "${widget.load.matchPercentage!.toStringAsFixed(0)}% Match",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: _getMatchColor(widget.load.matchPercentage!),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              "${widget.load.matchPercentage!.toStringAsFixed(0)}% Match",
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                     ],
-                    Container(
-                      padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(widget.load.status),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _getStatusText(widget.load.status),
-                        style: const TextStyle(color: Colors.white),
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(widget.load.status),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            _getStatusText(widget.load.status),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -115,7 +126,13 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                 Text("From : ${widget.load.originCity}, ${widget.load.originState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
+                Flexible(
+                  child: Text(
+                    "From : ${widget.load.originCity}, ${widget.load.originState}",
+                    style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 6),
@@ -123,11 +140,21 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                 Text("To : ${widget.load.destinationCity}, ${widget.load.destinationState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
-                const Spacer(),
-                Text(
-                  "Load ID #${widget.load.id.substring(0, 8)}",
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                Flexible(
+                  child: Text(
+                    "To : ${widget.load.destinationCity}, ${widget.load.destinationState}",
+                    style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    "Load ID #${widget.load.id.substring(0, 8)}",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                  ),
                 ),
               ],
             ),
@@ -140,46 +167,53 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                 SvgPicture.asset("assets/calender.svg",
                     width: 18, height: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                 Text("Pickup : ${_formatDate(widget.load.pickupDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700)),
+                Flexible(
+                  child: Text(
+                    "Pickup : ${_formatDate(widget.load.pickupDate)}",
+                    style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
+            const SizedBox(height: 6),
             Row(
               children: [
                 SvgPicture.asset("assets/calender.svg",
                     width: 18, height: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                Text("Delivery : ${_formatDate(widget.load.deliveryDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
-                const Spacer(),
+                Flexible(
+                  child: Text(
+                    "Delivery : ${_formatDate(widget.load.deliveryDate)}",
+                    style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w700),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     // Single button that handles both view details and booking
                     ElevatedButton(
-                      onPressed: widget.load.status == 'available' && !_isBooking 
+                      onPressed: widget.load.status == 'available' 
                           ? () => _handleLoadAction(context)
-                          : widget.load.status == 'available' && _isBooking
-                              ? null
-                              : () => _showLoadDetails(context),
+                          : () => _showLoadDetails(context),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: widget.load.status == 'available' 
-                            ? (_isBooking ? Colors.grey : primaryColor)
+                            ? primaryColor
                             : _getStatusColor(widget.load.status),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
-                      child: widget.load.status == 'available' && _isBooking
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            )
-                          : Text(
-                              widget.load.status == 'available' ? "Book Now" : _getActionText(widget.load.status), 
-                              style: const TextStyle(color: Colors.white),
-                            ),
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          widget.load.status == 'available' ? "Book Now" : _getActionText(widget.load.status), 
+                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -196,13 +230,24 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                     width: 20, height: 20, color: primaryColor),
                 const SizedBox(width: 8),
                 Text("${widget.load.weight.toStringAsFixed(0)} lb"),
-                const Spacer(),
-                Text("Equipment: ${widget.load.equipmentNeeded}"),
-                const Spacer(),
-                 Text(
-                  "${widget.load.loadType}",
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, color: primaryColor),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    "Equipment: ${widget.load.equipmentNeeded}",
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    "${widget.load.loadType}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: primaryColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.end,
+                  ),
                 ),
               ],
             ),
@@ -275,71 +320,13 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
 
-  Future<void> _handleLoadAction(BuildContext context) async {
-    // Direct booking for available loads (instant booking)
-    try {
-      setState(() {
-        _isBooking = true;
-      });
-
-      final user = FirebaseService.currentUser;
-      if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to book loads')),
-        );
-        setState(() {
-          _isBooking = false;
-        });
-        return;
-      }
-
-      print('DEBUG: Starting instant booking for load ${widget.load.id}');
-      final success = await FirebaseService.bookLoad(
-        loadId: widget.load.id,
-        carrierUid: user.uid,
-      );
-      print('DEBUG: Instant booking result: $success');
-
-      setState(() {
-        _isBooking = false;
-      });
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Load booked successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // Notify parent to refresh
-        if (widget.onLoadBooked != null) {
-          widget.onLoadBooked!();
-        }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Load is no longer available or booking failed. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } catch (e) {
-      setState(() {
-        _isBooking = false;
-      });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+  void _handleLoadAction(BuildContext context) {
+    // Open dialog for available loads - booking will happen in the dialog
+    _showLoadDetails(context);
   }
 
   void _showLoadDetails(BuildContext context) {
-    // Show details for non-available loads
+    // Show details dialog for all loads (available loads can be booked from dialog)
     showDialog(
       context: context,
       builder: (ctx) {
@@ -349,7 +336,10 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
           ),
           insetPadding: const EdgeInsets.all(16),
           child: SingleChildScrollView(
-            child: BookedNow(load: widget.load),
+            child: BookedNow(
+              load: widget.load,
+              onLoadBooked: widget.onLoadBooked,
+            ),
           ),
         );
       },

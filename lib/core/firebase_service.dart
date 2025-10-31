@@ -1925,11 +1925,6 @@ class FirebaseService {
         for (final doc in snapshot.docs) {
           try {
             final load = LoadModel.fromFirestore(doc);
-            // Exclude loads that are booked by any carrier (even if status is still 'available')
-            // This ensures booked loads don't show to other carriers
-            if (load.bookedByCarrierId != null && load.bookedByCarrierId!.isNotEmpty) {
-              continue; // Skip this load as it's already booked
-            }
             final matchPercentage = calculateLoadMatchPercentage(load, carrier);
             final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
             allLoads.add(loadWithMatch);
@@ -1940,11 +1935,20 @@ class FirebaseService {
         }
       }
 
+      // Filter out loads booked by other carriers (only show unbooked loads or loads booked by this carrier)
+      final availableLoads = allLoads.where((load) {
+        // Exclude loads that are booked by other carriers
+        if (load.bookedByCarrierId != null && load.bookedByCarrierId != carrierUid) {
+          return false;
+        }
+        return true;
+      }).toList();
+
       // Sort by match percentage (highest first)
-      allLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
+      availableLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
 
       // Apply search filter client-side (same pattern as getShipperLoads)
-      final filteredLoads = allLoads.where((load) {
+      final filteredLoads = availableLoads.where((load) {
         if (searchQuery.isEmpty) return true;
         final searchLower = searchQuery.toLowerCase();
         return load.originAddress.toLowerCase().contains(searchLower) ||
@@ -2031,18 +2035,16 @@ class FirebaseService {
         final availableSnapshot = await availableQuery.get();
         final bookedSnapshot = await bookedQuery.get();
         
-        // Process available loads
+        // Process available loads (exclude those booked by other carriers)
         for (final doc in availableSnapshot.docs) {
           try {
             final load = LoadModel.fromFirestore(doc);
-            // Exclude loads that are booked by any carrier (even if status is still 'available')
-            // This ensures booked loads don't show to other carriers
-            if (load.bookedByCarrierId != null && load.bookedByCarrierId!.isNotEmpty) {
-              continue; // Skip this load as it's already booked
+            // Only include if not booked by another carrier
+            if (load.bookedByCarrierId == null || load.bookedByCarrierId == carrierUid) {
+              final matchPercentage = calculateLoadMatchPercentage(load, carrier);
+              final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
+              allLoads.add(loadWithMatch);
             }
-            final matchPercentage = calculateLoadMatchPercentage(load, carrier);
-            final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
-            allLoads.add(loadWithMatch);
           } catch (e) {
             print('Error parsing available load ${doc.id}: $e');
             continue;

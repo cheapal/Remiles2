@@ -23,7 +23,7 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 3,
       color: Colors.white,
-      margin: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 16),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -140,20 +140,24 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 8),
-                Flexible(
+                Expanded(
+                  flex: 2,
                   child: Text(
                     "To : ${widget.load.destinationCity}, ${widget.load.destinationState}",
                     style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w700),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Flexible(
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 3,
                   child: Text(
-                    "Load ID #${widget.load.id.substring(0, 8)}",
+                    "Load ID #${widget.load.id.isNotEmpty ? widget.load.id : 'N/A'}",
                     style: const TextStyle(fontWeight: FontWeight.bold),
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
+                    maxLines: 1,
+                    softWrap: true,
                   ),
                 ),
               ],
@@ -178,6 +182,7 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
             ),
             const SizedBox(height: 6),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 SvgPicture.asset("assets/calender.svg",
                     width: 18, height: 18, color: primaryColor),
@@ -225,20 +230,39 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
 
             // Bottom Row
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                SvgPicture.asset("assets/truck.svg",
-                    width: 20, height: 20, color: primaryColor),
-                const SizedBox(width: 8),
-                Text("${widget.load.weight.toStringAsFixed(0)} lb"),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    "Equipment: ${widget.load.equipmentNeeded}",
-                    overflow: TextOverflow.ellipsis,
+                Expanded(
+                  flex: 2,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SvgPicture.asset("assets/truck.svg",
+                          width: 20, height: 20, color: primaryColor),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          "${widget.load.weight.toStringAsFixed(0)} lb",
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                Flexible(
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    "Equip: ${widget.load.equipmentNeeded}",
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
                   child: Text(
                     "${widget.load.loadType}",
                     style: TextStyle(
@@ -247,6 +271,7 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                     ),
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
+                    maxLines: 1,
                   ),
                 ),
               ],

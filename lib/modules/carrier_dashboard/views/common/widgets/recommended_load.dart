@@ -80,9 +80,12 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
                   "\$${widget.load.price.toStringAsFixed(0)}   ${widget.load.distance.toStringAsFixed(0)}(mi)",
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                Text(
-                  "Load ID #${widget.load.id.substring(0, 8)}",
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                Flexible(
+                  child: Text(
+                    "Load ID #${widget.load.id.isNotEmpty ? widget.load.id : 'N/A'}",
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

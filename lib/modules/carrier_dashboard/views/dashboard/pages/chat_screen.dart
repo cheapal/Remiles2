@@ -9,6 +9,8 @@ import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/negotiati
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/offer_dialog.dart';
 import 'package:Remiles/modules/shipper_dashboard/widgets/counter_offer_dialog.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
+import 'package:Remiles/models/load_model.dart';
 import 'package:provider/provider.dart';
 import 'package:Remiles/providers/auth_provider.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
@@ -248,10 +250,11 @@ class _ChatScreenState extends State<ChatScreen> {
         final offer = await FirebaseService.getOfferById(offerId);
         if (offer != null) {
           _offersCache[offerId] = offer;
-          // Track active offer for this conversation
+          // Track active offer for this conversation (exclude expired offers)
           if (offer.conversationId == widget.conversationId && 
               (offer.status == OfferStatus.pending || offer.status == OfferStatus.counterOffered) &&
-              offer.isActive) {
+              offer.isActive &&
+              !offer.isExpired) {
             _activeOffer = offer;
           }
         }
@@ -264,12 +267,15 @@ class _ChatScreenState extends State<ChatScreen> {
           final offer = await FirebaseService.getOfferById(activeOfferId);
           if (offer != null) {
             _offersCache[activeOfferId] = offer;
-            if (offer.isActive) {
+            if (offer.isActive && !offer.isExpired) {
               _activeOffer = offer;
             }
           }
-        } else if (_offersCache[activeOfferId]!.isActive) {
-          _activeOffer = _offersCache[activeOfferId];
+        } else {
+          final cachedOffer = _offersCache[activeOfferId]!;
+          if (cachedOffer.isActive && !cachedOffer.isExpired) {
+            _activeOffer = cachedOffer;
+          }
         }
       }
       
@@ -1074,52 +1080,125 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildLoadInfoMessage() {
     return Align(
       alignment: Alignment.center,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        margin: const EdgeInsets.symmetric(horizontal: 32),
-        decoration: BoxDecoration(
-          color: primaryColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: primaryColor.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.local_shipping, color: primaryColor, size: 20),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                '\$${widget.loadPrice!.toStringAsFixed(0)}',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: primaryColor,
+      child: GestureDetector(
+        onTap: _viewLoadDetails,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          margin: const EdgeInsets.symmetric(horizontal: 32),
+          decoration: BoxDecoration(
+            color: primaryColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: primaryColor.withOpacity(0.3)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.local_shipping, color: primaryColor, size: 20),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  '\$${widget.loadPrice!.toStringAsFixed(0)}',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: primaryColor,
+                  ),
+                  softWrap: true,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                softWrap: true,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '•',
-              style: TextStyle(color: primaryColor),
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                'Load #${widget.loadId!.substring(0, 8)}',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: primaryColor,
+              const SizedBox(width: 8),
+              Text(
+                '•',
+                style: TextStyle(color: primaryColor),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'Load #${widget.loadId!.substring(0, 8)}',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: primaryColor,
+                  ),
+                  softWrap: true,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                softWrap: true,
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Icon(Icons.arrow_forward_ios, color: primaryColor, size: 14),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _viewLoadDetails() async {
+    if (widget.loadId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Load details not available'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // Find and fetch the load
+      final shippersSnapshot = await FirebaseService.shippers.get();
+      LoadModel? load;
+      
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final loadDoc = await FirebaseService.shippers
+            .doc(shipperDoc.id)
+            .collection('loads')
+            .doc(widget.loadId!)
+            .get();
+        
+        if (loadDoc.exists) {
+          load = LoadModel.fromFirestore(loadDoc);
+          break;
+        }
+      }
+
+      if (load != null && context.mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) {
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              insetPadding: const EdgeInsets.all(16),
+              child: SingleChildScrollView(
+                child: BookedNow(
+                  load: load!,
+                ),
+              ),
+            );
+          },
+        );
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Load not found'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load details: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildStickyActionBar() {
@@ -1182,8 +1261,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ),
-                // Accept button (if counter-offer received)
+                // Accept button (if counter-offer received and not expired)
                 if (_activeOffer != null &&
+                    !_activeOffer!.isExpired &&
                     _activeOffer!.status == OfferStatus.counterOffered &&
                     _activeOffer!.isActive &&
                     !_isNegotiationExpired)
@@ -1204,8 +1284,9 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ),
-                // Make Offer button
-                if (_activeOffer?.status != OfferStatus.accepted)
+                // Make Offer button (hide if offer is expired)
+                if (_activeOffer?.status != OfferStatus.accepted && 
+                    (_activeOffer == null || !_activeOffer!.isExpired))
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _isNegotiationExpired ? null : () {
@@ -1238,10 +1319,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                   ),
               ],
-              // For Shippers (hide if load is booked)
+              // For Shippers (hide if load is booked or offer is expired)
               if (!_isLoadBooked &&
                   !carrierCheck && 
                   _activeOffer != null &&
+                  !_activeOffer!.isExpired &&
                   (_activeOffer!.status == OfferStatus.pending || 
                    _activeOffer!.status == OfferStatus.counterOffered) &&
                   _activeOffer!.isActive &&
@@ -1292,8 +1374,9 @@ class _ChatScreenState extends State<ChatScreen> {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
     final isShipper = user?.uid == offer.shipperId;
+    final isExpired = offer.isExpired || (offer.status == OfferStatus.pending && DateTime.now().isAfter(offer.expiresAt));
     final isAccepted = offer.status == OfferStatus.accepted || _isLoadBooked;
-    final isGreyedOut = isAccepted || offer.status == OfferStatus.rejected;
+    final isGreyedOut = isAccepted || offer.status == OfferStatus.rejected || isExpired;
 
     return Column(
       crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -1359,10 +1442,10 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
               const SizedBox(height: 8),
               Text(
-                _getOfferStatusText(offer.status),
+                _getOfferStatusText(offer, isExpired),
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.grey.shade600,
+                  color: isExpired ? Colors.red.shade600 : Colors.grey.shade600,
                   fontStyle: FontStyle.italic,
                 ),
               ),
@@ -1371,8 +1454,9 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
         ),
-        // Action buttons for shippers on pending/counter-offered offers (hide if booked)
+        // Action buttons for shippers on pending/counter-offered offers (hide if booked or expired)
         if (!_isLoadBooked &&
+            !isExpired &&
             isShipper && !isMe && 
             (offer.status == OfferStatus.pending || offer.status == OfferStatus.counterOffered) &&
             offer.isActive)
@@ -1408,8 +1492,13 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  String _getOfferStatusText(OfferStatus status) {
-    switch (status) {
+  String _getOfferStatusText(OfferModel offer, bool isExpired) {
+    // If expired, always show expired status regardless of stored status
+    if (isExpired) {
+      return 'Offer expired';
+    }
+    
+    switch (offer.status) {
       case OfferStatus.pending:
         return 'Pending response';
       case OfferStatus.accepted:

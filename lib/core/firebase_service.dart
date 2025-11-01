@@ -13,6 +13,7 @@ import '../models/shipper_onboarding_data.dart';
 import '../models/product_listing.dart';
 import '../models/chat_model.dart';
 import '../models/load_model.dart';
+import '../models/offer_model.dart';
 
 /// Firebase service class to handle all Firebase operations
 class FirebaseService {
@@ -37,6 +38,8 @@ class FirebaseService {
   static CollectionReference get conversations => _firestore.collection('conversations');
   static CollectionReference get messages => _firestore.collection('messages');
   static CollectionReference get bookings => _firestore.collection('bookings');
+  static CollectionReference get offers => _firestore.collection('offers');
+  static CollectionReference get reports => _firestore.collection('reports');
 
   // Storage methods
   static FirebaseStorage get storage => _storage;
@@ -1698,6 +1701,24 @@ class FirebaseService {
     }
   }
 
+  static Stream<List<ChatConversation>> getUserConversationsStream(String userId) {
+    print('Getting conversations stream for user: $userId');
+    return conversations
+        .where('participants', arrayContains: userId)
+        .orderBy('updatedAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          print('Conversation snapshot received: ${snapshot.docs.length} conversations');
+          final conversationList = snapshot.docs.map((doc) {
+            print('Processing conversation doc: ${doc.id}');
+            return ChatConversation.fromFirestore(doc);
+          }).toList();
+          
+          print('Created ${conversationList.length} conversation objects');
+          return conversationList;
+        });
+  }
+
   static Stream<List<ChatMessage>> getConversationMessages(String conversationId) {
     print('Getting messages for conversation: $conversationId');
     return messages
@@ -1765,6 +1786,422 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to mark messages as read');
       rethrow;
+    }
+  }
+
+  // ==================== Offer and Negotiation Functions ====================
+
+  /// Create or get conversation for load negotiation
+  static Future<String> createLoadConversation({
+    required String loadId,
+    required String carrierUid,
+    required String shipperUid,
+  }) async {
+    try {
+      // Check if conversation already exists for this load-carrier pair
+      final existingConversations = await conversations
+          .where('loadId', isEqualTo: loadId)
+          .where('participants', arrayContains: carrierUid)
+          .get();
+
+      for (final doc in existingConversations.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final participants = List<String>.from(data['participants'] ?? []);
+        if (participants.contains(shipperUid)) {
+          print('Found existing load conversation: ${doc.id}');
+          return doc.id;
+        }
+      }
+
+      // Create new conversation for load negotiation
+      final conversationId = conversations.doc().id;
+      final conversation = ChatConversation(
+        id: conversationId,
+        participants: [carrierUid, shipperUid],
+        loadId: loadId,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+      );
+
+      await conversations.doc(conversationId).set(conversation.toFirestore());
+      print('Created new load conversation: $conversationId');
+      return conversationId;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to create load conversation');
+      rethrow;
+    }
+  }
+
+  /// Get conversation by loadId and carrierId
+  static Future<String?> getConversationByLoadId({
+    required String loadId,
+    required String carrierId,
+  }) async {
+    try {
+      final snapshot = await conversations
+          .where('loadId', isEqualTo: loadId)
+          .where('participants', arrayContains: carrierId)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isEmpty) return null;
+      return snapshot.docs.first.id;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get conversation by loadId');
+      return null;
+    }
+  }
+
+  /// Send initial offer (starts 30-minute timer)
+  static Future<String> sendOffer({
+    required String conversationId,
+    required String carrierId,
+    required String carrierName,
+    required String shipperId,
+    required String loadId,
+    required double offerAmount,
+  }) async {
+    try {
+      final now = DateTime.now();
+      final expiresAt = now.add(const Duration(minutes: 30));
+
+      // Create offer document
+      final offerId = offers.doc().id;
+      final offer = OfferModel(
+        id: offerId,
+        loadId: loadId,
+        conversationId: conversationId,
+        carrierId: carrierId,
+        carrierName: carrierName,
+        shipperId: shipperId,
+        offerAmount: offerAmount,
+        status: OfferStatus.pending,
+        negotiationStartTime: now,
+        expiresAt: expiresAt,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      await offers.doc(offerId).set(offer.toFirestore());
+
+      // Update conversation with negotiation info
+      await conversations.doc(conversationId).update({
+        'negotiationStartTime': Timestamp.fromDate(now),
+        'negotiationExpiresAt': Timestamp.fromDate(expiresAt),
+        'isNegotiationActive': true,
+        'activeOfferId': offerId,
+        'updatedAt': Timestamp.fromDate(now),
+      });
+
+      // Send offer message
+      final messageId = messages.doc().id;
+      final message = ChatMessage(
+        id: messageId,
+        conversationId: conversationId,
+        senderId: carrierId,
+        receiverId: shipperId,
+        content: 'Offered \$${offerAmount.toStringAsFixed(2)}',
+        timestamp: now,
+        type: MessageType.offer,
+        offerId: offerId,
+      );
+
+      await messages.doc(messageId).set(message.toFirestore());
+
+      // Update conversation last message
+      await conversations.doc(conversationId).update({
+        'lastMessage': message.toFirestore(),
+        'updatedAt': Timestamp.fromDate(now),
+      });
+
+      print('Offer sent successfully: $offerId');
+      return offerId;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to send offer');
+      rethrow;
+    }
+  }
+
+  /// Shipper sends counter-offer
+  static Future<void> sendCounterOffer({
+    required String offerId,
+    required double counterAmount,
+  }) async {
+    try {
+      final offerDoc = await offers.doc(offerId).get();
+      if (!offerDoc.exists) {
+        throw Exception('Offer not found');
+      }
+
+      final offerData = offerDoc.data() as Map<String, dynamic>;
+      final originalAmount = (offerData['offerAmount'] as num).toDouble();
+      final conversationId = offerData['conversationId'] as String;
+      final carrierId = offerData['carrierId'] as String;
+      final shipperId = offerData['shipperId'] as String;
+
+      // Update offer with counter-offer
+      await offers.doc(offerId).update({
+        'status': OfferStatus.counterOffered.toString().split('.').last,
+        'counterOfferAmount': counterAmount,
+        'originalOfferAmount': originalAmount,
+        'updatedAt': Timestamp.now(),
+      });
+
+      // Send counter-offer message
+      final now = DateTime.now();
+      final messageId = messages.doc().id;
+      final message = ChatMessage(
+        id: messageId,
+        conversationId: conversationId,
+        senderId: shipperId,
+        receiverId: carrierId,
+        content: 'Counter-offered \$${counterAmount.toStringAsFixed(2)}',
+        timestamp: now,
+        type: MessageType.offer,
+        offerId: offerId,
+      );
+
+      await messages.doc(messageId).set(message.toFirestore());
+
+      // Update conversation
+      await conversations.doc(conversationId).update({
+        'lastMessage': message.toFirestore(),
+        'updatedAt': Timestamp.fromDate(now),
+      });
+
+      print('Counter-offer sent successfully for offer: $offerId');
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to send counter-offer');
+      rethrow;
+    }
+  }
+
+  /// Accept offer (updates load status, closes other negotiations)
+  static Future<bool> acceptOffer({
+    required String offerId,
+    required String loadId,
+  }) async {
+    try {
+      // Get offer data first to extract carrierId
+      final offerDoc = await offers.doc(offerId).get();
+      if (!offerDoc.exists) {
+        throw Exception('Offer not found');
+      }
+      final offerData = offerDoc.data() as Map<String, dynamic>;
+      final carrierId = offerData['carrierId'] as String;
+
+      return await _firestore.runTransaction<bool>((transaction) async {
+        // Get offer
+        final offerRef = offers.doc(offerId);
+        final offerDoc = await transaction.get(offerRef);
+        
+        if (!offerDoc.exists) {
+          throw Exception('Offer not found');
+        }
+
+        final offerData = offerDoc.data() as Map<String, dynamic>;
+        final status = offerData['status'] as String;
+        
+        if (status.contains('accepted') || status.contains('rejected')) {
+          throw Exception('Offer already processed');
+        }
+
+        final carrierName = offerData['carrierName'] as String;
+        final conversationId = offerData['conversationId'] as String;
+        final shipperId = offerData['shipperId'] as String;
+        final acceptedAmount = offerData['counterOfferAmount'] as double? ?? 
+                               (offerData['offerAmount'] as num).toDouble();
+
+        // Find the load in shipper subcollection (using shipperId from offer)
+        final loadRef = _firestore
+            .collection('shippers')
+            .doc(shipperId)
+            .collection('loads')
+            .doc(loadId);
+
+        // Check if load exists and is still available
+        final loadDoc = await transaction.get(loadRef);
+        if (!loadDoc.exists) {
+          throw Exception('Load not found');
+        }
+
+        final loadData = loadDoc.data() as Map<String, dynamic>;
+        if (loadData['status'] != 'available') {
+          throw Exception('Load is no longer available');
+        }
+
+        final shipperUid = shipperId;
+
+        final now = DateTime.now();
+
+        // Update offer status
+        transaction.update(offerRef, {
+          'status': OfferStatus.accepted.toString().split('.').last,
+          'acceptedAt': Timestamp.fromDate(now),
+          'updatedAt': Timestamp.fromDate(now),
+        });
+
+        // Update load - book it
+        transaction.update(loadRef, {
+          'status': 'booked',
+          'bookedByCarrierId': carrierId,
+          'bookedAt': Timestamp.fromDate(now),
+          'updatedAt': Timestamp.fromDate(now),
+          'price': acceptedAmount, // Update price to accepted offer amount
+        });
+
+        // Note: Closing other negotiations is handled outside transaction for efficiency
+        // We'll update them after transaction completes
+
+        // Update accepted conversation
+        final convRef = conversations.doc(conversationId);
+        transaction.update(convRef, {
+          'isNegotiationActive': false,
+          'updatedAt': Timestamp.fromDate(now),
+        });
+
+        // Send acceptance message
+        final messageId = messages.doc().id;
+        final message = ChatMessage(
+          id: messageId,
+          conversationId: conversationId,
+          senderId: shipperId,
+          receiverId: carrierId,
+          content: 'Offer accepted: \$${acceptedAmount.toStringAsFixed(2)}',
+          timestamp: now,
+          type: MessageType.offer,
+          offerId: offerId,
+        );
+
+        transaction.set(messages.doc(messageId), message.toFirestore());
+        transaction.update(convRef, {
+          'lastMessage': message.toFirestore(),
+        });
+
+        // Create booking record
+        final bookingRef = bookings.doc();
+        transaction.set(bookingRef, {
+          'loadId': loadId,
+          'carrierId': carrierId,
+          'carrierName': carrierName,
+          'shipperId': shipperUid,
+          'status': 'booked',
+          'bookedAt': Timestamp.fromDate(now),
+          'createdAt': Timestamp.fromDate(now),
+          'updatedAt': Timestamp.fromDate(now),
+        });
+
+        // Add to carrier's myBookings
+        final carrierBookingRef = carriers.doc(carrierId).collection('myBookings').doc(loadId);
+        transaction.set(carrierBookingRef, {
+          'loadId': loadId,
+          'status': 'booked',
+          'bookedAt': Timestamp.fromDate(now),
+          'createdAt': Timestamp.fromDate(now),
+        });
+
+        return true;
+      }).then((success) async {
+        if (success) {
+          // Close all other active negotiations for this load after transaction
+          await closeNegotiationsForLoad(loadId, carrierId);
+        }
+        return success;
+      });
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to accept offer');
+      return false;
+    }
+  }
+
+  /// Reject offer
+  static Future<void> rejectOffer(String offerId) async {
+    try {
+      final offerDoc = await offers.doc(offerId).get();
+      if (!offerDoc.exists) {
+        throw Exception('Offer not found');
+      }
+
+      await offers.doc(offerId).update({
+        'status': OfferStatus.rejected.toString().split('.').last,
+        'updatedAt': Timestamp.now(),
+      });
+
+      print('Offer rejected: $offerId');
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to reject offer');
+      rethrow;
+    }
+  }
+
+  /// Get all active offers for a load
+  static Future<List<OfferModel>> getActiveOffersForLoad(String loadId) async {
+    try {
+      final snapshot = await offers
+          .where('loadId', isEqualTo: loadId)
+          .where('status', whereIn: [
+            OfferStatus.pending.toString().split('.').last,
+            OfferStatus.counterOffered.toString().split('.').last,
+          ])
+          .get();
+
+      return snapshot.docs.map((doc) => OfferModel.fromFirestore(doc)).toList();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get active offers');
+      return [];
+    }
+  }
+
+  /// Get offer by ID
+  static Future<OfferModel?> getOfferById(String offerId) async {
+    try {
+      final doc = await offers.doc(offerId).get();
+      if (!doc.exists) return null;
+      return OfferModel.fromFirestore(doc);
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get offer');
+      return null;
+    }
+  }
+
+  /// Check if negotiation timer has expired
+  static Future<bool> checkNegotiationTimer(String conversationId) async {
+    try {
+      final convDoc = await conversations.doc(conversationId).get();
+      if (!convDoc.exists) return true;
+
+      final data = convDoc.data() as Map<String, dynamic>;
+      final expiresAt = data['negotiationExpiresAt'] as Timestamp?;
+      
+      if (expiresAt == null) return false;
+      return DateTime.now().isAfter(expiresAt.toDate());
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to check negotiation timer');
+      return true;
+    }
+  }
+
+  /// Close all other negotiations when an offer is accepted (called internally)
+  static Future<void> closeNegotiationsForLoad(String loadId, String acceptedCarrierId) async {
+    try {
+      // This is handled in acceptOffer transaction, but kept for explicit calls if needed
+      final activeOffers = await getActiveOffersForLoad(loadId);
+      
+      for (final offer in activeOffers) {
+        if (offer.carrierId != acceptedCarrierId) {
+          await offers.doc(offer.id).update({
+            'status': OfferStatus.rejected.toString().split('.').last,
+            'updatedAt': Timestamp.now(),
+          });
+
+          await conversations.doc(offer.conversationId).update({
+            'isNegotiationActive': false,
+            'updatedAt': Timestamp.now(),
+          });
+        }
+      }
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to close negotiations');
     }
   }
 
@@ -2246,6 +2683,39 @@ class FirebaseService {
   }
 
   /// Book a load for a carrier
+  /// Submit a report
+  static Future<bool> submitReport({
+    required String reporterId,
+    required String reportedUserId,
+    required String reportedUserName,
+    required String reason,
+    String? loadId,
+    String? conversationId,
+    String? offerId,
+  }) async {
+    try {
+      await reports.add({
+        'reporterId': reporterId,
+        'reportedUserId': reportedUserId,
+        'reportedUserName': reportedUserName,
+        'reason': reason,
+        'loadId': loadId,
+        'conversationId': conversationId,
+        'offerId': offerId,
+        'status': 'pending',
+        'createdAt': Timestamp.fromDate(DateTime.now()),
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
+      
+      print('Report submitted successfully');
+      return true;
+    } catch (e) {
+      print('Error submitting report: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to submit report');
+      return false;
+    }
+  }
+
   static Future<bool> bookLoad({
     required String loadId,
     required String carrierUid,

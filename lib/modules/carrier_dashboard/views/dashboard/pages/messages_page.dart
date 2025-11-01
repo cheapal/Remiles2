@@ -15,44 +15,9 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
-  List<ChatConversation> _conversations = [];
-  bool _isLoading = true;
-  String? _errorMessage;
-
   @override
   void initState() {
     super.initState();
-    _loadConversations();
-  }
-
-  Future<void> _loadConversations() async {
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final user = authProvider.currentUser;
-      
-      if (user == null) {
-        setState(() {
-          _errorMessage = 'User not logged in';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      print('Loading conversations for user: ${user.uid}');
-      final conversations = await FirebaseService.getUserConversations(user.uid);
-      print('Found ${conversations.length} conversations');
-      
-      setState(() {
-        _conversations = conversations;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading conversations: $e');
-      setState(() {
-        _errorMessage = e.toString();
-        _isLoading = false;
-      });
-    }
   }
 
   @override
@@ -91,97 +56,161 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Widget _buildConversationsList() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
-    }
-
-    if (_errorMessage != null) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+    
+    if (user == null) {
       return Center(
         child: Column(
           children: [
             Icon(Icons.error_outline, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
-              'Error loading conversations',
+              'User not logged in',
               style: TextStyle(fontSize: 18, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage!,
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadConversations,
-              child: const Text('Retry'),
             ),
           ],
         ),
       );
     }
 
-    if (_conversations.isEmpty) {
-      return Center(
-        child: Column(
-          children: [
-            Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              'No conversations yet',
-              style: TextStyle(fontSize: 18, color: Colors.grey),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your conversations will appear here',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: _conversations.length,
-      itemBuilder: (context, index) {
-        final conversation = _conversations[index];
-        final authProvider = Provider.of<AuthProvider>(context, listen: false);
-        final user = authProvider.currentUser;
-        
-        // Debug: Print conversation details
-        print('Conversation ${conversation.id}:');
-        print('  Participants: ${conversation.participants}');
-        print('  Current User: ${user?.uid}');
-        
-        final otherUserId = conversation.getOtherParticipant(user?.uid ?? '');
-        print('  Other User ID: $otherUserId');
-        
-        // Skip conversations with invalid participants
-        if (otherUserId.isEmpty) {
-          print('  Skipping conversation due to invalid participants');
-          return const SizedBox.shrink();
+    return StreamBuilder<List<ChatConversation>>(
+      stream: FirebaseService.getUserConversationsStream(user.uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
         }
-        
-        return _ConversationTile(
-          conversation: conversation,
-          otherUserId: otherUserId,
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ChatScreen(
-                  conversationId: conversation.id,
-                  otherUserId: otherUserId,
-                  otherUserName: 'User', // Simplified for now
-                  listingTitle: conversation.listingTitle,
-                  listingImageUrl: conversation.listingImageUrl,
-                  listingId: conversation.listingId,
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  'Error loading conversations',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
                 ),
-              ),
+                const SizedBox(height: 8),
+                Text(
+                  snapshot.error.toString(),
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        }
+
+        final conversations = snapshot.data ?? [];
+
+        if (conversations.isEmpty) {
+          return Center(
+            child: Column(
+              children: [
+                Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
+                const SizedBox(height: 16),
+                Text(
+                  'No conversations yet',
+                  style: TextStyle(fontSize: 18, color: Colors.grey),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your conversations will appear here',
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: conversations.length,
+          itemBuilder: (context, index) {
+            final conversation = conversations[index];
+            final authProvider = Provider.of<AuthProvider>(context, listen: false);
+            final user = authProvider.currentUser;
+            
+            final otherUserId = conversation.getOtherParticipant(user?.uid ?? '');
+            
+            // Skip conversations with invalid participants
+            if (otherUserId.isEmpty || user == null) {
+              return const SizedBox.shrink();
+            }
+            
+            // Get current user ID for unread check
+            final currentUserId = user.uid;
+            
+            return _ConversationTile(
+              conversation: conversation,
+              otherUserId: otherUserId,
+              currentUserId: currentUserId,
+              onTap: () async {
+                // Get other user's name
+                String otherUserName = 'User';
+                try {
+                  final shipperDoc = await FirebaseService.shippers.doc(otherUserId).get();
+                  if (shipperDoc.exists) {
+                    final data = shipperDoc.data() as Map<String, dynamic>?;
+                    otherUserName = data?['companyName'] ?? data?['displayName'] ?? data?['name'] ?? 'Shipper';
+                  } else {
+                    final carrierDoc = await FirebaseService.carriers.doc(otherUserId).get();
+                    if (carrierDoc.exists) {
+                      final data = carrierDoc.data() as Map<String, dynamic>?;
+                      otherUserName = data?['companyName'] ?? data?['displayName'] ?? 'Carrier';
+                    }
+                  }
+                } catch (e) {
+                  print('Error fetching user name: $e');
+                }
+
+                // Get load details if this is a load conversation
+                String? loadId = conversation.loadId;
+                double? loadPrice;
+                
+                if (loadId != null) {
+                  // Try to find the load to get price
+                  try {
+                    final shippersSnapshot = await FirebaseService.shippers.get();
+                    for (final shipperDoc in shippersSnapshot.docs) {
+                      final loadDoc = await FirebaseService.shippers
+                          .doc(shipperDoc.id)
+                          .collection('loads')
+                          .doc(loadId)
+                          .get();
+                      if (loadDoc.exists) {
+                        final loadData = loadDoc.data();
+                        loadPrice = (loadData?['price'] as num?)?.toDouble();
+                        break;
+                      }
+                    }
+                  } catch (e) {
+                    print('Error fetching load price: $e');
+                  }
+                }
+
+                if (context.mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(
+                        conversationId: conversation.id,
+                        otherUserId: otherUserId,
+                        otherUserName: otherUserName,
+                        listingTitle: conversation.listingTitle,
+                        listingImageUrl: conversation.listingImageUrl,
+                        listingId: conversation.listingId,
+                        loadId: loadId,
+                        loadPrice: loadPrice,
+                      ),
+                    ),
+                  );
+                }
+              },
             );
           },
         );
@@ -193,11 +222,13 @@ class _MessagesPageState extends State<MessagesPage> {
 class _ConversationTile extends StatelessWidget {
   final ChatConversation conversation;
   final String otherUserId;
+  final String currentUserId;
   final VoidCallback onTap;
 
   const _ConversationTile({
     required this.conversation,
     required this.otherUserId,
+    required this.currentUserId,
     required this.onTap,
   });
 
@@ -249,13 +280,20 @@ class _ConversationTile extends StatelessWidget {
               ),
             ),
           const SizedBox(height: 4),
-          if (conversation.unreadCount[otherUserId] == true)
+          if (conversation.unreadCount[currentUserId] == true)
             Container(
-              width: 8,
-              height: 8,
-              decoration: const BoxDecoration(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
                 color: iconColor,
                 shape: BoxShape.circle,
+              ),
+              child: const Text(
+                '!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
         ],

@@ -1,6 +1,7 @@
 import 'package:Remiles/core/theme/colors.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/load_model.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:flutter/material.dart';
 
 class BookedNow extends StatefulWidget {
@@ -21,6 +22,44 @@ class _BookedNowState extends State<BookedNow> {
   void initState() {
     super.initState();
     _currentStatus = widget.load.status;
+    _refreshLoadStatus();
+  }
+
+  @override
+  void didUpdateWidget(BookedNow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Refresh status when widget is updated
+    if (oldWidget.load.id != widget.load.id || oldWidget.load.status != widget.load.status) {
+      _refreshLoadStatus();
+    }
+  }
+
+  Future<void> _refreshLoadStatus() async {
+    try {
+      // Find the load in shipper subcollections to get latest status
+      final shippersSnapshot = await FirebaseService.shippers.get();
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final loadDoc = await FirebaseService.shippers
+            .doc(shipperDoc.id)
+            .collection('loads')
+            .doc(widget.load.id)
+            .get();
+        
+        if (loadDoc.exists) {
+          final loadData = loadDoc.data();
+          final status = loadData?['status'] as String?;
+          
+          if (status != null && status != _currentStatus && mounted) {
+            setState(() {
+              _currentStatus = status;
+            });
+          }
+          break;
+        }
+      }
+    } catch (e) {
+      print('Error refreshing load status: $e');
+    }
   }
 
   @override
@@ -293,13 +332,7 @@ class _BookedNowState extends State<BookedNow> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Navigator.push(
-                    //   context,
-                    //   MaterialPageRoute(builder: (context) => const NegotiateLoad()),
-                    // );
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: () => _navigateToNegotiation(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.greenAccent.shade200 ,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -431,8 +464,13 @@ class _BookedNowState extends State<BookedNow> {
           widget.onLoadBooked!();
         }
         
-        // Close the dialog
+        // Close the dialog and navigate to chat
         Navigator.of(context).pop();
+        
+        // Navigate to chat with shipper
+        if (context.mounted) {
+          await _navigateToChat();
+        }
       } else {
         setState(() {
           _isBooking = false;
@@ -456,6 +494,85 @@ class _BookedNowState extends State<BookedNow> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _navigateToNegotiation() async {
+    await _navigateToChat();
+  }
+
+  Future<void> _navigateToChat() async {
+    try {
+      final user = FirebaseService.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to chat')),
+        );
+        return;
+      }
+
+      // Show loading indicator if dialog is still open
+      if (context.mounted && Navigator.canPop(context)) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(),
+          ),
+        );
+      }
+
+      // Create or get conversation for load
+      final conversationId = await FirebaseService.createLoadConversation(
+        loadId: widget.load.id,
+        carrierUid: user.uid,
+        shipperUid: widget.load.shipperUid,
+      );
+
+      // Close loading dialog if open
+      if (context.mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      // Navigate to chat screen and refresh status when returning
+      if (context.mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversationId,
+              otherUserId: widget.load.shipperUid,
+              otherUserName: widget.load.shipperName,
+              listingId: null,
+              loadId: widget.load.id,
+              loadPrice: widget.load.price,
+            ),
+          ),
+        );
+        
+        // Refresh load status when returning from chat
+        if (context.mounted) {
+          await _refreshLoadStatus();
+          // Notify parent to refresh if callback provided
+          if (widget.onLoadBooked != null) {
+            widget.onLoadBooked!();
+          }
+        }
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (context.mounted && Navigator.canPop(context)) {
+        Navigator.of(context).pop();
+      }
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start chat: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

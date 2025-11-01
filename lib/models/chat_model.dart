@@ -9,6 +9,7 @@ class ChatMessage {
   final DateTime timestamp;
   final MessageType type;
   final String? listingId; // Reference to the product listing
+  final String? offerId; // Reference to an offer (for offer messages)
   final bool isRead;
 
   ChatMessage({
@@ -20,6 +21,7 @@ class ChatMessage {
     required this.timestamp,
     this.type = MessageType.text,
     this.listingId,
+    this.offerId,
     this.isRead = false,
   });
 
@@ -37,6 +39,7 @@ class ChatMessage {
         orElse: () => MessageType.text,
       ),
       listingId: data['listingId'],
+      offerId: data['offerId'],
       isRead: data['isRead'] ?? false,
     );
   }
@@ -54,6 +57,7 @@ class ChatMessage {
         orElse: () => MessageType.text,
       ),
       listingId: data['listingId'],
+      offerId: data['offerId'],
       isRead: data['isRead'] ?? false,
     );
   }
@@ -67,12 +71,13 @@ class ChatMessage {
       'timestamp': Timestamp.fromDate(timestamp),
       'type': type.toString().split('.').last,
       'listingId': listingId,
+      'offerId': offerId,
       'isRead': isRead,
     };
   }
 }
 
-enum MessageType { text, image, listing }
+enum MessageType { text, image, listing, offer }
 
 class ChatConversation {
   final String id;
@@ -80,10 +85,15 @@ class ChatConversation {
   final String? listingId;
   final String? listingTitle;
   final String? listingImageUrl;
+  final String? loadId; // Reference to load (for load negotiations)
   final ChatMessage? lastMessage;
   final DateTime createdAt;
   final DateTime updatedAt;
   final Map<String, bool> unreadCount; // userId -> hasUnreadMessages
+  final DateTime? negotiationStartTime; // When first offer was sent
+  final DateTime? negotiationExpiresAt; // 30 minutes from negotiationStartTime
+  final bool isNegotiationActive; // Whether negotiation is active
+  final String? activeOfferId; // ID of the current active offer
 
   ChatConversation({
     required this.id,
@@ -91,10 +101,15 @@ class ChatConversation {
     this.listingId,
     this.listingTitle,
     this.listingImageUrl,
+    this.loadId,
     this.lastMessage,
     required this.createdAt,
     required this.updatedAt,
     this.unreadCount = const {},
+    this.negotiationStartTime,
+    this.negotiationExpiresAt,
+    this.isNegotiationActive = false,
+    this.activeOfferId,
   });
 
   factory ChatConversation.fromFirestore(DocumentSnapshot doc) {
@@ -105,12 +120,21 @@ class ChatConversation {
       listingId: data['listingId'],
       listingTitle: data['listingTitle'],
       listingImageUrl: data['listingImageUrl'],
+      loadId: data['loadId'],
       lastMessage: data['lastMessage'] != null 
           ? ChatMessage.fromMap(data['lastMessage'] as Map<String, dynamic>)
           : null,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       updatedAt: (data['updatedAt'] as Timestamp).toDate(),
       unreadCount: Map<String, bool>.from(data['unreadCount'] ?? {}),
+      negotiationStartTime: data['negotiationStartTime'] != null
+          ? (data['negotiationStartTime'] as Timestamp).toDate()
+          : null,
+      negotiationExpiresAt: data['negotiationExpiresAt'] != null
+          ? (data['negotiationExpiresAt'] as Timestamp).toDate()
+          : null,
+      isNegotiationActive: data['isNegotiationActive'] ?? false,
+      activeOfferId: data['activeOfferId'],
     );
   }
 
@@ -120,11 +144,34 @@ class ChatConversation {
       'listingId': listingId,
       'listingTitle': listingTitle,
       'listingImageUrl': listingImageUrl,
+      'loadId': loadId,
       'lastMessage': lastMessage?.toFirestore(),
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'unreadCount': unreadCount,
+      'negotiationStartTime': negotiationStartTime != null
+          ? Timestamp.fromDate(negotiationStartTime!)
+          : null,
+      'negotiationExpiresAt': negotiationExpiresAt != null
+          ? Timestamp.fromDate(negotiationExpiresAt!)
+          : null,
+      'isNegotiationActive': isNegotiationActive,
+      'activeOfferId': activeOfferId,
     };
+  }
+
+  bool get isNegotiationExpired {
+    if (negotiationExpiresAt == null) return false;
+    return DateTime.now().isAfter(negotiationExpiresAt!);
+  }
+
+  Duration? get negotiationTimeRemaining {
+    if (negotiationExpiresAt == null) return null;
+    final now = DateTime.now();
+    if (now.isAfter(negotiationExpiresAt!)) {
+      return Duration.zero;
+    }
+    return negotiationExpiresAt!.difference(now);
   }
 
   String getOtherParticipant(String currentUserId) {

@@ -104,14 +104,18 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
   Widget _buildHeader() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
-    final userName = user?.displayName ?? 'User';
+    final shipper = authProvider.shipperUser;
+    final userName = user?.displayName ?? shipper?.companyName ?? 'User';
+    final profileImageUrl = shipper?.profileImageUrl ?? user?.profileImageUrl;
 
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         GestureDetector(
           onTap: () => Navigator.pop(context),
           child: Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
               color: brandColor,
               borderRadius: BorderRadius.circular(8),
@@ -123,23 +127,10 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
             ),
           ),
         ),
-        const SizedBox(width: 16),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: brandColor,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.person,
-            color: Colors.white,
-            size: 24,
-          ),
-        ),
-        const SizedBox(width: 12),
+      
         Expanded(
           child: Text(
-            "$userName's Listings",
+            "$userName",
             style: const TextStyle(
               fontFamily: 'Roboto',
               fontWeight: FontWeight.w800,
@@ -149,7 +140,54 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
             ),
             overflow: TextOverflow.ellipsis,
             maxLines: 1,
+            textAlign: TextAlign.center,
           ),
+        ),
+
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: brandColor,
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+          ),
+          child: profileImageUrl != null
+              ? ClipOval(
+                  child: Image.network(
+                    profileImageUrl,
+                    width: 44,
+                    height: 44,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: brandColor,
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      );
+                    },
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        color: brandColor,
+                        child: const Center(
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                )
+              : const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 24,
+                ),
         ),
       ],
     );
@@ -169,7 +207,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
             ),
             const SizedBox(width: 12),
             _buildTabButton(
-              'Saved Items',
+              'Saved',
               1,
               Icons.bookmark_border,
               isActive: _selectedTab == 1,
@@ -235,19 +273,25 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 icon,
                 color: isActive ? Colors.white : brandGreen,
                 size: 20,
               ),
-              const SizedBox(width: 8),
-              Text(
-                text,
-                style: TextStyle(
-                  color: isActive ? Colors.white : brandGreen,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  text,
+                  style: TextStyle(
+                    color: isActive ? Colors.white : brandGreen,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
                 ),
               ),
             ],
@@ -402,13 +446,17 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
           padding: const EdgeInsets.only(bottom: 16),
           child: _ListingCard(
             listing: listing,
-            onTap: () {
-              Navigator.push(
+            onTap: () async {
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => ProductPagePrecise(listing: listing),
                 ),
               );
+              // Refresh listings if listing was deleted or updated
+              if (result == true && mounted) {
+                _loadUserData();
+              }
             },
           ),
         );

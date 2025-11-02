@@ -1,6 +1,7 @@
 import 'package:Remiles/core/theme/colors.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_create_listing.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:Remiles/models/product_listing.dart';
 import 'package:Remiles/core/firebase_service.dart';
@@ -30,13 +31,94 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
   // Shipper details
   Map<String, dynamic>? _shipperDetails;
   bool _isLoadingShipper = true;
+  
+  // Listing data (can be updated after edit)
+  late ProductListing _currentListing;
+
+  bool get _isOwnListing {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUser = authProvider.currentUser;
+    return currentUser != null && _currentListing.shipperUid == currentUser.uid;
+  }
+
+  Future<void> _deleteListing() async {
+    // Show confirmation dialog
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Listing'),
+        content: const Text('Are you sure you want to delete this listing? This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) {
+      return;
+    }
+
+    try {
+      await FirebaseService.deleteProductListing(_currentListing.id);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Listing deleted successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // Go back to previous screen with result to trigger refresh
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to delete listing: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
     super.initState();
+    _currentListing = widget.listing;
     _checkIfSaved();
     _loadShipperDetails();
     _messageController.text = 'Hello, is this still available?';
+  }
+  
+  // Reload listing data from Firebase
+  Future<void> _reloadListing() async {
+    try {
+      final updatedListing = await FirebaseService.getProductListing(_currentListing.id);
+      if (updatedListing != null && mounted) {
+        setState(() {
+          _currentListing = updatedListing;
+        });
+        // Reload shipper details in case they changed
+        _loadShipperDetails();
+        // Reload saved status
+        _checkIfSaved();
+      }
+    } catch (e) {
+      print('Error reloading listing: $e');
+    }
   }
 
   @override
@@ -52,7 +134,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
       final user = authProvider.currentUser;
       
       if (user != null) {
-        final isSaved = await FirebaseService.isListingSaved(user.uid, widget.listing.id);
+        final isSaved = await FirebaseService.isListingSaved(user.uid, _currentListing.id);
         if (mounted) {
           setState(() {
             _isSaved = isSaved;
@@ -67,7 +149,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
 
   void _loadShipperDetails() async {
     try {
-      final shipperDetails = await FirebaseService.getShipperDetails(widget.listing.shipperUid);
+      final shipperDetails = await FirebaseService.getShipperDetails(_currentListing.shipperUid);
       if (mounted) {
         setState(() {
           _shipperDetails = shipperDetails;
@@ -93,17 +175,129 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
           children: [
             //top nav
             TopNavigationBar(context),
-            // ---------- BACK BUTTON ----------
+            // ---------- BACK BUTTON + EDIT + DELETE BUTTONS ----------
             Padding(
-              padding: const EdgeInsets.fromLTRB(8, 12, 0, 0),
-              child: Align(
-                alignment: Alignment.topLeft,
-                child: IconButton(
-                  icon: Icon(Icons.arrow_back, color: primaryColor, size: 28),
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                ),
+              padding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.arrow_back, color: primaryColor, size: 28),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                  // Edit and Delete buttons (only show for own listings)
+                  if (_isOwnListing)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Edit button
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: green,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: green.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () async {
+                                // Navigate to edit listing screen with listing data prefilled
+                                final result = await Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ShipperCreateListing(
+                                      listingToEdit: _currentListing,
+                                    ),
+                                  ),
+                                );
+                                
+                                // Refresh listing data if it was updated
+                                if (result == true && mounted) {
+                                  await _reloadListing();
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.edit,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      'Edit',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        // Delete button
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.red.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: _deleteListing,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.delete,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Text(
+                                      'Delete',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
               ),
             ),
             // ---------- IMAGE CAROUSEL ----------
@@ -120,7 +314,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
                     children:  [
                       Expanded(
                         child: Text(
-                          '${widget.listing.title}\n\$${widget.listing.price.toStringAsFixed(0)}',
+                          '${_currentListing.title}\n\$${_currentListing.price.toStringAsFixed(0)}',
                           style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
@@ -137,7 +331,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
                                 Icon(Icons.location_on, color: green, size: 20),
                                 const SizedBox(width: 6),
                                 Text(
-                                  widget.listing.location,
+                                  _currentListing.location,
                                   style: TextStyle(
                                     color: Colors.black,
                                     fontSize: 18,
@@ -155,104 +349,105 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
             SizedBox(height: 24),
       
       
-            // ---------- Message card overlaps - use negative translate ----------
-            Transform.translate(
-              offset: const Offset(0, -10),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: green.withOpacity(0.9), width: 1.6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: green.withOpacity(0.12),
-                        blurRadius: 12,
-                        spreadRadius: 1,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Send seller a message',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+            // ---------- Message card overlaps - use negative translate (only show if not own listing) ----------
+            if (!_isOwnListing)
+              Transform.translate(
+                offset: const Offset(0, -10),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: green.withOpacity(0.9), width: 1.6),
+                      boxShadow: [
+                        BoxShadow(
+                          color: green.withOpacity(0.12),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 6),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Container(
-                              height: 48,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF3F3F4),
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: TextField(
-                                controller: _messageController,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black87,
-                                ),
-                                decoration: const InputDecoration(
-                                  hintText: 'Type your message...',
-                                  hintStyle: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.grey,
-                                  ),
-                                  border: InputBorder.none,
-                                  contentPadding: EdgeInsets.symmetric(vertical: 12),
-                                ),
-                                maxLines: 1,
-                                textInputAction: TextInputAction.done,
-                                onSubmitted: (_) => _sendMessage(),
-                              ),
-                            ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Send seller a message',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
-                          const SizedBox(width: 12),
-                          GestureDetector(
-                            onTap: _sendMessage,
-                            child: Container(
-                            height: 48,
-                            padding: const EdgeInsets.symmetric(horizontal: 25),
-                            decoration: BoxDecoration(
-                              color: green,
-                              borderRadius: BorderRadius.circular(28),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black26,
-                                  blurRadius: 6,
-                                  offset: Offset(0, 3),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Container(
+                                height: 48,
+                                padding: const EdgeInsets.symmetric(horizontal: 14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF3F3F4),
+                                  borderRadius: BorderRadius.circular(30),
                                 ),
-                              ],
-                            ),
-                            child: Center(
-                              child: Text(
-                                'Send',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 16,
+                                child: TextField(
+                                  controller: _messageController,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.black87,
                                   ),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Type your message...',
+                                    hintStyle: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey,
+                                    ),
+                                    border: InputBorder.none,
+                                    contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                  maxLines: 1,
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: (_) => _sendMessage(),
                                 ),
                               ),
                             ),
-                          )
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: 12),
+                            GestureDetector(
+                              onTap: _sendMessage,
+                              child: Container(
+                              height: 48,
+                              padding: const EdgeInsets.symmetric(horizontal: 25),
+                              decoration: BoxDecoration(
+                                color: green,
+                                borderRadius: BorderRadius.circular(28),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 6,
+                                    offset: Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Center(
+                                child: Text(
+                                  'Send',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
       
             const SizedBox(height: 12),
       
@@ -262,12 +457,15 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _outlinePill(
-                    icon: _isAlertSet ? Icons.notifications : Icons.notifications_none, 
-                    label: _isAlertSet ? 'Alert Set' : 'Alert', 
-                    green: green,
-                    onTap: _toggleAlert,
-                  ),
+                  // Alert button (only show if not own listing)
+                  if (!_isOwnListing)
+                    _outlinePill(
+                      icon: _isAlertSet ? Icons.notifications : Icons.notifications_none, 
+                      label: _isAlertSet ? 'Alert Set' : 'Alert', 
+                      green: green,
+                      onTap: _toggleAlert,
+                    ),
+                  // Save button (always show)
                   _outlinePill(
                     icon: _isSaved ? Icons.bookmark : Icons.bookmark_border, 
                     label: _isSaved ? 'Saved' : 'Save', 
@@ -319,7 +517,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                           Text(
-                        _shipperDetails?['name'] ?? widget.listing.shipperName,
+                        _shipperDetails?['name'] ?? _currentListing.shipperName,
                         style: const TextStyle(fontSize: 16, color: Colors.black),
                       ),
       
@@ -367,7 +565,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
   }
 
   Widget _buildImageCarousel() {
-    if (widget.listing.imageUrls.isEmpty) {
+    if (_currentListing.imageUrls.isEmpty) {
       return Container(
         height: 260,
         width: double.infinity,
@@ -389,12 +587,12 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
                 _currentImageIndex = index;
               });
             },
-            itemCount: widget.listing.imageUrls.length,
+            itemCount: _currentListing.imageUrls.length,
             itemBuilder: (context, index) {
               return GestureDetector(
                 onTap: () => _openImageViewer(index),
                 child: Image.network(
-                  widget.listing.imageUrls[index],
+                  _currentListing.imageUrls[index],
                   height: 260,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -411,7 +609,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
               );
             },
           ),
-          if (widget.listing.imageUrls.length > 1)
+          if (_currentListing.imageUrls.length > 1)
             Positioned(
               bottom: 16,
               left: 0,
@@ -419,7 +617,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(
-                  widget.listing.imageUrls.length,
+                  _currentListing.imageUrls.length,
                   (index) => Container(
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     width: 8,
@@ -441,14 +639,14 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
 
   Future<String> _createConversation(dynamic user) async {
     // Create or get conversation
-    print('Creating conversation between ${user.uid} and ${widget.listing.shipperUid}');
+    print('Creating conversation between ${user.uid} and ${_currentListing.shipperUid}');
     final conversationId = await FirebaseService.createOrGetConversation(
       senderId: user.uid,
-      receiverId: widget.listing.shipperUid,
-      listingId: widget.listing.id,
-      listingTitle: widget.listing.title,
-      listingImageUrl: widget.listing.imageUrls.isNotEmpty 
-          ? widget.listing.imageUrls.first 
+      receiverId: _currentListing.shipperUid,
+      listingId: _currentListing.id,
+      listingTitle: _currentListing.title,
+      listingImageUrl: _currentListing.imageUrls.isNotEmpty 
+          ? _currentListing.imageUrls.first 
           : null,
     );
     print('Conversation ID: $conversationId');
@@ -513,13 +711,13 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
         MaterialPageRoute(
           builder: (context) => ChatScreen(
             conversationId: conversationId,
-            otherUserId: widget.listing.shipperUid,
-            otherUserName: widget.listing.shipperName,
-            listingTitle: widget.listing.title,
-            listingImageUrl: widget.listing.imageUrls.isNotEmpty 
-                ? widget.listing.imageUrls.first 
+            otherUserId: _currentListing.shipperUid,
+            otherUserName: _currentListing.shipperName,
+            listingTitle: _currentListing.title,
+            listingImageUrl: _currentListing.imageUrls.isNotEmpty 
+                ? _currentListing.imageUrls.first 
                 : null,
-            listingId: widget.listing.id, // Pass the listing ID for view details
+            listingId: _currentListing.id, // Pass the listing ID for view details
             preFilledMessage: messageText, // Pass the message to pre-fill
           ),
         ),
@@ -571,7 +769,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
 
       if (_isSaved) {
         // Remove from saved
-        await FirebaseService.removeSavedListing(user.uid, widget.listing.id);
+        await FirebaseService.removeSavedListing(user.uid, _currentListing.id);
         setState(() {
           _isSaved = false;
         });
@@ -583,7 +781,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
         );
       } else {
         // Add to saved
-        await FirebaseService.saveListing(user.uid, widget.listing);
+        await FirebaseService.saveListing(user.uid, _currentListing);
         setState(() {
           _isSaved = true;
         });
@@ -610,7 +808,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
         // Create a TextPainter to measure the text
         final textPainter = TextPainter(
           text: TextSpan(
-            text: widget.listing.description,
+            text: _currentListing.description,
             style: const TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w600),
           ),
           maxLines: 3,
@@ -631,7 +829,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
                 style: TextStyle(fontWeight: FontWeight.w600),
               ),
               TextSpan(
-                text: widget.listing.description,
+                text: _currentListing.description,
                 style: const TextStyle(fontWeight: FontWeight.w600),
               ),
               if (isOverflowing)
@@ -702,10 +900,10 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => _ImageViewerScreen(
-          imageUrls: widget.listing.imageUrls,
-          initialIndex: initialIndex,
-        ),
+      builder: (context) => _ImageViewerScreen(
+        imageUrls: _currentListing.imageUrls,
+        initialIndex: initialIndex,
+      ),
       ),
     );
   }

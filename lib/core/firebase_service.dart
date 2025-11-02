@@ -454,6 +454,17 @@ class FirebaseService {
     }
   }
 
+  // Delete file from Storage using URL
+  static Future<void> deleteFileFromURL(String url) async {
+    try {
+      final ref = _storage.refFromURL(url);
+      await ref.delete();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'File deletion from URL failed');
+      rethrow;
+    }
+  }
+
   // Role-based user management methods
   static Future<ShipperModel?> createShipper(ShipperModel shipper) async {
     try {
@@ -1538,6 +1549,80 @@ class FirebaseService {
 
   static Future<void> deleteProductListing(String listingId) async {
     try {
+      // First, get the listing to find image and video URLs
+      final listingDoc = await listings.doc(listingId).get();
+      
+      if (listingDoc.exists) {
+        final listingData = listingDoc.data() as Map<String, dynamic>?;
+        
+        if (listingData != null) {
+          // Delete images from Storage
+          if (listingData['imageUrls'] != null) {
+            final imageUrls = List<String>.from(listingData['imageUrls'] ?? []);
+            for (final imageUrl in imageUrls) {
+              try {
+                final ref = _storage.refFromURL(imageUrl);
+                await ref.delete();
+              } catch (e) {
+                // Log error but don't fail the entire operation
+                await recordError(e, StackTrace.current, reason: 'Failed to delete listing image from storage');
+              }
+            }
+          }
+          
+          // Delete video from Storage
+          if (listingData['videoUrl'] != null && listingData['videoUrl'].toString().isNotEmpty) {
+            try {
+              final videoUrl = listingData['videoUrl'].toString();
+              final ref = _storage.refFromURL(videoUrl);
+              await ref.delete();
+            } catch (e) {
+              // Log error but don't fail the entire operation
+              await recordError(e, StackTrace.current, reason: 'Failed to delete listing video from storage');
+            }
+          }
+          
+          // Try to delete the entire listing folder from Storage
+          final listingSnapshot = await listings.doc(listingId).get();
+          if (listingSnapshot.exists) {
+            final listing = ProductListing.fromFirestore(listingSnapshot);
+            try {
+              final listingImagesRef = _storage.ref().child('shippers/${listing.shipperUid}/listings/$listingId/images');
+              final listResult = await listingImagesRef.listAll();
+              
+              // Delete all images in the folder
+              for (final item in listResult.items) {
+                try {
+                  await item.delete();
+                } catch (e) {
+                  await recordError(e, StackTrace.current, reason: 'Failed to delete individual listing image');
+                }
+              }
+              
+              // Delete video folder
+              try {
+                final listingVideoRef = _storage.ref().child('shippers/${listing.shipperUid}/listings/$listingId/video');
+                final videoListResult = await listingVideoRef.listAll();
+                
+                for (final item in videoListResult.items) {
+                  try {
+                    await item.delete();
+                  } catch (e) {
+                    await recordError(e, StackTrace.current, reason: 'Failed to delete listing video');
+                  }
+                }
+              } catch (e) {
+                // Video folder might not exist, that's okay
+              }
+            } catch (e) {
+              // Folder might not exist, that's okay
+              await recordError(e, StackTrace.current, reason: 'Failed to delete listing folder from storage');
+            }
+          }
+        }
+      }
+      
+      // Delete the Firestore document
       await listings.doc(listingId).delete();
       
       // Log listing deletion event
@@ -2827,6 +2912,7 @@ class FirebaseService {
     String? loadId,
     String? conversationId,
     String? offerId,
+    String? listingId,
   }) async {
     try {
       await reports.add({
@@ -2837,6 +2923,7 @@ class FirebaseService {
         'loadId': loadId,
         'conversationId': conversationId,
         'offerId': offerId,
+        'listingId': listingId,
         'status': 'pending',
         'createdAt': Timestamp.fromDate(DateTime.now()),
         'updatedAt': Timestamp.fromDate(DateTime.now()),

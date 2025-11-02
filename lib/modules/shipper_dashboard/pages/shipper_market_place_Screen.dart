@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_create_listing.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_screen.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/product_listing.dart';
+import 'package:Remiles/models/shipper_model.dart';
+import 'package:Remiles/providers/auth_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -459,7 +463,7 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
         crossAxisCount: crossAxisCount,
         crossAxisSpacing: 12,
         mainAxisSpacing: 16,
-          childAspectRatio: 184 / 169,
+          childAspectRatio: 200 / 280, // Increased height for better image visibility
       ),
       itemBuilder: (context, i) {
           return Shimmer(
@@ -490,12 +494,13 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
             crossAxisCount: crossAxisCount,
             crossAxisSpacing: 12,
             mainAxisSpacing: 16,
-            childAspectRatio: 184 / 169,
+            childAspectRatio: 200 / 300, // Increased height for better image visibility
           ),
           itemBuilder: (context, i) {
             final listing = _filteredListings[i];
             return _AdCard(
               listing: listing,
+              onRefresh: _refreshListings,
             );
           },
         ),
@@ -852,15 +857,76 @@ class _ShipperMarketplaceScreenState extends State<ShipperMarketplaceScreen>
 }
 
 /// A beautiful ad card following the market design sizing & shadows
-class _AdCard extends StatelessWidget {
+class _AdCard extends StatefulWidget {
   const _AdCard({
     required this.listing,
+    this.onRefresh,
   });
 
   final ProductListing listing;
+  final VoidCallback? onRefresh;
+
+  @override
+  State<_AdCard> createState() => _AdCardState();
+}
+
+class _AdCardState extends State<_AdCard> {
+  ShipperModel? _shipperData;
+  bool _isLoadingShipper = false;
+  int? _completedShipments;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadShipperData();
+  }
+
+  Future<void> _loadShipperData() async {
+    if (widget.listing.shipperUid.isEmpty) return;
+    
+    setState(() {
+      _isLoadingShipper = true;
+    });
+
+    try {
+      final shipper = await FirebaseService.getShipper(widget.listing.shipperUid);
+      if (shipper != null) {
+        // Also load completed shipments count
+        final stats = await FirebaseService.getShipperLoadStats(shipper.uid);
+        
+        if (mounted) {
+          setState(() {
+            _shipperData = shipper;
+            _completedShipments = stats['completed'] ?? 0;
+            _isLoadingShipper = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoadingShipper = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('Error loading shipper data for listing: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingShipper = false;
+        });
+      }
+    }
+  }
+
+  bool get _isOwnListing {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final currentUser = authProvider.currentUser;
+    return currentUser != null && widget.listing.shipperUid == currentUser.uid;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final listing = widget.listing;
     return GestureDetector(
       onTap: () {
         // Handle ad tap (e.g., navigate to details)
@@ -869,13 +935,18 @@ class _AdCard extends StatelessWidget {
           MaterialPageRoute(
             builder: (context) => ProductPagePrecise(listing: listing)
           ),
-        );
+        ).then((result) {
+          // Refresh listings if listing was deleted
+          if (result == true && mounted && widget.onRefresh != null) {
+            widget.onRefresh!();
+          }
+        });
       },
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 2), // prevent shadow clipping
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(23),
+          borderRadius: BorderRadius.circular(12), // Decreased from 23 to 12 for less roundness
           boxShadow: [
             BoxShadow(
               color: const Color(0xFF6CA78A).withOpacity(0.20),
@@ -886,63 +957,111 @@ class _AdCard extends StatelessWidget {
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(23),
+          borderRadius: BorderRadius.circular(12), // Decreased from 23 to 12
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Product image
               Expanded(
-                child: Container(
-                  width: double.infinity,
-                  color: const Color(0xFFD9D9D9),
-                  child: listing.imageUrls.isNotEmpty
-                      ? Image.network(
-                          listing.imageUrls.first,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return const Icon(Icons.image, size: 34, color: Colors.white);
-                          },
-                        )
-                      : const Icon(Icons.image, size: 34, color: Colors.white),
+                child: Stack(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      color: const Color(0xFFD9D9D9),
+                      child: listing.imageUrls.isNotEmpty
+                          ? Image.network(
+                              listing.imageUrls.first,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return const Icon(Icons.image, size: 34, color: Colors.white);
+                              },
+                            )
+                          : const Icon(Icons.image, size: 34, color: Colors.white),
+                    ),
+                    // "Your Listing" pill badge
+                    if (_isOwnListing)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: brandGreen,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Text(
+                            'Your Listing',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 10),
+                    // tag + price row
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Flexible(
+                            child: Container(
+                              padding:
+                              const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: listing.condition == 'New'
+                                    ? brandGreen
+                                    : const Color(0xFF386544),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                listing.condition,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              '\$${listing.price.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                color: Color(0xFFCEB838),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 6),
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // tag + price row
-                    Row(
-                      children: [
-                        Container(
-                          padding:
-                          const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: listing.condition == 'New'
-                                ? brandGreen
-                                : const Color(0xFF386544),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            listing.condition,
-                            style: const TextStyle(
-                              fontSize: 10.5,
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          '\$${listing.price.toStringAsFixed(0)}',
-                          style: const TextStyle(
-                            color: Color(0xFFCEB838),
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
+              
                     Text(
                       listing.title,
                       maxLines: 1,
@@ -970,7 +1089,96 @@ class _AdCard extends StatelessWidget {
                           ),
                         ),
                       ],
-                    )
+                    ),
+                    // Rating, Verified, Shipments row (only show if not own listing)
+                    if (!_isOwnListing && (_isLoadingShipper || _shipperData != null))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Row(
+                          children: [
+                            // Rating
+                            Icon(Icons.star, size: 14, color: const Color(0xFFFDD610)),
+                            const SizedBox(width: 2),
+                            Text(
+                              _shipperData?.rating != null
+                                  ? '${_shipperData!.rating!.toStringAsFixed(1)}'
+                                  : 'N/A',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: _shipperData?.rating != null ? Colors.black87 : Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Verified Badge
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: _shipperData?.isVerified == true
+                                    ? const Color(0xFF81AB3A)
+                                    : Colors.grey.shade400,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                size: 7,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              _shipperData?.isVerified == true ? 'Verified' : '',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: _shipperData?.isVerified == true ? Colors.black87 : Colors.grey,
+                              ),
+                            ),
+                            const Spacer(),
+                            // Shipments
+                            Icon(Icons.local_shipping, size: 12, color: Colors.black87),
+                            const SizedBox(width: 2),
+                            _isLoadingShipper
+                                ? const SizedBox(
+                                    width: 10,
+                                    height: 10,
+                                    child: CircularProgressIndicator(strokeWidth: 1.5),
+                                  )
+                                : Text(
+                                    '${_completedShipments ?? _shipperData?.totalShipments ?? 0}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                            const SizedBox(width: 6),
+                            // Comment/Review icon
+                            GestureDetector(
+                              onTap: () {
+                                _navigateToChat(context);
+                              },
+                              child: Icon(
+                                Icons.chat_bubble_outline,
+                                size: 14,
+                                color: Colors.black54,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            // Flag/Report icon
+                            GestureDetector(
+                              onTap: () {
+                                _showReportDialog(context);
+                              },
+                              child: Icon(
+                                Icons.flag_outlined,
+                                size: 14,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -978,6 +1186,238 @@ class _AdCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  Future<void> _navigateToChat(BuildContext context) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+    
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to chat'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+   
+
+    try {
+      // Create or get conversation for this listing
+      final conversationId = await FirebaseService.createOrGetConversation(
+        senderId: user.uid,
+        receiverId: widget.listing.shipperUid,
+        listingId: widget.listing.id,
+        listingTitle: widget.listing.title,
+        listingImageUrl: widget.listing.imageUrls.isNotEmpty 
+            ? widget.listing.imageUrls.first 
+            : null,
+      );
+
+    
+
+      // Navigate to chat screen
+      if (context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversationId,
+              otherUserId: widget.listing.shipperUid,
+              otherUserName: widget.listing.shipperName,
+              listingTitle: widget.listing.title,
+              listingImageUrl: widget.listing.imageUrls.isNotEmpty 
+                  ? widget.listing.imageUrls.first 
+                  : null,
+              listingId: widget.listing.id,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if still open
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open chat: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showReportDialog(BuildContext context) {
+    final reasonController = TextEditingController();
+    bool isSubmitting = false;
+    
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text(
+                'Report Listing',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF186230),
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Listing: ${widget.listing.title}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF666666),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Seller: ${widget.listing.shipperName}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF666666),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Reason for reporting:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF186230),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: reasonController,
+                      decoration: const InputDecoration(
+                        hintText: 'Please describe the issue...',
+                        border: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF43975A)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF43975A), width: 2),
+                        ),
+                      ),
+                      maxLines: 4,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSubmitting
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isSubmitting ? null : () async {
+                    if (reasonController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please provide a reason for reporting'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                      return;
+                    }
+
+                    setDialogState(() {
+                      isSubmitting = true;
+                    });
+
+                    // Submit report to Firebase
+                    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                    final reporter = authProvider.currentUser;
+                    
+                    if (reporter == null) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('You must be logged in to submit a report'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                      setDialogState(() {
+                        isSubmitting = false;
+                      });
+                      return;
+                    }
+
+                    final success = await FirebaseService.submitReport(
+                      reporterId: reporter.uid,
+                      reportedUserId: widget.listing.shipperUid,
+                      reportedUserName: widget.listing.shipperName,
+                      reason: reasonController.text.trim(),
+                      listingId: widget.listing.id,
+                    );
+
+                    if (context.mounted) {
+                      Navigator.of(dialogContext).pop();
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            success
+                                ? 'Report submitted successfully. Thank you for your feedback.'
+                                : 'Failed to submit report. Please try again.',
+                          ),
+                          backgroundColor: success ? const Color(0xFF4B744F) : Colors.red,
+                          duration: const Duration(seconds: 3),
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF186230),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: isSubmitting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Submit Report',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -990,7 +1430,7 @@ class _SkeletonAdCard extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 2),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(23),
+        borderRadius: BorderRadius.circular(12), // Decreased from 23 to 12 for less roundness
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF6CA78A).withOpacity(0.20),
@@ -1001,7 +1441,7 @@ class _SkeletonAdCard extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(23),
+        borderRadius: BorderRadius.circular(12), // Decreased from 23 to 12
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

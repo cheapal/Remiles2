@@ -6,8 +6,26 @@ import '../../../models/product_listing.dart';
 import '../../../providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 
+// Helper class to represent images (either existing URL or new file)
+class _ImageItem {
+  final String? url;
+  final File? file;
+  final bool isExisting;
+  
+  _ImageItem({
+    this.url,
+    this.file,
+    required this.isExisting,
+  }) : assert(
+    (url != null && file == null) || (url == null && file != null),
+    'Either url or file must be provided, but not both',
+  );
+}
+
 class ShipperCreateListing extends StatefulWidget {
-  const ShipperCreateListing({super.key});
+  final ProductListing? listingToEdit;
+  
+  const ShipperCreateListing({super.key, this.listingToEdit});
 
   @override
   State<ShipperCreateListing> createState() => _ShipperCreateListingState();
@@ -28,6 +46,10 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
   final ImagePicker _picker = ImagePicker();
   List<File> _selectedImages = [];
   File? _selectedVideo;
+  
+  // Existing image/video URLs (from listing being edited)
+  List<String> _existingImageUrls = [];
+  String? _existingVideoUrl;
 
   // Location picker
   String? _selectedLocation;
@@ -51,6 +73,27 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
     "Used - Fair",
     "Refurbished",
   ];
+
+  bool get _isEditing => widget.listingToEdit != null;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing && widget.listingToEdit != null) {
+      _prefillForm(widget.listingToEdit!);
+    }
+  }
+
+  void _prefillForm(ProductListing listing) {
+    _titleController.text = listing.title;
+    _descriptionController.text = listing.description;
+    _priceController.text = listing.price.toStringAsFixed(0);
+    _selectedLocation = listing.location;
+    _locationController.text = listing.location;
+    selectedCondition = listing.condition;
+    _existingImageUrls = List<String>.from(listing.imageUrls);
+    _existingVideoUrl = listing.videoUrl;
+  }
 
   @override
   void dispose() {
@@ -96,9 +139,9 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                 // Header with close button
                 Row(
                   children: [
-                    const Text(
-                      'Create Listing',
-                      style: TextStyle(
+                    Text(
+                      _isEditing ? 'Edit Listing' : 'Create Listing',
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
@@ -117,26 +160,59 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                 ),
                 const SizedBox(height: 16),
                 
-                // Row for photos & video
+                // Images section
+                if (_existingImageUrls.isNotEmpty || _selectedImages.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Product Photos',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildImagesGrid(),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                
+                // Upload photo button
+                if (_existingImageUrls.length + _selectedImages.length < 10)
+                  OutlinedButton.icon(
+                    onPressed: _pickImages,
+                    icon: const Icon(Icons.add_photo_alternate),
+                    label: const Text('Add More Photos'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      side: BorderSide(color: Colors.green.shade700),
+                    ),
+                  ),
+                
+                const SizedBox(height: 16),
+                
+                // Video section
                 Row(
                   children: [
-                    Expanded(
-                      child: _uploadCard(
-                        Icons.camera_alt, 
-                        "Product Photos",
-                        onTap: _pickImages,
-                        count: _selectedImages.length,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
                     Expanded(
                       child: _uploadCard(
                         Icons.videocam, 
                         "Product Video",
                         onTap: _pickVideo,
-                        hasVideo: _selectedVideo != null,
+                        hasVideo: _selectedVideo != null || _existingVideoUrl != null,
                       ),
                     ),
+                    if (_existingVideoUrl != null || _selectedVideo != null) ...[
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildVideoPreview(),
+                      ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -286,7 +362,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Publish button
+                    // Publish/Update button
                     Expanded(
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
@@ -306,9 +382,9 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text(
-                                "Publish",
-                                style: TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
+                            : Text(
+                                _isEditing ? "Update" : "Publish",
+                                style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
                               ),
                       ),
                     ),
@@ -467,8 +543,8 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       return;
     }
 
-    // Validate images
-    if (_selectedImages.isEmpty) {
+    // Validate images (must have images or existing images when editing)
+    if (_selectedImages.isEmpty && _existingImageUrls.isEmpty) {
       _showErrorSnackBar('Please select at least one product photo');
       return;
     }
@@ -501,32 +577,62 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       final user = authProvider.currentUser;
       
       if (user == null) {
-        _showErrorSnackBar('Please log in to create a listing');
+        _showErrorSnackBar('Please log in to ${_isEditing ? 'update' : 'create'} a listing');
         return;
       }
 
-      // Create listing ID
-      final listingId = DateTime.now().millisecondsSinceEpoch.toString();
+      // Use existing listing ID if editing, otherwise create new one
+      final listingId = _isEditing ? widget.listingToEdit!.id : DateTime.now().millisecondsSinceEpoch.toString();
       
-      // Upload images with progress indication
-      List<String> imageUrls = [];
-      try {
-        imageUrls = await FirebaseService.uploadProductImages(
-          user.uid,
-          listingId,
-          _selectedImages,
-        );
-        if (imageUrls.isEmpty) {
-          _showErrorSnackBar('Failed to upload images. Please try again.');
+      // If editing, find and delete removed images
+      if (_isEditing && widget.listingToEdit != null) {
+        final originalImageUrls = widget.listingToEdit!.imageUrls;
+        final removedImageUrls = originalImageUrls.where((url) => !_existingImageUrls.contains(url)).toList();
+        
+        // Delete removed images from Storage
+        if (removedImageUrls.isNotEmpty) {
+          try {
+            await _deleteOldImages(removedImageUrls);
+          } catch (e) {
+            print('Warning: Failed to delete removed images: $e');
+            // Continue anyway
+          }
+        }
+      }
+      
+      // Upload new images if any selected
+      List<String> imageUrls = List<String>.from(_existingImageUrls);
+      if (_selectedImages.isNotEmpty) {
+        try {
+          final newImageUrls = await FirebaseService.uploadProductImages(
+            user.uid,
+            listingId,
+            _selectedImages,
+          );
+          if (newImageUrls.isNotEmpty) {
+            // Combine existing (kept) images with new uploaded images
+            imageUrls = [..._existingImageUrls, ...newImageUrls];
+          } else if (!_isEditing) {
+            _showErrorSnackBar('Failed to upload images. Please try again.');
+            return;
+          }
+        } catch (e) {
+          _showErrorSnackBar('Failed to upload images: ${e.toString()}');
           return;
         }
-      } catch (e) {
-        _showErrorSnackBar('Failed to upload images: ${e.toString()}');
-        return;
       }
 
-      // Upload video if selected
-      String? videoUrl;
+      // If editing and new video selected, delete old video
+      if (_isEditing && _selectedVideo != null && _existingVideoUrl != null) {
+        try {
+          await _deleteOldVideo(_existingVideoUrl!);
+        } catch (e) {
+          print('Warning: Failed to delete old video: $e');
+        }
+      }
+
+      // Upload new video if selected
+      String? videoUrl = _existingVideoUrl;
       if (_selectedVideo != null) {
         try {
           videoUrl = await FirebaseService.uploadProductVideo(
@@ -540,7 +646,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
         }
       }
 
-      // Create product listing
+      // Create or update product listing
       final listing = ProductListing(
         id: listingId,
         shipperUid: user.uid,
@@ -552,18 +658,21 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
         location: _selectedLocation ?? _locationController.text.trim(),
         imageUrls: imageUrls,
         videoUrl: videoUrl,
-        createdAt: DateTime.now(),
+        createdAt: _isEditing ? widget.listingToEdit!.createdAt : DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
       // Save to Firebase
-      await FirebaseService.createProductListing(listing);
-
-      // Show success message
-      _showSuccessSnackBar('Listing published successfully!');
+      if (_isEditing) {
+        await FirebaseService.updateProductListing(listingId, listing);
+        _showSuccessSnackBar('Listing updated successfully!');
+      } else {
+        await FirebaseService.createProductListing(listing);
+        _showSuccessSnackBar('Listing published successfully!');
+      }
       
       // Close dialog
-      Navigator.pop(context);
+      Navigator.pop(context, true); // Return true to indicate success
       
     } catch (e) {
       String errorMessage = 'Failed to publish listing';
@@ -600,8 +709,232 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
     );
   }
 
+  // Build images grid widget
+  Widget _buildImagesGrid() {
+    final allImages = <_ImageItem>[];
+    
+    // Add existing images
+    for (var url in _existingImageUrls) {
+      allImages.add(_ImageItem(url: url, isExisting: true));
+    }
+    
+    // Add new selected images
+    for (var file in _selectedImages) {
+      allImages.add(_ImageItem(file: file, isExisting: false));
+    }
+    
+    if (allImages.isEmpty) {
+      return Container(
+        height: 100,
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: Text(
+            'No images selected',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ),
+      );
+    }
+    
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 1,
+      ),
+      itemCount: allImages.length,
+      itemBuilder: (context, index) {
+        final item = allImages[index];
+        return _buildImageItem(item, index);
+      },
+    );
+  }
+  
+  Widget _buildImageItem(_ImageItem item, int index) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: item.isExisting
+              ? Image.network(
+                  item.url!,
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey.shade200,
+                      child: const Icon(Icons.broken_image, color: Colors.grey),
+                    );
+                  },
+                )
+              : Image.file(
+                  item.file!,
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                ),
+        ),
+        Positioned(
+          top: 4,
+          right: 4,
+          child: GestureDetector(
+            onTap: () => _removeImage(index, item.isExisting),
+            child: Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: const Icon(
+                Icons.close,
+                color: Colors.white,
+                size: 16,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  // Remove image (either existing or new)
+  void _removeImage(int gridIndex, bool isExisting) {
+    setState(() {
+      if (isExisting) {
+        // This is an existing image - find its index in _existingImageUrls
+        // Grid index matches existing image index directly since existing images come first
+        if (gridIndex < _existingImageUrls.length) {
+          _existingImageUrls.removeAt(gridIndex);
+        }
+      } else {
+        // This is a new image - find its index in _selectedImages
+        int newIndex = gridIndex - _existingImageUrls.length;
+        if (newIndex >= 0 && newIndex < _selectedImages.length) {
+          _selectedImages.removeAt(newIndex);
+        }
+      }
+    });
+  }
+  
+  Widget _buildVideoPreview() {
+    String? videoPath;
+    bool isExisting = false;
+    
+    if (_selectedVideo != null) {
+      videoPath = _selectedVideo!.path;
+    } else if (_existingVideoUrl != null) {
+      videoPath = _existingVideoUrl;
+      isExisting = true;
+    }
+    
+    if (videoPath == null) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.green.shade700),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: double.infinity,
+              height: 80,
+              color: Colors.black,
+              child: const Center(
+                child: Icon(
+                  Icons.play_circle_filled,
+                  color: Colors.white,
+                  size: 40,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isExisting) {
+                    _existingVideoUrl = null;
+                  } else {
+                    _selectedVideo = null;
+                  }
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.close,
+                  color: Colors.white,
+                  size: 16,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Delete old images from Storage
+  Future<void> _deleteOldImages(List<String> imageUrls) async {
+    for (final imageUrl in imageUrls) {
+      try {
+        await FirebaseService.deleteFileFromURL(imageUrl);
+      } catch (e) {
+        print('Failed to delete image: $imageUrl - $e');
+        // Continue deleting other images even if one fails
+      }
+    }
+  }
+
+  // Delete old video from Storage
+  Future<void> _deleteOldVideo(String videoUrl) async {
+    try {
+      await FirebaseService.deleteFileFromURL(videoUrl);
+    } catch (e) {
+      print('Failed to delete video: $videoUrl - $e');
+    }
+  }
+
+
   // Check if there are any unsaved changes
   bool _hasUnsavedChanges() {
+    if (_isEditing && widget.listingToEdit != null) {
+      final listing = widget.listingToEdit!;
+      return _titleController.text.trim() != listing.title ||
+             _descriptionController.text.trim() != listing.description ||
+             _priceController.text.trim() != listing.price.toStringAsFixed(0) ||
+             _selectedLocation != listing.location ||
+             selectedCondition != listing.condition ||
+             _selectedImages.isNotEmpty ||
+             (_selectedVideo != null && _existingVideoUrl != listing.videoUrl);
+    }
+    
     return _titleController.text.isNotEmpty ||
            _descriptionController.text.isNotEmpty ||
            _priceController.text.isNotEmpty ||

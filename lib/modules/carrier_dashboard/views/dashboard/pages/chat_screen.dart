@@ -845,21 +845,13 @@ class _ChatScreenState extends State<ChatScreen> {
             onPressed: () => _showReportDialog(),
             tooltip: 'Report',
           ),
-          if (widget.listingImageUrl != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: CircleAvatar(
-                radius: 20,
-                backgroundImage: NetworkImage(widget.listingImageUrl!),
-                backgroundColor: Colors.grey.shade300,
-              ),
-            ),
+      
              GestureDetector(
                 onTap: _showProfileDialog,
                 child: Padding(
                   padding: const EdgeInsets.only(left: 4.0,right: 14),
                   child: CircleAvatar(
-                    radius: 16,
+                    radius: 20,
                     backgroundColor: Colors.white.withOpacity(0.2),
                     backgroundImage: _otherUserProfileImage != null
                         ? NetworkImage(_otherUserProfileImage!)

@@ -5,9 +5,10 @@ import '../../../providers/auth_provider.dart';
 import '../../../providers/app_state_provider.dart';
 import '../../../core/auth_wrapper.dart';
 import '../../../models/user_model.dart';
-import '../../carrier_dashboard/views/dashboard/pages/main_page.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import '../../carrier_onboarding/carrier_onboarding_wrapper.dart';
+import 'forgot_password_screen.dart';
+import 'google_role_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -69,6 +70,60 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       print('Login failed: ${authProvider.errorMessage}');
       appStateProvider.showError(authProvider.errorMessage ?? 'Login failed');
+    }
+  }
+
+  // Handle Google Sign-In
+  Future<void> _handleGoogleSignIn() async {
+    final authProvider = context.read<AuthProvider>();
+    final appStateProvider = context.read<AppStateProvider>();
+
+    appStateProvider.showLoadingWithMessage('Signing in with Google...');
+
+    final success = await authProvider.signInWithGoogle();
+
+    appStateProvider.clearLoading();
+
+    if (success) {
+      appStateProvider.showSuccess();
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google Sign-In successful! Redirecting...'),
+          backgroundColor: Color(0xFF4B744F),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      
+      print('Google Sign-In successful, navigating based on user role');
+      
+      // Add a small delay to ensure user data is fully loaded
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Direct navigation as fallback if AuthWrapper doesn't trigger
+      if (context.mounted) {
+        _navigateBasedOnRole(context, authProvider);
+      }
+    } else {
+      // Check if this is a new user who needs to select a role
+      if (authProvider.firebaseUser != null && authProvider.currentUser == null) {
+        // New user - navigate to role selection
+        print('Google Sign-In: New user, navigating to role selection');
+        if (context.mounted) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const GoogleRoleSelectionScreen(),
+            ),
+          );
+        }
+      } else {
+        // Actual error occurred
+        print('Google Sign-In failed: ${authProvider.errorMessage}');
+        if (authProvider.errorMessage != null && authProvider.errorMessage!.isNotEmpty) {
+          appStateProvider.showError(authProvider.errorMessage!);
+        }
+      }
+      // Note: User cancellation doesn't show an error
     }
   }
 
@@ -312,11 +367,20 @@ class _LoginScreenState extends State<LoginScreen> {
                                       ),
                                     ],
                                   ),
-                                  Text(
+                                  GestureDetector(
+                                    onTap: () {
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => const ForgotPasswordScreen(),
+                                        ),
+                                      );
+                                    },
+                                    child: Text(
                                     "Forgot Password?",
                                     style: TextStyle(
                                       fontSize: 11 * scale,
                                       color: const Color(0x40000000),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -405,7 +469,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 ElevatedButton.icon(
-                                  onPressed: () {},
+                                  onPressed: authProvider.isLoading ? null : _handleGoogleSignIn,
                                   icon: Image.asset('assets/google.png', width: 24 * scale, height: 24 * scale),
                                   label: Text(
                                     "Sign In with Google",

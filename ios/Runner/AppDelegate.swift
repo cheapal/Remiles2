@@ -12,4 +12,13 @@ import Firebase
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
+  
+  // Handle URL callbacks for Google Sign-In
+  @objc override func application(
+    _ application: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey: Any] = [:]
+  ) -> Bool {
+    return super.application(application, open: url, options: options)
+  }
 }

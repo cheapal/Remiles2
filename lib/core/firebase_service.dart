@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'app_config.dart';
 import 'dart:io';
 import '../models/user_model.dart';
@@ -341,6 +342,65 @@ class FirebaseService {
         'error': e.toString(),
       }));
       await recordError(e, StackTrace.current, reason: 'Sign out failed');
+      rethrow;
+    }
+  }
+
+  // Sign in with Google
+  static Future<UserCredential?> signInWithGoogle() async {
+    try {
+      // Web client ID from google-services.json (client_type: 3)
+      // This is required for Google Sign-In to work properly on Android
+      // On iOS, this is also needed to get the idToken for Firebase Auth
+      const String serverClientId = '60865903848-qufrm62v42k4kuh30jr022dr2mjcim5i.apps.googleusercontent.com';
+      
+      // Create GoogleSignIn instance with serverClientId
+      // serverClientId is the web client ID required for Firebase Auth on both platforms
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+        serverClientId: serverClientId,
+      );
+
+      // Trigger the authentication flow
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        // User canceled the sign-in
+        return null;
+      }
+
+      // Obtain the auth details from the request
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+
+      // Check if idToken is available (required for Firebase Auth)
+      if (googleAuth.idToken == null) {
+        throw Exception('Failed to obtain Google ID token');
+      }
+
+      // Create a new credential
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in to Firebase with the Google credential
+      final userCredential = await _auth.signInWithCredential(credential);
+
+      // Log successful sign in
+      await logEvent('login', parameters: _convertParameters({
+        'method': 'google',
+        'success': 'true',
+      }));
+
+      return userCredential;
+    } catch (e) {
+      // Log failed sign in
+      await logEvent('login', parameters: _convertParameters({
+        'method': 'google',
+        'success': 'false',
+        'error': e.toString(),
+      }));
+      await recordError(e, StackTrace.current, reason: 'Google sign in failed');
       rethrow;
     }
   }
@@ -901,6 +961,64 @@ class FirebaseService {
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to upload image');
       return null;
+    }
+  }
+
+  // Upload carrier profile image to Firebase Storage
+  static Future<String?> uploadCarrierProfileImage(
+    String carrierUid,
+    File imageFile,
+  ) async {
+    try {
+      final ref = _storage.ref().child('carriers/$carrierUid/profile/profile_image.jpg');
+      final uploadTask = ref.putFile(imageFile);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload carrier profile image');
+      return null;
+    }
+  }
+
+  // Update user password
+  static Future<void> updatePassword(String newPassword) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null) {
+        await user.updatePassword(newPassword);
+        await logEvent('password_update', parameters: _convertParameters({
+          'success': 'true',
+        }));
+      } else {
+        throw Exception('User not authenticated');
+      }
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to update password');
+      await logEvent('password_update', parameters: _convertParameters({
+        'success': 'false',
+        'error': e.toString(),
+      }));
+      rethrow;
+    }
+  }
+
+  // Reauthenticate user (required before password change)
+  static Future<void> reauthenticateUser(String email, String password) async {
+    try {
+      final user = _auth.currentUser;
+      if (user != null && user.email != null) {
+        final credential = EmailAuthProvider.credential(
+          email: email,
+          password: password,
+        );
+        await user.reauthenticateWithCredential(credential);
+      } else {
+        throw Exception('User not authenticated');
+      }
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to reauthenticate user');
+      rethrow;
     }
   }
 

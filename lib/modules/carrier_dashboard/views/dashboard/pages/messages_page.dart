@@ -32,6 +32,7 @@ class _MessagesPageState extends State<MessagesPage> {
   Map<String, String> _userNameCache = {}; // Cache user names
   Map<String, double?> _loadPriceCache = {}; // Cache load prices
   bool _isLoading = false;
+  bool _hasLoadedInitial = false; // Track if initial load has been attempted
   ConversationFilter _selectedFilter = ConversationFilter.all;
   String _searchQuery = '';
   static const int _itemsPerPage = 20;
@@ -44,6 +45,10 @@ class _MessagesPageState extends State<MessagesPage> {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     _scrollController.addListener(_onScroll);
+    // Load conversations on init instead of in build method
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadConversations();
+    });
   }
 
   @override
@@ -69,6 +74,11 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Future<void> _loadConversations({bool refresh = false}) async {
+    // Prevent multiple simultaneous loads
+    if (_isLoading && !refresh) {
+      return;
+    }
+
     if (refresh) {
       setState(() {
         _currentPage = 0;
@@ -88,32 +98,35 @@ class _MessagesPageState extends State<MessagesPage> {
       final user = authProvider.currentUser;
       
       if (user == null) {
+        setState(() {
+          _allConversations = [];
+          _isLoading = false;
+          _hasLoadedInitial = true; // Mark as loaded even if no user
+        });
+        return;
+      }
+
+      final conversations = await FirebaseService.getUserConversations(user.uid);
+      
+      // Load offers and preload user names and load prices in parallel
+      await Future.wait([
+        _loadOffersForConversations(conversations),
+        _preloadUserNames(conversations, user.uid),
+        _preloadLoadPrices(conversations),
+      ]);
+
       setState(() {
-        _allConversations = [];
+        _allConversations = conversations;
         _isLoading = false;
+        _hasLoadedInitial = true; // Mark that initial load is complete
       });
-      return;
-    }
-
-    final conversations = await FirebaseService.getUserConversations(user.uid);
-    
-    // Load offers and preload user names and load prices in parallel
-    await Future.wait([
-      _loadOffersForConversations(conversations),
-      _preloadUserNames(conversations, user.uid),
-      _preloadLoadPrices(conversations),
-    ]);
-
-    setState(() {
-      _allConversations = conversations;
-      _isLoading = false;
-    });
 
       _applyFilters();
     } catch (e) {
       print('Error loading conversations: $e');
       setState(() {
         _isLoading = false;
+        _hasLoadedInitial = true; // Mark as loaded even on error to prevent loops
       });
     }
   }
@@ -369,7 +382,8 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Widget _buildConversationsList() {
-    if (_isLoading && _allConversations.isEmpty) {
+    // Show loading only if we're loading and haven't loaded initial data yet
+    if (_isLoading && !_hasLoadedInitial) {
       return const Center(
         child: CircularProgressIndicator(),
       );
@@ -393,9 +407,9 @@ class _MessagesPageState extends State<MessagesPage> {
       );
     }
 
-    // Load conversations if not loaded yet
-    if (_allConversations.isEmpty && !_isLoading) {
-      _loadConversations();
+    // Don't load conversations in build method - it's already loaded in initState
+    // Only show loading if initial load hasn't completed yet
+    if (!_hasLoadedInitial) {
       return const Center(
         child: CircularProgressIndicator(),
       );

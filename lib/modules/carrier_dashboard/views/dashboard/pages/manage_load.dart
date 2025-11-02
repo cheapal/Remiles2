@@ -427,7 +427,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
               style: TextStyle(
                 color: isActive ? Colors.white : Colors.black,
                 fontWeight: FontWeight.bold,
-                fontSize: 13,
+                fontSize: 11.5,
               ),
             ),
           ),

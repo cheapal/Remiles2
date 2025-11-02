@@ -51,5 +51,18 @@
     <string>This app needs access to camera to take photos for document upload.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app needs access to photo library to select images for document upload.</string>
+    
+    <!-- Google Sign-In URL Scheme -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeRole</key>
+            <string>Editor</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>com.googleusercontent.apps.60865903848-1b2qqj7b6cn681ng7f1li77jfmn3gk3a</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>

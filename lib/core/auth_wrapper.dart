@@ -48,7 +48,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
     
     final userProvider = context.read<UserProvider>();
 
-    if (_authProvider.isLoggedIn && _authProvider.firebaseUser != null) {
+    // Check for Firebase user (even if Firestore data doesn't exist yet - e.g., new Google Sign-In users)
+    if (_authProvider.firebaseUser != null) {
       // User is logged in via Firebase Auth, now fetch their app-specific data
       print('AuthWrapper: currentUser is ${_authProvider.currentUser?.role}');
       if (_authProvider.currentUser == null) {
@@ -62,14 +63,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
             print('AuthWrapper: User data loaded successfully: ${userProvider.currentUser?.role}');
             _authProvider.setUserData(_authProvider.firebaseUser, userProvider.currentUser);
           } else {
-            print('AuthWrapper: No user data found in UserProvider');
+            print('AuthWrapper: No user data found in UserProvider - this might be a new user');
+            // Don't sign out - this could be a new Google Sign-In user who needs role selection
+            // Keep the Firebase user authenticated
           }
         } catch (e) {
           print('AuthWrapper: Error fetching user data: $e');
           debugPrint('Error fetching user data in AuthWrapper: $e');
-          _authProvider.signOut(); // Force sign out if user data cannot be fetched
-          return;
+          // Don't sign out automatically - user might be in the role selection flow
+          // Only sign out if it's a critical error
         }
+      } else {
+        // Firebase user exists but no Firestore data - could be new user
+        print('AuthWrapper: Firebase user exists but no Firestore data - likely new user');
+        // Don't navigate away - let the current flow (e.g., role selection) continue
       }
 
       // Navigate based on role

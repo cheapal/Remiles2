@@ -5,6 +5,8 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_boost_my_page.da
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_my_preference.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_payment_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_document_management.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_account_details_page.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_settings_page.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/app_state_provider.dart';
@@ -194,7 +196,12 @@ class _ShipperProfileState extends State<ShipperProfile>
 
                     // Profile Options
                     _buildProfileOption('Account Details', Icons.account_circle, () {
-                      // Navigate to Account Details page
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ShipperAccountDetailsPage(),
+                        ),
+                      );
                     }),
                     const SizedBox(height: 16),
                     _buildProfileOption('Payment Method', Icons.credit_card, () {
@@ -230,7 +237,14 @@ class _ShipperProfileState extends State<ShipperProfile>
                       );
                     }),
                     const SizedBox(height: 16),
-                    _buildProfileOption('Settings', Icons.settings,(){}),
+                    _buildProfileOption('Settings', Icons.settings,(){
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ShipperSettingsPage(),
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 16),
                     _buildProfileOption('Help & Legal', Icons.help_outline,(){}),
                     const SizedBox(height: 16),

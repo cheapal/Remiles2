@@ -981,6 +981,23 @@ class FirebaseService {
     }
   }
 
+  // Upload shipper profile image to Firebase Storage
+  static Future<String?> uploadShipperProfileImage(
+    String shipperUid,
+    File imageFile,
+  ) async {
+    try {
+      final ref = _storage.ref().child('shippers/$shipperUid/profile/profile_image.jpg');
+      final uploadTask = ref.putFile(imageFile);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload shipper profile image');
+      return null;
+    }
+  }
+
   // Update user password
   static Future<void> updatePassword(String newPassword) async {
     try {

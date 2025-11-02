@@ -8,9 +8,12 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_document
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_account_details_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_settings_page.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/app_state_provider.dart';
 import '../../../core/auth_wrapper.dart';
+import '../../../core/firebase_service.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -25,13 +28,128 @@ class ShipperProfile extends StatefulWidget {
 
 class _ShipperProfileState extends State<ShipperProfile>
     with TickerProviderStateMixin {
-  int _selectedTab = 3; // Profile tab
+  int? _completedShipments;
+  bool _isLoadingStats = true;
+  final ImagePicker _picker = ImagePicker();
+  bool _isUploadingImage = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadShipperStats();
+  }
+
+  Future<void> _loadShipperStats() async {
+    final authProvider = context.read<AuthProvider>();
+    final shipper = authProvider.shipperUser;
+    
+    if (shipper != null) {
+      try {
+        final stats = await FirebaseService.getShipperLoadStats(shipper.uid);
+        if (mounted) {
+          setState(() {
+            _completedShipments = stats['completed'] ?? 0;
+            _isLoadingStats = false;
+          });
+        }
+      } catch (e) {
+        print('Error loading shipper stats: $e');
+        if (mounted) {
+          setState(() {
+            _isLoadingStats = false;
+          });
+        }
+      }
+    } else {
+      setState(() {
+        _isLoadingStats = false;
+      });
+    }
+  }
+
+  Future<void> _changeProfilePicture() async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      setState(() {
+        _isUploadingImage = true;
+      });
+
+      final authProvider = context.read<AuthProvider>();
+      final appStateProvider = context.read<AppStateProvider>();
+      final shipper = authProvider.shipperUser;
+
+      if (shipper == null) {
+        throw Exception('Shipper not found');
+      }
+
+      appStateProvider.showLoadingWithMessage('Uploading profile picture...');
+
+      // Upload image to Firebase Storage
+      final imageFile = File(image.path);
+      final imageUrl = await FirebaseService.uploadShipperProfileImage(
+        shipper.uid,
+        imageFile,
+      );
+
+      if (imageUrl == null) {
+        throw Exception('Failed to upload image');
+      }
+
+      // Update shipper profile with new image URL
+      await FirebaseService.updateShipper(shipper.uid, {
+        'profileImageUrl': imageUrl,
+      });
+
+      // Refresh user data
+      await authProvider.refreshUser();
+
+      appStateProvider.showSuccess();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture updated successfully'),
+            backgroundColor: Color(0xFF4B744F),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      final appStateProvider = context.read<AppStateProvider>();
+      appStateProvider.showError('Failed to update profile picture. Please try again.');
+      print('Error updating profile picture: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final bool isTabletOrDesktop = MediaQuery.of(context).size.width > 600;
-    const sidePadding = 470.0;
-    const topPanelColor = Color(0xFF386544);
+    final authProvider = context.watch<AuthProvider>();
+    final shipper = authProvider.shipperUser;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFEF6),
@@ -112,37 +230,101 @@ class _ShipperProfileState extends State<ShipperProfile>
                                   ),
                                 ],
                               ),
-                              child: const Center(
+                              child: Center(
                                 child: Text(
-                                  'Farm Valley Ltd.',
-                                  style: TextStyle(
+                                  shipper?.companyName ?? 'Company Name',
+                                  style: const TextStyle(
                                     fontFamily: 'Roboto',
                                     fontWeight: FontWeight.w500,
                                     fontSize: 16,
                                     color: Color(0xFF186230),
                                   ),
+                                  textAlign: TextAlign.center,
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
                                 ),
                               ),
                             ),
                           ],
                         ),
-                        Container(
-                          width: 106,
-                          height: 106,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF43975A),
-                            border: Border.all(color: Colors.white, width: 4),
-                          ),
-                          child: Center(
-                            child: Container(
-                              width: 93.26,
-                              height: 93.26,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Color(0xFFFFFEF6),
-                              ),
-                              child: const Icon(Icons.person, size: 70, color: Color(0xFF43975A)),
+                        GestureDetector(
+                          onTap: _isUploadingImage ? null : _changeProfilePicture,
+                          child: Container(
+                            width: 106,
+                            height: 106,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF43975A),
+                              border: Border.all(color: Colors.white, width: 4),
+                            ),
+                            child: Stack(
+                              children: [
+                                Center(
+                                  child: shipper?.profileImageUrl != null
+                                      ? ClipOval(
+                                          child: Image.network(
+                                            shipper!.profileImageUrl!,
+                                            width: 98,
+                                            height: 98,
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (context, error, stackTrace) {
+                                              return Container(
+                                                width: 98,
+                                                height: 98,
+                                                decoration: const BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: Color(0xFFFFFEF6),
+                                                ),
+                                                child: const Icon(Icons.person, size: 70, color: Color(0xFF43975A)),
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      : Container(
+                                          width: 98,
+                                          height: 98,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Color(0xFFFFFEF6),
+                                          ),
+                                          child: const Icon(Icons.person, size: 70, color: Color(0xFF43975A)),
+                                        ),
+                                ),
+                                if (_isUploadingImage)
+                                  Container(
+                                    width: 106,
+                                    height: 106,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.black.withOpacity(0.5),
+                                    ),
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (!_isUploadingImage)
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Container(
+                                      width: 28,
+                                      height: 28,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: const Color(0xFF43975A),
+                                        border: Border.all(color: Colors.white, width: 2),
+                                      ),
+                                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
@@ -150,58 +332,93 @@ class _ShipperProfileState extends State<ShipperProfile>
                     ),
                     const SizedBox(height: 20),
                     // Ratings and Shipments
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.star, color: Color(0xFFFDD610)),
-                        const SizedBox(width: 5),
-                        const Text(
-                          '4.8 Ratings',
-                          style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500),
+                    if (shipper != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Star Rating - always show
+                            const Icon(Icons.star, color: Color(0xFFFDD610), size: 16),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                shipper.rating != null
+                                    ? '${shipper.rating!.toStringAsFixed(1)}'
+                                    : 'N/A',
+                                style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: shipper.rating != null ? Colors.black87 : Colors.grey),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Verified Badge - always show
+                            Container(
+                              width: 14,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: shipper.isVerified
+                                    ? const Color(0xFF81AB3A)
+                                    : Colors.grey.shade400,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                              child: const Icon(
+                                Icons.check,
+                                size: 9,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                shipper.isVerified ? 'Verified' : 'Unverified',
+                                style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: shipper.isVerified ? Colors.black87 : Colors.grey),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            // Shipments
+                            Icon(Icons.local_shipping, size: 16, color: Colors.black87),
+                            const SizedBox(width: 4),
+                            _isLoadingStats
+                                ? const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Flexible(
+                                    child: Text(
+                                      '${_completedShipments ?? shipper.totalShipments}',
+                                      style: const TextStyle(
+                                          fontFamily: 'Roboto',
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Container(
-                          width: 16,
-                          height: 15,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF81AB3A),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          child: const Icon(Icons.check, size: 10, color: Colors.white),
-                        ),
-                        const SizedBox(width: 5),
-                        const Text(
-                          'Verified',
-                          style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500),
-                        ),
-                        const SizedBox(width: 10),
-                        _buildShipmentIcon(),
-                        const SizedBox(width: 5),
-                        const Text(
-                          '24 Shipments',
-                          style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
+                      ),
                     const SizedBox(height: 20),
 
                     // Profile Options
-                    _buildProfileOption('Account Details', Icons.account_circle, () {
-                      Navigator.push(
+                    _buildProfileOption('Account Details', Icons.account_circle, () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder: (context) => const ShipperAccountDetailsPage(),
                         ),
                       );
+                      // Refresh stats when returning from Account Details
+                      _loadShipperStats();
                     }),
                     const SizedBox(height: 16),
                     _buildProfileOption('Payment Method', Icons.credit_card, () {

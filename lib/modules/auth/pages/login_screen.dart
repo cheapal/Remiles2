@@ -4,9 +4,12 @@ import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/app_state_provider.dart';
 import '../../../core/auth_wrapper.dart';
+import '../../../core/firebase_service.dart';
 import '../../../models/user_model.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import '../../shipper_dashboard/pages/shipper_dashboard_1.dart';
 import '../../carrier_onboarding/carrier_onboarding_wrapper.dart';
+import '../../shipper_onboarding/shipper_onboarding_wrapper.dart';
 import 'forgot_password_screen.dart';
 import 'google_role_selection_screen.dart';
 
@@ -65,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // Direct navigation as fallback if AuthWrapper doesn't trigger
       if (context.mounted) {
-        _navigateBasedOnRole(context, authProvider);
+        await _navigateBasedOnRole(context, authProvider);
       }
     } else {
       print('Login failed: ${authProvider.errorMessage}');
@@ -102,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
       
       // Direct navigation as fallback if AuthWrapper doesn't trigger
       if (context.mounted) {
-        _navigateBasedOnRole(context, authProvider);
+        await _navigateBasedOnRole(context, authProvider);
       }
     } else {
       // Check if this is a new user who needs to select a role
@@ -128,29 +131,69 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // Navigate based on user role
-  void _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) {
+  Future<void> _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) async {
     final userRole = authProvider.currentUser?.role;
     print('Login: Navigating based on role: $userRole');
     
     if (userRole == UserRole.shipper) {
-      print('Login: Navigating to Shipper Dashboard');
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
-        (route) => false,
-      );
+      final shipper = authProvider.shipperUser;
+      if (shipper != null && shipper.isOnboardingComplete == false) {
+        print('Login: Navigating to Shipper Onboarding');
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ShipperOnboardingWrapper()),
+            (route) => false,
+          );
+        }
+      } else if (shipper != null) {
+        // Check if dashboard steps are completed
+        print('Login: Checking if dashboard steps are completed...');
+        final isDashboardComplete = await FirebaseService.isShipperDashboardComplete(shipper.uid);
+        print('Login: Dashboard complete: $isDashboardComplete');
+        
+        if (!isDashboardComplete) {
+          print('Login: Navigating to Shipper Dashboard 1');
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ShipperDashboard1()),
+              (route) => false,
+            );
+          }
+        } else {
+          print('Login: Navigating to Shipper Dashboard Main Page');
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+              (route) => false,
+            );
+          }
+        }
+      } else {
+        print('Login: No shipper data, navigating to AuthWrapper');
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthWrapper()),
+            (route) => false,
+          );
+        }
+      }
     } else if (userRole == UserRole.carrier) {
       print('Login: Navigating to Carrier Onboarding Wrapper');
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-        (route) => false,
-      );
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
+          (route) => false,
+        );
+      }
     } else {
       print('Login: Role not determined, navigating to AuthWrapper');
       // If role is not determined, navigate to AuthWrapper
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AuthWrapper()),
-        (route) => false,
-      );
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthWrapper()),
+          (route) => false,
+        );
+      }
     }
   }
 

@@ -8,6 +8,7 @@ import '../../../core/firebase_service.dart';
 import '../../carrier_onboarding/carrier_onboarding_wrapper.dart';
 import '../../shipper_onboarding/shipper_onboarding_wrapper.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import '../../shipper_dashboard/pages/shipper_dashboard_1.dart';
 
 /// Role selection screen specifically for Google Sign-In flow
 /// User is already authenticated via Google, we just need to create their account in Firestore
@@ -75,7 +76,7 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
         await Future.delayed(const Duration(milliseconds: 500));
         
         if (context.mounted) {
-          _navigateBasedOnRole(context, authProvider);
+          await _navigateBasedOnRole(context, authProvider);
         }
       } else {
         final errorMsg = authProvider.errorMessage ?? 'Failed to create account';
@@ -105,7 +106,7 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
     }
   }
 
-  void _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) {
+  Future<void> _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) async {
     final userRole = authProvider.currentUser?.role;
     print('Google Role Selection: Navigating based on role: $userRole');
     
@@ -113,23 +114,44 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
       final shipper = authProvider.shipperUser;
       if (shipper != null && !shipper.isOnboardingComplete) {
         print('Google Role Selection: Navigating to Shipper Onboarding');
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const ShipperOnboardingWrapper()),
-          (route) => false,
-        );
-      } else {
-        print('Google Role Selection: Navigating to Shipper Dashboard');
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
-          (route) => false,
-        );
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ShipperOnboardingWrapper()),
+            (route) => false,
+          );
+        }
+      } else if (shipper != null) {
+        // Check if dashboard steps are completed
+        print('Google Role Selection: Checking if dashboard steps are completed...');
+        final isDashboardComplete = await FirebaseService.isShipperDashboardComplete(shipper.uid);
+        print('Google Role Selection: Dashboard complete: $isDashboardComplete');
+        
+        if (!isDashboardComplete) {
+          print('Google Role Selection: Navigating to Shipper Dashboard 1');
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ShipperDashboard1()),
+              (route) => false,
+            );
+          }
+        } else {
+          print('Google Role Selection: Navigating to Shipper Dashboard Main Page');
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+              (route) => false,
+            );
+          }
+        }
       }
     } else if (userRole == UserRole.carrier) {
       print('Google Role Selection: Navigating to Carrier Onboarding Wrapper');
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-        (route) => false,
-      );
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
+          (route) => false,
+        );
+      }
     }
   }
 

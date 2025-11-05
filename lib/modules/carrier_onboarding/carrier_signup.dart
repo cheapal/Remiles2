@@ -39,16 +39,16 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
   // Country data with unique keys
   final List<Map<String, String>> _countries = [
     {'key': 'canada', 'code': '+1', 'flag': 'assets/canada_flag.png', 'name': 'Canada'},
-    {'key': 'usa', 'code': '+1', 'flag': 'assets/flag.png', 'name': 'United States'},
-    {'key': 'uk', 'code': '+44', 'flag': 'assets/flag.png', 'name': 'United Kingdom'},
-    {'key': 'france', 'code': '+33', 'flag': 'assets/flag.png', 'name': 'France'},
-    {'key': 'germany', 'code': '+49', 'flag': 'assets/flag.png', 'name': 'Germany'},
-    {'key': 'japan', 'code': '+81', 'flag': 'assets/flag.png', 'name': 'Japan'},
-    {'key': 'china', 'code': '+86', 'flag': 'assets/flag.png', 'name': 'China'},
-    {'key': 'india', 'code': '+91', 'flag': 'assets/flag.png', 'name': 'India'},
+    // {'key': 'usa', 'code': '+1', 'flag': 'assets/flag.png', 'name': 'United States'},
+    // {'key': 'uk', 'code': '+44', 'flag': 'assets/flag.png', 'name': 'United Kingdom'},
+    // {'key': 'france', 'code': '+33', 'flag': 'assets/flag.png', 'name': 'France'},
+    // {'key': 'germany', 'code': '+49', 'flag': 'assets/flag.png', 'name': 'Germany'},
+    // {'key': 'japan', 'code': '+81', 'flag': 'assets/flag.png', 'name': 'Japan'},
+    // {'key': 'china', 'code': '+86', 'flag': 'assets/flag.png', 'name': 'China'},
+    // {'key': 'india', 'code': '+91', 'flag': 'assets/flag.png', 'name': 'India'},
     {'key': 'pakistan', 'code': '+92', 'flag': 'assets/flag.png', 'name': 'Pakistan'},
-    {'key': 'australia', 'code': '+61', 'flag': 'assets/flag.png', 'name': 'Australia'},
-    {'key': 'brazil', 'code': '+55', 'flag': 'assets/flag.png', 'name': 'Brazil'},
+    // {'key': 'australia', 'code': '+61', 'flag': 'assets/flag.png', 'name': 'Australia'},
+    // {'key': 'brazil', 'code': '+55', 'flag': 'assets/flag.png', 'name': 'Brazil'},
   ];
 
   @override
@@ -227,7 +227,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.1),
+                                  color: const Color(0xFF1C6B4A).withOpacity(0.5),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -460,7 +460,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: const Color(0xFF1C6B4A).withOpacity(0.95),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -496,7 +496,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
+                        color: const Color(0xFF1C6B4A).withOpacity(0.95),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -784,7 +784,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                                 BorderRadius.circular(4 * scale),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.25),
+                                    color: const Color(0xFF1C6B4A).withOpacity(0.95),
                                     blurRadius: 4,
                                     offset: const Offset(0, 4),
                                   ),
@@ -878,7 +878,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                                     fontWeight: FontWeight.bold,
                                     shadows: [
                                       Shadow(
-                                        color: Colors.black26,
+                                        color: const Color(0xFF1C6B4A).withOpacity(0.95),
                                         offset: Offset(0, 2),
                                         blurRadius: 4,
                                       ),
@@ -945,7 +945,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: const Color(0xFF1C6B4A).withOpacity(0.95),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -968,6 +968,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                 obscureText: obscureText,
                 keyboardType: keyboardType,
                 inputFormatters: inputFormatters,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: validator,
                 decoration: InputDecoration(
                   hintText: hintText,
@@ -1011,7 +1012,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: const Color(0xFF1C6B4A).withOpacity(0.95),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -1029,6 +1030,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
               child: TextFormField(
                 controller: controller,
                 keyboardType: TextInputType.phone,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: validator,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly,
@@ -1294,7 +1296,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
         borderRadius: BorderRadius.circular(10 * scale),
         boxShadow: [
           BoxShadow(
-            color: const Color(0x40000000),
+            color: const Color(0xFF1C6B4A).withOpacity(0.95),
             blurRadius: 3,
             offset: const Offset(0, 4),
           ),
@@ -1317,6 +1319,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                 obscureText: obscureText,
                 keyboardType: keyboardType,
                 inputFormatters: inputFormatters,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: validator,
                 decoration: InputDecoration(
                   hintText: hintText,
@@ -1362,7 +1365,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
         borderRadius: BorderRadius.circular(10 * scale),
         boxShadow: [
           BoxShadow(
-            color: const Color(0x40000000),
+            color: const Color(0xFF1C6B4A).withOpacity(0.95),
             blurRadius: 3,
             offset: const Offset(0, 4),
           ),
@@ -1379,6 +1382,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
               child: TextFormField(
                 controller: controller,
                 keyboardType: TextInputType.phone,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: validator,
                 inputFormatters: [
                   FilteringTextInputFormatter.digitsOnly

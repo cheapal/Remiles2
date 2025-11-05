@@ -5,9 +5,11 @@ import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/app_state_provider.dart';
 import '../../../core/auth_wrapper.dart';
+import '../../../core/firebase_service.dart';
 import '../../../models/user_model.dart';
 import '../../carrier_dashboard/views/dashboard/pages/main_page.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import '../../shipper_dashboard/pages/shipper_dashboard_1.dart';
 import '../../shipper_onboarding/shipper_onboarding_wrapper.dart';
 import 'choose_role.dart';
 
@@ -40,16 +42,16 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
   // Country data with unique keys
   final List<Map<String, String>> _countries = [
     {'key': 'canada', 'code': '+1', 'flag': 'assets/canada_flag.png', 'name': 'Canada'},
-    {'key': 'usa', 'code': '+1', 'flag': 'assets/flag.png', 'name': 'United States'},
-    {'key': 'uk', 'code': '+44', 'flag': 'assets/flag.png', 'name': 'United Kingdom'},
-    {'key': 'france', 'code': '+33', 'flag': 'assets/flag.png', 'name': 'France'},
-    {'key': 'germany', 'code': '+49', 'flag': 'assets/flag.png', 'name': 'Germany'},
-    {'key': 'japan', 'code': '+81', 'flag': 'assets/flag.png', 'name': 'Japan'},
-    {'key': 'china', 'code': '+86', 'flag': 'assets/flag.png', 'name': 'China'},
-    {'key': 'india', 'code': '+91', 'flag': 'assets/flag.png', 'name': 'India'},
+    // {'key': 'usa', 'code': '+1', 'flag': 'assets/flag.png', 'name': 'United States'},
+    // {'key': 'uk', 'code': '+44', 'flag': 'assets/flag.png', 'name': 'United Kingdom'},
+    // {'key': 'france', 'code': '+33', 'flag': 'assets/flag.png', 'name': 'France'},
+    // {'key': 'germany', 'code': '+49', 'flag': 'assets/flag.png', 'name': 'Germany'},
+    // {'key': 'japan', 'code': '+81', 'flag': 'assets/flag.png', 'name': 'Japan'},
+    // {'key': 'china', 'code': '+86', 'flag': 'assets/flag.png', 'name': 'China'},
+    // {'key': 'india', 'code': '+91', 'flag': 'assets/flag.png', 'name': 'India'},
     {'key': 'pakistan', 'code': '+92', 'flag': 'assets/flag.png', 'name': 'Pakistan'},
-    {'key': 'australia', 'code': '+61', 'flag': 'assets/flag.png', 'name': 'Australia'},
-    {'key': 'brazil', 'code': '+55', 'flag': 'assets/flag.png', 'name': 'Brazil'},
+    // {'key': 'australia', 'code': '+61', 'flag': 'assets/flag.png', 'name': 'Australia'},
+    // {'key': 'brazil', 'code': '+55', 'flag': 'assets/flag.png', 'name': 'Brazil'},
   ];
 
   @override
@@ -106,7 +108,7 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
       
       // Direct navigation as fallback if AuthWrapper doesn't trigger
       if (context.mounted) {
-        _navigateBasedOnRole(context, authProvider);
+        await _navigateBasedOnRole(context, authProvider);
       }
     } else {
       print('Shipper signup failed: ${authProvider.errorMessage}');
@@ -115,7 +117,7 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
   }
 
   // Navigate based on user role
-  void _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) {
+  Future<void> _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) async {
     final userRole = authProvider.currentUser?.role;
     print('Shipper Signup: Navigating based on role: $userRole');
     
@@ -123,30 +125,61 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
       final shipper = authProvider.shipperUser;
       if (shipper != null && shipper.isOnboardingComplete == false) {
         print('Shipper Signup: Navigating to Shipper Onboarding');
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const ShipperOnboardingWrapper()),
-          (route) => false,
-        );
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const ShipperOnboardingWrapper()),
+            (route) => false,
+          );
+        }
+      } else if (shipper != null) {
+        // Check if dashboard steps are completed
+        print('Shipper Signup: Checking if dashboard steps are completed...');
+        final isDashboardComplete = await FirebaseService.isShipperDashboardComplete(shipper.uid);
+        print('Shipper Signup: Dashboard complete: $isDashboardComplete');
+        
+        if (!isDashboardComplete) {
+          print('Shipper Signup: Navigating to Shipper Dashboard 1');
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ShipperDashboard1()),
+              (route) => false,
+            );
+          }
+        } else {
+          print('Shipper Signup: Navigating to Shipper Dashboard Main Page');
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+              (route) => false,
+            );
+          }
+        }
       } else {
-        print('Shipper Signup: Navigating to Shipper Dashboard');
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
-          (route) => false,
-        );
+        print('Shipper Signup: No shipper data, navigating to AuthWrapper');
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const AuthWrapper()),
+            (route) => false,
+          );
+        }
       }
     } else if (userRole == UserRole.carrier) {
       print('Shipper Signup: Navigating to Carrier Dashboard');
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const MainPage()),
-        (route) => false,
-      );
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const MainPage()),
+          (route) => false,
+        );
+      }
     } else {
       print('Shipper Signup: Role not determined, navigating to AuthWrapper');
       // If role is not determined, navigate to AuthWrapper
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AuthWrapper()),
-        (route) => false,
-      );
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthWrapper()),
+          (route) => false,
+        );
+      }
     }
   }
 
@@ -223,13 +256,271 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
         bottom: false,
         child: Stack(
           children: [
-            // Background color container
             Container(
               width: double.infinity,
               height: double.infinity,
               color: const Color(0xFFFEFEF6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(height: 40 * scale),
+                  SizedBox(
+                    width: 150 * scale,
+                    height: 150 * scale,
+                    child: Image.asset(
+                      'assets/remiles.png',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                  SizedBox(height: 10 * scale),
+                  Text(
+                    'Shipper Sign up',
+                    style: TextStyle(
+                      fontSize: 24 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
+                  ),
+                  SizedBox(height: 31 * scale),
+                  Container(
+                    width: 330 * scale,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFFEF6),
+                      borderRadius: BorderRadius.circular(37 * scale),
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        children: [
+                          _buildMobileInputField(
+                            scale: scale,
+                            hintText: "Company name or Full name",
+                            iconAsset: 'assets/user.png',
+                            controller: _companyNameController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter company name';
+                              }
+                              return null;
+                            },
+                          ),
+                          SizedBox(height: 25 * scale),
+                          _buildMobileInputField(
+                            scale: scale,
+                            hintText: "Email Address",
+                            iconAsset: 'assets/email.png',
+                            keyboardType: TextInputType.emailAddress,
+                            controller: _emailController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter email address';
+                              }
+                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                return 'Please enter a valid email';
+                              }
+                              return null;
+                            },
+                          ),
+                          SizedBox(height: 25 * scale),
+                          _buildMobilePhoneInputField(
+                            scale: scale,
+                            hintText: "Contact Number",
+                            controller: _phoneController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter contact number';
+                              }
+                              if (value.length < 10) {
+                                return 'Please enter a valid phone number';
+                              }
+                              return null;
+                            },
+                          ),
+                          SizedBox(height: 25 * scale),
+                          _buildMobileInputField(
+                            scale: scale,
+                            hintText: "Password",
+                            iconAsset: 'assets/password.png',
+                            obscureText: _obscurePassword,
+                            controller: _passwordController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter password';
+                              }
+                              if (value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                            onSuffixIconPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                          SizedBox(height: 25 * scale),
+                          _buildMobileInputField(
+                            scale: scale,
+                            hintText: "Confirm Password",
+                            iconAsset: 'assets/password.png',
+                            obscureText: _obscureConfirmPassword,
+                            controller: _confirmPasswordController,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please confirm password';
+                              }
+                              if (value != _passwordController.text) {
+                                return 'Passwords do not match';
+                              }
+                              return null;
+                            },
+                            onSuffixIconPressed: () {
+                              setState(() {
+                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 20 * scale),
+                  Container(
+                    width: 294 * scale,
+                    height: 45 * scale,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _agreeToTerms = !_agreeToTerms;
+                            });
+                          },
+                          child: Container(
+                            width: 20 * scale,
+                            height: 20 * scale,
+                            margin: EdgeInsets.only(
+                                right: 8 * scale, top: 2 * scale),
+                            decoration: BoxDecoration(
+                              color: _agreeToTerms
+                                  ? const Color(0xFF4B744F)
+                                  : Colors.white,
+                              borderRadius:
+                              BorderRadius.circular(4 * scale),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF1C6B4A).withOpacity(0.95),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: _agreeToTerms
+                                ? Icon(
+                              Icons.check,
+                              color: Colors.white,
+                              size: 14 * scale,
+                            )
+                                : null,
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12 * scale,
+                              height: 14 / 12,
+                              color: const Color(0xFF7D8AB0),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            // The leather image is only shown on mobile - moved to back layer
+            Positioned(
+              bottom: 190 * scale,
+              right: 30 * scale,
+              child: Consumer2<AuthProvider, AppStateProvider>(
+                builder: (context, authProvider, appStateProvider, child) {
+                  return GestureDetector(
+                    onTap: _handleSignup,
+                    child: Container(
+                      width: 110 * scale,
+                      height: 55 * scale,
+                      decoration: BoxDecoration(
+                        image: const DecorationImage(
+                          image: AssetImage('assets/signup_button.png'),
+                          fit: BoxFit.fill,
+                        ),
+                        borderRadius: BorderRadius.circular(24.5 * scale),
+                      ),
+                      child: Align(
+                        alignment: Alignment(0, -0.2),
+                        child: authProvider.isLoading
+                            ? SizedBox(
+                                width: 20 * scale,
+                                height: 20 * scale,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                ),
+                              )
+                            : Text(
+                                "Next",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  shadows: [
+                                    Shadow(
+                                      color: const Color(0xFF1C6B4A).withOpacity(0.95),
+                                      offset: Offset(0, 2),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Error message display
+            Consumer<AuthProvider>(
+              builder: (context, authProvider, child) {
+                if (authProvider.errorMessage != null) {
+                  return Positioned(
+                    bottom: 250 * scale,
+                    left: 20 * scale,
+                    right: 20 * scale,
+                    child: Container(
+                      padding: EdgeInsets.all(12 * scale),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8 * scale),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Text(
+                        authProvider.errorMessage!,
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 14 * scale,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
             Positioned(
               bottom: 0,
               left: 0,
@@ -237,16 +528,6 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
               child: Image.asset(
                 'assets/leather_up.png',
                 fit: BoxFit.cover,
-              ),
-            ),
-            // Content on top layer
-            Container(
-              width: double.infinity,
-              height: double.infinity,
-              color: Colors.transparent,
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 24 * scale),
-                child: _buildSignUpForm(scale, isWeb: false),
               ),
             ),
           ],
@@ -527,34 +808,56 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: Checkbox(
-                value: _agreeToTerms,
-                onChanged: (value) => setState(() => _agreeToTerms = value!),
-                activeColor: const Color(0xFF059669),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _agreeToTerms = !_agreeToTerms;
+                });
+              },
+              child: Container(
+                width: isWeb ? 20 : 20 * scale,
+                height: isWeb ? 20 : 20 * scale,
+                margin: EdgeInsets.only(
+                  right: isWeb ? 12 : 8 * scale,
+                  top: isWeb ? 2 : 2 * scale,
+                ),
+                decoration: BoxDecoration(
+                  color: _agreeToTerms
+                      ? (isWeb ? const Color(0xFF4B744F) : const Color(0xFF4B744F))
+                      : Colors.white,
+                  borderRadius: BorderRadius.circular(isWeb ? 4 : 4 * scale),
+                  border: Border.all(
+                    color: _agreeToTerms
+                        ? (isWeb ? const Color(0xFF4B744F) : const Color(0xFF4B744F))
+                        : (isWeb ? const Color(0xFFD1D5DB) : const Color(0xFFD1D5DB)),
+                    width: isWeb ? 2 : 2,
+                  ),
+                  boxShadow: !isWeb ? [
+                    BoxShadow(
+                      color: const Color(0xFF1C6B4A).withOpacity(0.95),
+                      blurRadius: 4,
+                      offset: const Offset(0, 4),
+              ),
+                  ] : null,
+            ),
+                child: _agreeToTerms
+                    ? Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: isWeb ? 14 : 14 * scale,
+                      )
+                    : null,
               ),
             ),
-            const SizedBox(width: 8),
             Expanded(
-              child: RichText(
-                text: TextSpan(
+              child: Text(
+                'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
                   style: TextStyle(
-                    fontSize: 12 * scale,
-                    color: Colors.grey[600],
-                    height: 1.5,
-                  ),
-                  children: [
-                    const TextSpan(text: 'I have read and agree to the '),
-                    _buildClickableTextSpan('Re-Miles Terms of Service'),
-                    const TextSpan(text: ', '),
-                    _buildClickableTextSpan('User Agreement'),
-                    const TextSpan(text: ', and '),
-                    _buildClickableTextSpan('Privacy Policy'),
-                    const TextSpan(text: '.'),
-                  ],
+                  fontSize: isWeb ? 14 : 12 * scale,
+                  color: isWeb ? const Color(0xFF6B7280) : const Color(0xFF7D8AB0),
+                  height: isWeb ? 1.4 : 14 / 12,
+                  fontWeight: isWeb ? FontWeight.normal : FontWeight.w700,
+                  fontFamily: !isWeb ? 'Roboto' : null,
                 ),
               ),
             ),
@@ -621,44 +924,30 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
         ),
 
         // Already have an account link
-        Center(
-          child: Text.rich(
-            TextSpan(
-              text: 'Already have an account? ',
-              style: TextStyle(color: Colors.grey[600]),
-              children: [
-                TextSpan(
-                  text: 'Contact support to sign in',
-                  style: const TextStyle(
-                    color: Color(0xFF059669),
-                    fontWeight: FontWeight.bold,
-                  ),
-                  recognizer: TapGestureRecognizer()..onTap = () {
-                    // Handle tap
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
+        // Center(
+        //   child: Text.rich(
+        //     TextSpan(
+        //       text: 'Already have an account? ',
+        //       style: TextStyle(color: Colors.grey[600]),
+        //       children: [
+        //         TextSpan(
+        //           text: 'Contact support to sign in',
+        //           style: const TextStyle(
+        //             color: Color(0xFF059669),
+        //             fontWeight: FontWeight.bold,
+        //           ),
+        //           recognizer: TapGestureRecognizer()..onTap = () {
+        //             // Handle tap
+        //           },
+        //         ),
+        //       ],
+        //     ),
+        //   ),
+        // ),
 
         if (!isWeb) SizedBox(height: 220 * scale), // Padding for bottom image on mobile
         ],
       ),
-    );
-  }
-
-  // Helper for clickable text in terms
-  TextSpan _buildClickableTextSpan(String text) {
-    return TextSpan(
-      text: text,
-      style: const TextStyle(
-        color: Color(0xFF059669),
-        fontWeight: FontWeight.w600,
-      ),
-      recognizer: TapGestureRecognizer()..onTap = () {
-        // Handle navigation to terms/policy pages
-      },
     );
   }
 
@@ -678,6 +967,7 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       validator: validator,
       decoration: InputDecoration(
         hintText: hintText,
@@ -707,6 +997,18 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF059669), width: 2),
         ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.red[300]!),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: Colors.red[500]!, width: 2),
+        ),
+        errorStyle: TextStyle(
+          fontSize: 12 * scale,
+          color: Colors.red[700],
+        ),
         hintStyle: TextStyle(fontSize: 14 * scale, color: Colors.grey[400]),
       ),
       style: TextStyle(fontSize: 14 * scale, color: Colors.black),
@@ -735,6 +1037,7 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
             child: TextFormField(
               controller: controller,
               keyboardType: TextInputType.phone,
+              autovalidateMode: AutovalidateMode.onUserInteraction,
               validator: validator,
               inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               decoration: InputDecoration(
@@ -748,6 +1051,254 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // Mobile input field matching carrier signup style
+  Widget _buildMobileInputField({
+    required double scale,
+    required String hintText,
+    required String iconAsset,
+    bool obscureText = false,
+    TextInputType keyboardType = TextInputType.text,
+    VoidCallback? onSuffixIconPressed,
+    TextEditingController? controller,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      width: 314 * scale,
+      height: 60 * scale,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(10 * scale),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1C6B4A).withOpacity(0.95),
+            blurRadius: 3,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10 * scale),
+        child: Row(
+          children: [
+            Image.asset(
+              iconAsset,
+              width: 15.71 * scale,
+              height: 18 * scale,
+              color: const Color(0x40000000),
+            ),
+            SizedBox(width: 10 * scale),
+            Expanded(
+              child: TextFormField(
+                controller: controller,
+                obscureText: obscureText,
+                keyboardType: keyboardType,
+                inputFormatters: keyboardType == TextInputType.phone 
+                    ? [FilteringTextInputFormatter.digitsOnly] 
+                    : null,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                validator: validator,
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    fontSize: 16 * scale,
+                    color: const Color(0x40000000),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: 16 * scale,
+                  color: const Color(0xFF000000),
+                ),
+              ),
+            ),
+            if (onSuffixIconPressed != null)
+              IconButton(
+                icon: Icon(
+                  obscureText ? Icons.visibility_off : Icons.visibility,
+                  color: Colors.grey,
+                  size: 24 * scale,
+                ),
+                onPressed: onSuffixIconPressed,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Mobile phone input field matching carrier signup style
+  Widget _buildMobilePhoneInputField({
+    required double scale,
+    required String hintText,
+    TextEditingController? controller,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      width: 314 * scale,
+      height: 60 * scale,
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFFFF),
+        borderRadius: BorderRadius.circular(10 * scale),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1C6B4A).withOpacity(0.95),
+            blurRadius: 3,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 10 * scale),
+        child: Row(
+          children: [
+            // Country dropdown for mobile
+            _buildMobileCountryDropdown(scale),
+            SizedBox(width: 10 * scale),
+            Expanded(
+              child: TextFormField(
+                controller: controller,
+                keyboardType: TextInputType.phone,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                validator: validator,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly
+                ],
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(
+                    fontSize: 16 * scale,
+                    color: const Color(0x40000000),
+                  ),
+                ),
+                style: TextStyle(
+                  fontSize: 16 * scale,
+                  color: const Color(0xFF000000),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Mobile country dropdown
+  Widget _buildMobileCountryDropdown(double scale) {
+    return Container(
+      height: 40 * scale,
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        borderRadius: BorderRadius.circular(8 * scale),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: _selectedCountryKey,
+          isExpanded: false,
+          icon: Icon(
+            Icons.keyboard_arrow_down,
+            color: const Color(0xFF6B7280),
+            size: 20 * scale,
+          ),
+          style: TextStyle(
+            fontSize: 14 * scale,
+            color: const Color(0xFF111827),
+            fontWeight: FontWeight.w500,
+          ),
+          onChanged: (String? newValue) {
+            if (newValue != null) {
+              setState(() {
+                _selectedCountryKey = newValue;
+                final selectedCountry = _countries.firstWhere(
+                  (country) => country['key'] == newValue,
+                );
+                _selectedCountryCode = selectedCountry['code']!;
+                _selectedCountryFlag = selectedCountry['flag']!;
+              });
+            }
+          },
+          items: _countries.map<DropdownMenuItem<String>>((Map<String, String> country) {
+            return DropdownMenuItem<String>(
+              value: country['key'],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    country['flag']!,
+                    width: 20 * scale,
+                    height: 14 * scale,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 20 * scale,
+                        height: 14 * scale,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2 * scale),
+                        ),
+                        child: Icon(
+                          Icons.flag,
+                          size: 12 * scale,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 6 * scale),
+                  Text(
+                    country['code']!,
+                    style: TextStyle(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+          selectedItemBuilder: (BuildContext context) {
+            return _countries.map<Widget>((Map<String, String> country) {
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset(
+                    _selectedCountryFlag,
+                    width: 20 * scale,
+                    height: 14 * scale,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 20 * scale,
+                        height: 14 * scale,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2 * scale),
+                        ),
+                        child: Icon(
+                          Icons.flag,
+                          size: 12 * scale,
+                          color: Colors.grey,
+                        ),
+                      );
+                    },
+                  ),
+                  SizedBox(width: 6 * scale),
+                  Text(
+                    _selectedCountryCode,
+                    style: TextStyle(
+                      fontSize: 12 * scale,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              );
+            }).toList();
+          },
+        ),
       ),
     );
   }

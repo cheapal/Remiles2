@@ -51,6 +51,11 @@
     <string>This app needs access to camera to take photos for document upload.</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app needs access to photo library to select images for document upload.</string>
+    <!-- Permission for speech to text -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app needs access to microphone for voice input in AI Miley chat assistant.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>This app needs speech recognition permission to convert your voice to text in AI Miley chat assistant.</string>
     
     <!-- Google Sign-In URL Scheme -->
     <key>CFBundleURLTypes</key>

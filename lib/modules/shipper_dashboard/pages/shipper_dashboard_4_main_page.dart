@@ -6,6 +6,7 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_manage_loads.dar
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_post_load.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
@@ -1001,6 +1002,7 @@ class ShipperDashboardMainPage extends StatefulWidget {
 
 class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
   int _index = 0;
+  bool _isOnAiMileyPage = false;
 
   final _tabKeys = [
     GlobalKey<NavigatorState>(),
@@ -1023,31 +1025,86 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
     // Always pop the navigator of the destination tab to its first route.
     _tabKeys[newIndex].currentState?.popUntil((r) => r.isFirst);
     // Update the index to switch the tab.
-    setState(() => _index = newIndex);
+    setState(() {
+      _index = newIndex;
+      _isOnAiMileyPage = false; // Reset when switching tabs
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    const Color green = Color(0xFF497A57);
+    
     return WillPopScope(
       // handle Android back button
       onWillPop: () async {
         final currentNavigator = _tabKeys[_index].currentState!;
         if (currentNavigator.canPop()) {
           currentNavigator.pop();
+          setState(() {
+            _isOnAiMileyPage = false; // Reset when popping
+          });
           return false;
         }
         return true;
       },
       child: Scaffold(
-        body: IndexedStack(
-          index: _index,
+        body: Stack(
           children: [
-            _buildTabNavigator(_tabKeys[0],  ShipperDashboardHomePage()),
-            _buildTabNavigator(_tabKeys[1], const ShipperManageLoadsScreen()),
-            _buildTabNavigator(_tabKeys[2], const ShipperMarketplaceScreen()),
-            _buildTabNavigator(_tabKeys[3],  ShipperProfile()),
-            _buildTabNavigator(_tabKeys[4], More()//ShipperMoreOptions()
+            IndexedStack(
+              index: _index,
+              children: [
+                _buildTabNavigator(_tabKeys[0],  ShipperDashboardHomePage()),
+                _buildTabNavigator(_tabKeys[1], const ShipperManageLoadsScreen()),
+                _buildTabNavigator(_tabKeys[2], const ShipperMarketplaceScreen()),
+                _buildTabNavigator(_tabKeys[3],  ShipperProfile()),
+                _buildTabNavigator(_tabKeys[4], More()//ShipperMoreOptions()
+                ),
+              ],
             ),
+            // AI Miley floating button - only show when not on AI Miley page
+            if (!_isOnAiMileyPage)
+              Positioned(
+                bottom: 35, // Position above the bottom navigation bar
+                right: 20,
+                child: GestureDetector(
+                  onTap: () {
+                    final currentNavigator = _tabKeys[_index].currentState;
+                    if (currentNavigator != null) {
+                      setState(() {
+                        _isOnAiMileyPage = true; // Hide button when navigating to AI Miley
+                      });
+                      Navigator.push(
+                        currentNavigator.context,
+                        MaterialPageRoute(
+                          builder: (context) => const AiMileyScreen(),
+                        ),
+                      ).then((_) {
+                        // Show button again when returning from AI Miley page
+                        setState(() {
+                          _isOnAiMileyPage = false;
+                        });
+                      });
+                    }
+                  },
+                  child: Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: green,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: green.withOpacity(0.25),
+                          blurRadius: 12,
+                          offset: const Offset(0, 6),
+                        )
+                      ],
+                    ),
+                    child: const Icon(Icons.headset_mic, color: Colors.white, size: 36),
+                  ),
+                ),
+              ),
           ],
         ),
         bottomNavigationBar: BottomNavigationBarTab(

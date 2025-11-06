@@ -354,6 +354,23 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
     }
   }
 
+  void _editLoad(Map<String, dynamic> load) async {
+    // Open post load screen with pre-filled data for editing
+    final result = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ShipperDashboardPostLoad(
+          editLoadData: load, // Pass the load data for editing
+        ),
+      ),
+    );
+    
+    // If load was updated, refresh the loads list
+    if (result != null && result['loadUpdated'] == true) {
+      _loadLoads(reset: true);
+      _loadLoadStats();
+    }
+  }
+
   void _showDeleteConfirmation(String loadId) {
     showDialog(
       context: context,
@@ -809,6 +826,36 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                   ),
                 ),
                 const SizedBox(width: 10),
+                // Edit button for active loads only
+                if (status == 'active')
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () => _editLoad(load),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF386544).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.edit, size: 12, color: Color(0xFF386544)),
+                            const SizedBox(width: 4),
+                            const Text(
+                              'Edit',
+                              style: TextStyle(
+                                color: Color(0xFF386544),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(

@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 
 class ShipperDashboardPostLoad extends StatefulWidget {
   final Map<String, dynamic>? editLoadData;
@@ -217,17 +218,16 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
   @override
   Widget build(BuildContext context) {
     final bool isTabletOrDesktop = MediaQuery.of(context).size.width > 600;
-    const topPanelColor = Color(0xFF386544);
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: topPanelColor,
-        elevation: 0,
-        toolbarHeight: 60,
-        title: Text(
-          widget.editLoadData != null ? 'Edit Load' : 'Post Load',
-        ),
-      ),
+      // appBar: AppBar(
+      //   backgroundColor: topPanelColor,
+      //   elevation: 0,
+      //   toolbarHeight: 60,
+      //   title: Text(
+      //     widget.editLoadData != null ? 'Edit Load' : 'Post Load',
+      //   ),
+      // ),
       backgroundColor: const Color(0xFFFFFEF6),
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
@@ -235,21 +235,23 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Top Navigation Bar
+              TopNavigationBar(context),
 
               // Form fields
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: isTabletOrDesktop ? 100.0 : 40.0),
+                padding: EdgeInsets.symmetric(horizontal: isTabletOrDesktop ? 100.0 : 30.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 25),
+                    const SizedBox(height: 35),
                     Row(
                       children: [
-                        const Text(
-                          'Post a New Load',
+                         Text(
+                        widget.editLoadData != null ? 'Edit Load' : 'Post a New Load',
                           style: TextStyle(
                             fontFamily: 'Roboto',
-                            fontSize: 32,
+                            fontSize: 26,
                             color: Colors.black,
                             fontWeight: FontWeight.w800,
                           ),
@@ -529,8 +531,8 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
                             if (_isPreviousDocumentImage)
                               Container(
                                 width: 32,
-                                height: 32,
-                                margin: EdgeInsets.only(right: 8),
+                                height: 32, 
+                                margin: EdgeInsets.only(left: 8,right: 4),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(4),
                                   border: Border.all(color: Colors.blue, width: 1),

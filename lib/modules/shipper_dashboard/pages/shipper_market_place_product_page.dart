@@ -528,31 +528,33 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
                   const Spacer(),
       
                   // big support circle button (matches screenshot)
-                  GestureDetector(
-                    onTap: () {
-                      // handle support tap
-                      showDialog(
-                        context: context,
-                        builder: (context) => AiMileyScreen()
-                      );
-                    },
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: green,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: green.withOpacity(0.25),
-                            blurRadius: 12,
-                            offset: const Offset(0, 6),
-                          )
-                        ],
-                      ),
-                      child: const Icon(Icons.headset_mic, color: Colors.white, size: 36),
-                    ),
-                  ),
+                  // GestureDetector(
+                  //   onTap: () {
+                  //     Navigator.push(
+                  //       context,
+                  //       MaterialPageRoute(
+                  //         builder: (context) => const AiMileyScreen(),
+                  //       ),
+                  //     );
+                  //   },
+                  //   child: Container(
+                  //     width: 72,
+                  //     height: 72,
+                  //     decoration: BoxDecoration(
+                  //       color: green,
+                  //       shape: BoxShape.circle,
+                  //       boxShadow: [
+                  //         BoxShadow(
+                  //           color: green.withOpacity(0.25),
+                  //           blurRadius: 12,
+                  //           offset: const Offset(0, 6),
+                  //         )
+                  //       ],
+                  //     ),
+                  //     child: const Icon(Icons.headset_mic, color: Colors.white, size: 36),
+                  //   ),
+                  // ),
+                
                 ],
               ),
             ),

@@ -7,6 +7,7 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_payment_page.dar
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_document_management.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_account_details_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_settings_page.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_help_legal_page.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -436,21 +437,18 @@ class _ShipperProfileState extends State<ShipperProfile>
                     const SizedBox(height: 16),
                     _buildProfileOption('Documents', Icons.description,(){
 
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          return  ShipperProfileDocumentManagment();
-                        },
+                       Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ShipperProfileDocumentManagment(),
+                        ),
                       );
                     }),
                     const SizedBox(height: 16),
                     _buildProfileOption('Boost My Load', Icons.rocket_launch,(){
 //ShipperBoostMyPage
-                      showDialog(
-                        context: context,
-                        builder: (context) {
-                          return  ShipperBoostMyPage();
-                        },
+                     Navigator.push(context,
+                      MaterialPageRoute(builder: (context) => const ShipperBoostMyPage())
                       );
                     }),
                     const SizedBox(height: 16),
@@ -463,7 +461,14 @@ class _ShipperProfileState extends State<ShipperProfile>
                       );
                     }),
                     const SizedBox(height: 16),
-                    _buildProfileOption('Help & Legal', Icons.help_outline,(){}),
+                    _buildProfileOption('Help & Legal', Icons.help_outline,(){
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ShipperHelpLegalPage(),
+                        ),
+                      );
+                    }),
                     const SizedBox(height: 16),
                     // Logout button
                     GestureDetector(

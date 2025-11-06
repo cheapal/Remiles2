@@ -10,6 +10,7 @@ import '../../common/widgets/top_navigation_bar.dart';
 import 'carrier_preferences.dart';
 import 'account_details_page.dart';
 import 'settings_page.dart';
+import 'help_legal_page.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -389,7 +390,14 @@ class _ProfileState extends State<Profile> {
                   );
                 }),
                 const SizedBox(height: 16),
-                _buildProfileOption('Help & Legal', Icons.help_outline, () {}),
+                _buildProfileOption('Help & Legal', Icons.help_outline, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CarrierHelpLegalPage(),
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
                 // Logout button
                 GestureDetector(

@@ -17,7 +17,7 @@ firebase init functions
 
 ### Step 3: Set Stripe Secret Key
 ```bash
-firebase functions:config:set stripe.secret_key="sk_test_51RkhVRR1kSahGVhDPud5buRNVCrzeaIuLUFR4ikUr96AoMNTC12oj3hpA0Ojk1hVo9A0cZ8YqKi2ft8UXbYyLPXU00xqiOxF1m"
+firebase functions:config:set stripe.secret_key="test key"
 ```
 
 ### Step 4: Deploy Functions

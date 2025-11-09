@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:share_plus/share_plus.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
+import '../../../core/stripe_service.dart';
 
 class ShipperBoostMyPage extends StatefulWidget {
   const ShipperBoostMyPage({super.key});
@@ -17,11 +18,13 @@ class ShipperBoostMyPage extends StatefulWidget {
 }
 
 class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
-  String selectedPlan = ""; // Empty string means no plan selected
+  String selectedPlan = ""; // Plan user is clicking on to select
+  String activePlan = ""; // Plan user is actually subscribed to (from Firestore)
   bool _isLoading = false;
   int _usedPosts = 0;
   int _postLimit = 10; // Default limit
   List<Map<String, dynamic>> _subscriptionHistory = [];
+  DateTime? _renewalDate; // Renewal date for active plan
 
   @override
   void initState() {
@@ -44,13 +47,38 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           if (currentData != null) {
             // Load subscription plan
             if (currentData['subscriptionPlan'] != null) {
+              final planName = currentData['subscriptionPlan'] as String;
               setState(() {
-                selectedPlan = currentData!['subscriptionPlan'] as String;
+                activePlan = planName; // This is the actual active subscription
+                // Only set selectedPlan if user hasn't manually selected a different plan
+                if (selectedPlan.isEmpty) {
+                  selectedPlan = planName;
+                }
               });
+              
+              // Load renewal date for active plan
+              if (currentData['renewalDate'] != null) {
+                try {
+                  final renewalDateStr = currentData['renewalDate'] as String;
+                  setState(() {
+                    _renewalDate = DateTime.parse(renewalDateStr);
+                  });
+                } catch (e) {
+                  debugPrint('Error parsing renewal date: $e');
+                  setState(() {
+                    _renewalDate = null;
+                  });
+                }
+              } else {
+                setState(() {
+                  _renewalDate = null;
+                });
+              }
             } else {
               // No plan subscribed, set to empty
               setState(() {
-                selectedPlan = "";
+                activePlan = "";
+                _renewalDate = null;
               });
             }
             
@@ -64,8 +92,18 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           }
         }
         
-        // Load total number of loads posted
-        final loadStats = await FirebaseService.getShipperLoadStats(shipper.uid);
+        // Load posts used this period (reset on subscription/renewal/upgrade)
+        // If not available, fall back to total count
+        int usedPosts = 0;
+        if (currentData != null && currentData['postsUsedThisPeriod'] != null) {
+          usedPosts = currentData['postsUsedThisPeriod'] is int 
+              ? currentData['postsUsedThisPeriod'] 
+              : int.tryParse(currentData['postsUsedThisPeriod'].toString()) ?? 0;
+        } else {
+          // Fallback to total count if postsUsedThisPeriod not set
+          final loadStats = await FirebaseService.getShipperLoadStats(shipper.uid);
+          usedPosts = loadStats['total'] ?? 0;
+        }
         
         // Load subscription history
         final history = currentData?['subscriptionHistory'] as List<dynamic>?;
@@ -76,7 +114,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
             : <Map<String, dynamic>>[];
         
         setState(() {
-          _usedPosts = loadStats['total'] ?? 0;
+          _usedPosts = usedPosts;
           _subscriptionHistory = historyList;
         });
       }
@@ -116,13 +154,16 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
             ),
           );
         }
+        setState(() => _isLoading = false);
         return;
       }
 
       // Determine plan details based on selected plan
       Map<String, dynamic> planData = {};
+      int planPrice = 0;
       switch (selectedPlan) {
         case "Starter Bundle":
+          planPrice = 99;
           planData = {
             'subscriptionPlan': 'Starter Bundle',
             'subscriptionPrice': 99,
@@ -132,6 +173,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           };
           break;
         case "Pro Bundle":
+          planPrice = 249;
           planData = {
             'subscriptionPlan': 'Pro Bundle',
             'subscriptionPrice': 249,
@@ -141,6 +183,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           };
           break;
         case "Enterprise Bundle":
+          planPrice = 449;
           planData = {
             'subscriptionPlan': 'Enterprise Bundle',
             'subscriptionPrice': 449,
@@ -151,9 +194,37 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           break;
       }
 
-      // Add subscription date
-      planData['subscriptionStartDate'] = DateTime.now().toIso8601String();
-      planData['subscriptionUpdatedAt'] = DateTime.now().toIso8601String();
+      // Process payment with Stripe before saving plan
+      if (mounted) {
+        final paymentConfirmed = await _processPayment(
+          amount: planPrice,
+          planName: selectedPlan,
+          shipper: shipper,
+        );
+        
+        if (!paymentConfirmed) {
+          setState(() => _isLoading = false);
+          return; // Payment was canceled or failed
+        }
+      }
+
+      // Calculate subscription dates
+      final now = DateTime.now();
+      final subscriptionStartDate = now;
+      // Monthly subscription - add 1 month for end date (handles year overflow)
+      final subscriptionEndDate = DateTime(now.year, now.month + 1, now.day);
+      final renewalDate = subscriptionEndDate; // Renewal is same as end date for monthly
+      
+      // Add subscription dates
+      planData['subscriptionStartDate'] = subscriptionStartDate.toIso8601String();
+      planData['subscriptionEndDate'] = subscriptionEndDate.toIso8601String();
+      planData['renewalDate'] = renewalDate.toIso8601String();
+      planData['subscriptionUpdatedAt'] = now.toIso8601String();
+      planData['paymentStatus'] = 'paid';
+      planData['paymentDate'] = now.toIso8601String();
+      
+      // Reset posts counter for new subscription period
+      planData['postsUsedThisPeriod'] = 0;
 
       // Get current subscription data to save to history
       final shipperDoc = await FirebaseService.shippers.doc(shipper.uid).get();
@@ -199,6 +270,11 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
       }
       
       await FirebaseService.updateShipper(shipper.uid, updates);
+
+      // Update activePlan immediately after successful save
+      setState(() {
+        activePlan = selectedPlan;
+      });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -264,7 +340,11 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                     ),
                     IconButton(
                       onPressed: _showSubscriptionHistory,
-                      icon: const Icon(Icons.history, color: Colors.black),
+                      icon: const Icon(
+                        Icons.history,
+                        color: Color(0xFF195529),
+                        size: 28,
+                      ),
                       tooltip: 'View Subscription History',
                     ),
                   ],
@@ -279,14 +359,18 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   title: "Starter Bundle",
                   price: "\$99/month",
                   details: ["10 load postings + 1 Boost"],
-                  renewal: "Sept 30*",
+                  renewal: activePlan == "Starter Bundle" && _renewalDate != null
+                      ? _formatRenewalDate(_renewalDate!)
+                      : null,
                   selected: selectedPlan == "Starter Bundle",
+                  isActive: activePlan == "Starter Bundle",
                   onTap: () {
                     setState(() {
                       selectedPlan = "Starter Bundle";
                       _postLimit = 10;
                     });
                   },
+                  onCancel: activePlan == "Starter Bundle" ? _showCancelPlanDialog : null,
                 ),
                 const SizedBox(height: 16),
           
@@ -296,13 +380,18 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   price: "\$249/month",
                   details: ["25 Load Postings + 5 Boost Credits"],
                   tag: "Best Value",
+                  renewal: activePlan == "Pro Bundle" && _renewalDate != null
+                      ? _formatRenewalDate(_renewalDate!)
+                      : null,
                   selected: selectedPlan == "Pro Bundle",
+                  isActive: activePlan == "Pro Bundle",
                   onTap: () {
                     setState(() {
                       selectedPlan = "Pro Bundle";
                       _postLimit = 25;
                     });
                   },
+                  onCancel: activePlan == "Pro Bundle" ? _showCancelPlanDialog : null,
                 ),
                 const SizedBox(height: 16),
           
@@ -311,26 +400,35 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   title: "Enterprise Bundle",
                   price: "\$449/month",
                   details: ["Unlimited Load Postings + 10 Boost Credits"],
+                  renewal: activePlan == "Enterprise Bundle" && _renewalDate != null
+                      ? _formatRenewalDate(_renewalDate!)
+                      : null,
                   selected: selectedPlan == "Enterprise Bundle",
+                  isActive: activePlan == "Enterprise Bundle",
                   onTap: () {
                     setState(() {
                       selectedPlan = "Enterprise Bundle";
                       _postLimit = -1; // Unlimited
                     });
                   },
+                  onCancel: activePlan == "Enterprise Bundle" ? _showCancelPlanDialog : null,
                 ),
                 const SizedBox(height: 30),
           
                 // Upgrade Button
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isLoading ? Colors.grey : Colors.green,
+                    backgroundColor: (_isLoading || (activePlan.isNotEmpty && selectedPlan == activePlan))
+                        ? Colors.grey
+                        : Colors.green,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onPressed: _isLoading ? null : _savePlan,
+                  onPressed: (_isLoading || (activePlan.isNotEmpty && selectedPlan == activePlan))
+                      ? null
+                      : _savePlan,
                   child: _isLoading
                       ? const SizedBox(
                           height: 20,
@@ -340,9 +438,11 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         )
-                      : const Text(
-                    "Upgrade My Plan",
-                    style: TextStyle(
+                      : Text(
+                    activePlan.isNotEmpty && selectedPlan == activePlan
+                        ? "This is your active plan"
+                        : "Upgrade My Plan",
+                    style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -363,41 +463,43 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     final authProvider = context.read<AuthProvider>();
     final shipper = authProvider.shipperUser;
     
-    // Get current subscription from Firebase
+    // Reload fresh data from Firestore to ensure history is up to date
     Map<String, dynamic>? currentSubscription;
+    List<Map<String, dynamic>> subscriptionHistory = [];
+    
     if (shipper != null) {
       try {
         final shipperDoc = await FirebaseService.shippers.doc(shipper.uid).get();
         if (shipperDoc.exists) {
           final data = shipperDoc.data() as Map<String, dynamic>?;
-          if (data != null && data['subscriptionPlan'] != null) {
-            currentSubscription = {
-              'subscriptionPlan': data['subscriptionPlan'],
-              'subscriptionPrice': data['subscriptionPrice'] ?? _getPlanPrice(selectedPlan),
-              'loadPostingsLimit': data['loadPostingsLimit'] ?? _postLimit,
-              'boostCredits': data['boostCredits'] ?? _getPlanBoostCredits(selectedPlan),
-              'subscriptionType': data['subscriptionType'] ?? 'monthly',
-              'subscriptionStartDate': data['subscriptionStartDate'],
-              'status': 'active',
-            };
+          if (data != null) {
+            // Get current active subscription
+            if (data['subscriptionPlan'] != null) {
+              currentSubscription = {
+                'subscriptionPlan': data['subscriptionPlan'],
+                'subscriptionPrice': data['subscriptionPrice'] ?? _getPlanPrice(activePlan),
+                'loadPostingsLimit': data['loadPostingsLimit'] ?? _postLimit,
+                'boostCredits': data['boostCredits'] ?? _getPlanBoostCredits(activePlan),
+                'subscriptionType': data['subscriptionType'] ?? 'monthly',
+                'subscriptionStartDate': data['subscriptionStartDate'],
+                'subscriptionEndDate': data['subscriptionEndDate'],
+                'renewalDate': data['renewalDate'],
+                'status': 'active',
+              };
+            }
+            
+            // Get fresh subscription history from Firestore
+            final history = data['subscriptionHistory'] as List<dynamic>?;
+            if (history != null) {
+              subscriptionHistory = List<Map<String, dynamic>>.from(
+                history.map((e) => e as Map<String, dynamic>)
+              );
+            }
           }
         }
       } catch (e) {
-        debugPrint('Error loading current subscription: $e');
+        debugPrint('Error loading subscription history: $e');
       }
-    }
-    
-    // If no current subscription found and a plan is selected, create one from state
-    if (currentSubscription == null && selectedPlan.isNotEmpty) {
-      currentSubscription = {
-        'subscriptionPlan': selectedPlan,
-        'subscriptionPrice': _getPlanPrice(selectedPlan),
-        'loadPostingsLimit': _postLimit,
-        'boostCredits': _getPlanBoostCredits(selectedPlan),
-        'subscriptionType': 'monthly',
-        'subscriptionStartDate': DateTime.now().toIso8601String(),
-        'status': 'active',
-      };
     }
     
     // Combine current with history (newest first)
@@ -405,7 +507,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     if (currentSubscription != null) {
       allSubscriptions.add(currentSubscription);
     }
-    allSubscriptions.addAll(_subscriptionHistory.reversed);
+    allSubscriptions.addAll(subscriptionHistory.reversed);
     
     // Navigate to full screen
     Navigator.of(context).push(
@@ -426,7 +528,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
         : "$_usedPosts/$_postLimit";
     
     return Container(
-      padding: const EdgeInsets.all(16),
+      height: 110, // Fixed height to prevent UI shifts
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.grey.shade200, // ✅ Light card
         borderRadius: BorderRadius.circular(12),
@@ -434,10 +537,13 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text("Remaining Posts",
-              style: TextStyle(color: Colors.black, fontSize: 14)),
-          const SizedBox(height: 4),
+          const Text(
+            "Remaining Posts",
+            style: TextStyle(color: Colors.black, fontSize: 14),
+          ),
+          const SizedBox(height: 6),
           Text(
             displayText,
             style: const TextStyle(
@@ -445,6 +551,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
               fontSize: 22,
               fontWeight: FontWeight.bold,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (_postLimit != -1 && remaining >= 0) ...[
             const SizedBox(height: 4),
@@ -455,6 +563,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ],
@@ -469,18 +579,27 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     String? renewal,
     String? tag,
     bool selected = false,
+    bool isActive = false, // True only if this is the actual active subscription
     required VoidCallback onTap,
+    VoidCallback? onCancel, // Cancel subscription callback
   }) {
     return InkWell(
       onTap: onTap,
-      child: Container(
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.grey.shade200, // ✅ Light card
+          color: isActive 
+              ? const Color(0xFF195529).withOpacity(0.08) // Primary color tint for active plan
+              : Colors.grey.shade200, // ✅ Light card for inactive plans
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: selected ? Colors.green : Colors.transparent,
-            width: 2,
+            color: isActive 
+                ? const Color(0xFF195529) // Primary color border for active plan
+                : (selected ? Colors.green.withOpacity(0.6) : Colors.grey.withOpacity(0.3)), // Border for selected (clicked) plan
+            width: 2, // Fixed width to prevent resizing
           ),
         ),
         child: Stack(
@@ -488,9 +607,41 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.black)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, color: Colors.black)),
+                    ),
+                    // Active Plan Chip - ONLY show for actually active plan
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: isActive
+                          ? Container(
+                              key: const ValueKey('active-chip'),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF195529),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'Active Plan',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          : const SizedBox(
+                              key: ValueKey('empty-chip'),
+                              width: 0,
+                              height: 0,
+                            ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 6),
                 Text(price,
                     style:
@@ -503,9 +654,68 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                 ))
                     .toList(),
                 if (renewal != null) ...[
-                  const SizedBox(height: 6),
-                  Text("Renewal Date: $renewal",
-                      style: const TextStyle(color: Colors.black54)),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF195529).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF195529).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.autorenew,
+                          size: 16,
+                          color: Color(0xFF195529),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Renewal Date: $renewal",
+                          style: const TextStyle(
+                            color: Color(0xFF195529),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                // Cancel Subscription Button - only for active plan
+                if (isActive && onCancel != null) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: onCancel,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          side: BorderSide(color: Colors.red.withOpacity(0.5), width: 1),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.cancel_outlined, size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Cancel Subscription',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -557,6 +767,1092 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
       default:
         return 0;
     }
+  }
+
+  /// Format renewal date for display (e.g., "Sept 30, 2025")
+  String _formatRenewalDate(DateTime date) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  /// Process payment using Stripe
+  Future<bool> _processPayment({
+    required int amount,
+    required String planName,
+    required dynamic shipper,
+  }) async {
+    try {
+      // Show payment processing dialog
+      if (!mounted) return false;
+      
+      // Show payment method selection dialog
+      final paymentMethod = await _showPaymentMethodDialog();
+      if (paymentMethod == null) {
+        return false; // User canceled
+      }
+
+      // Convert amount to cents for Stripe
+      final amountInCents = amount * 100;
+      
+      // Prepare payment metadata
+      final metadata = {
+        'shipper_id': shipper.uid,
+        'shipper_email': shipper.email ?? 'N/A',
+        'plan_name': planName,
+        'amount': amount.toString(),
+        'subscription_type': 'monthly',
+      };
+
+      // Process payment using Stripe Payment Sheet
+      final paymentSuccess = await StripeService.processPayment(
+        amountInCents: amountInCents,
+        currency: 'usd',
+        metadata: metadata,
+      );
+
+      if (paymentSuccess) {
+        // Log analytics event for successful subscription upgrade
+        await FirebaseService.logEvent(
+          'subscription_upgrade_success',
+          parameters: FirebaseService.convertParameters({
+            'plan_name': planName,
+            'amount': amount,
+            'shipper_id': shipper.uid,
+          }),
+        );
+        
+        if (mounted) {
+          // Get subscription dates from planData (calculated in _savePlan)
+          final now = DateTime.now();
+          final subscriptionEndDate = DateTime(now.year, now.month + 1, now.day);
+          await _showPaymentSuccessDialog(
+            planName: planName,
+            amount: amount,
+            startDate: now,
+            endDate: subscriptionEndDate,
+            renewalDate: subscriptionEndDate,
+          );
+        }
+        return true;
+      } else {
+        return false;
+      }
+    } catch (e, stackTrace) {
+      // Log payment errors to Crashlytics
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Payment processing failed in shipper_boost_my_page',
+      );
+      await FirebaseService.log('Payment Failed - Plan: $planName, Amount: \$$amount');
+      await FirebaseService.setCustomKey('payment_plan', planName);
+      await FirebaseService.setCustomKey('payment_amount', amount);
+      
+      // Log analytics event for subscription upgrade failure
+      final errorMessage = StripeService.getErrorMessage(e);
+      await FirebaseService.logEvent(
+        'subscription_upgrade_failed',
+        parameters: FirebaseService.convertParameters({
+          'plan_name': planName,
+          'amount': amount,
+          'shipper_id': shipper.uid,
+          'error_message': errorMessage.length > 100 ? errorMessage.substring(0, 100) : errorMessage,
+        }),
+      );
+      
+      if (mounted) {
+        // Calculate renewal date for failure dialog
+        final now = DateTime.now();
+        final renewalDate = DateTime(now.year, now.month + 1, now.day);
+        await _showPaymentFailureDialog(
+          planName: planName,
+          amount: amount,
+          errorMessage: errorMessage,
+          shipper: shipper,
+          renewalDate: renewalDate,
+        );
+      }
+      return false;
+    }
+  }
+
+  /// Show payment method selection dialog
+  Future<String?> _showPaymentMethodDialog() async {
+    // For now, directly proceed with Payment Sheet
+    // In the future, you can add more payment methods here
+    return 'payment_sheet';
+  }
+
+  /// Show cancel plan confirmation dialog
+  Future<void> _showCancelPlanDialog() async {
+    final authProvider = context.read<AuthProvider>();
+    final shipper = authProvider.shipperUser;
+    
+    if (shipper == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User not found. Please login again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Get current subscription details
+    final shipperDoc = await FirebaseService.shippers.doc(shipper.uid).get();
+    final currentData = shipperDoc.data() as Map<String, dynamic>?;
+    final currentPlan = currentData?['subscriptionPlan'] as String? ?? selectedPlan;
+    final endDateStr = currentData?['subscriptionEndDate'] as String?;
+    DateTime? endDate;
+    if (endDateStr != null) {
+      try {
+        endDate = DateTime.parse(endDateStr);
+      } catch (e) {
+        debugPrint('Error parsing end date: $e');
+      }
+    }
+
+    // Format date for display
+    String formatDate(DateTime date) {
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'
+      ];
+      return '${months[date.month - 1]} ${date.day}, ${date.year}';
+    }
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6CA78A).withOpacity(0.2),
+                  blurRadius: 13.4,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Warning icon with gradient background
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF9800), Color(0xFFE53935)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFE53935).withOpacity(0.36),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.white,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Title
+                const Text(
+                  'Cancel Subscription',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF195529),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                // Subscription details card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFE53935).withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildCancelDetailRow(
+                        icon: Icons.workspace_premium,
+                        label: 'Current Plan',
+                        value: currentPlan,
+                        iconColor: const Color(0xFFE53935),
+                        labelColor: const Color(0xFFE53935),
+                      ),
+                      if (endDate != null) ...[
+                        const SizedBox(height: 12),
+                        const Divider(height: 1, color: Color(0xFFD9D9D9)),
+                        const SizedBox(height: 12),
+                        _buildCancelDetailRow(
+                          icon: Icons.calendar_today,
+                          label: 'Active Until',
+                          value: formatDate(endDate),
+                          iconColor: const Color(0xFFE53935),
+                          labelColor: const Color(0xFFE53935),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Warning message container
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFE53935).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Color(0xFFE53935),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Important Notice',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFE53935),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              endDate != null
+                                  ? 'Your subscription will remain active until ${formatDate(endDate)}. After this date, you will lose access to all premium features and benefits.'
+                                  : 'Cancelling will immediately revoke access to all premium features and benefits.',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFFE53935),
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Action buttons
+                Column(
+                  children: [
+                    // Cancel Subscription button (primary action - red)
+                    Container(
+                      width: double.infinity,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFE53935), Color(0xFFC62828)],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFC62828).withOpacity(0.36),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () async {
+                            Navigator.of(context).pop();
+                            await _cancelPlan(shipper);
+                          },
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.delete_outline,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Delete Subscription',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    // Keep Subscription button (secondary action)
+                    Container(
+                      width: double.infinity,
+                      height: 50,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF195529).withOpacity(0.5),
+                          width: 2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF195529).withOpacity(0.2),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => Navigator.of(context).pop(),
+                          borderRadius: BorderRadius.circular(12),
+                          child: const Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  color: Color(0xFF195529),
+                                  size: 20,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Keep My Subscription',
+                                  style: TextStyle(
+                                    color: Color(0xFF195529),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Build a detail row for the cancel dialog
+  Widget _buildCancelDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? iconColor,
+    Color? labelColor,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: iconColor ?? const Color(0xFFE53935),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: labelColor ?? const Color(0xFFE53935),
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: labelColor ?? const Color(0xFFE53935),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Cancel the current subscription plan
+  Future<void> _cancelPlan(dynamic shipper) async {
+    try {
+      setState(() => _isLoading = true);
+
+      // Get current subscription data to save to history
+      final shipperDoc = await FirebaseService.shippers.doc(shipper.uid).get();
+      final currentData = shipperDoc.data() as Map<String, dynamic>?;
+
+      // Prepare history entry for canceled subscription
+      Map<String, dynamic>? historyEntry;
+      if (currentData != null && currentData['subscriptionPlan'] != null) {
+        historyEntry = {
+          'subscriptionPlan': currentData['subscriptionPlan'],
+          'subscriptionPrice': currentData['subscriptionPrice'] ?? 0,
+          'loadPostingsLimit': currentData['loadPostingsLimit'] ?? 0,
+          'boostCredits': currentData['boostCredits'] ?? 0,
+          'subscriptionType': currentData['subscriptionType'] ?? 'monthly',
+          'subscriptionStartDate': currentData['subscriptionStartDate'],
+          'subscriptionEndDate': DateTime.now().toIso8601String(), // Cancellation date
+          'changedAt': DateTime.now().toIso8601String(),
+          'reason': 'cancelled', // Reason for cancellation
+        };
+      }
+
+      // Update shipper document - remove subscription but keep history
+      final updates = <String, dynamic>{
+        'subscriptionPlan': null,
+        'subscriptionPrice': null,
+        'loadPostingsLimit': null,
+        'boostCredits': null,
+        'subscriptionType': null,
+        'subscriptionStartDate': null,
+        'subscriptionEndDate': null,
+        'renewalDate': null,
+        'paymentStatus': 'cancelled',
+        'subscriptionUpdatedAt': DateTime.now().toIso8601String(),
+      };
+
+      if (historyEntry != null) {
+        // Get existing history or initialize empty array
+        final existingHistory = currentData?['subscriptionHistory'] as List<dynamic>? ?? [];
+        
+        // Add canceled subscription to history
+        final updatedHistory = List<Map<String, dynamic>>.from(
+          existingHistory.map((e) => e as Map<String, dynamic>)
+        );
+        updatedHistory.add(historyEntry);
+        
+        // Store updated history
+        updates['subscriptionHistory'] = updatedHistory;
+      } else if (currentData != null && currentData['subscriptionHistory'] == null) {
+        // Initialize empty history array if it doesn't exist
+        updates['subscriptionHistory'] = [];
+      }
+
+      await FirebaseService.updateShipper(shipper.uid, updates);
+
+      // Update activePlan immediately after cancellation
+      setState(() {
+        activePlan = "";
+      });
+
+      // Log analytics event
+      await FirebaseService.logEvent(
+        'subscription_cancelled',
+        parameters: FirebaseService.convertParameters({
+          'plan_name': currentData?['subscriptionPlan'] ?? 'unknown',
+          'shipper_id': shipper.uid,
+        }),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Subscription cancelled successfully.'),
+            backgroundColor: Colors.orange,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Reload plan data
+        await _loadCurrentPlan();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel subscription: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  /// Show payment success dialog with beautiful design inspired by shipper_intransit_orders
+  Future<void> _showPaymentSuccessDialog({
+    required String planName,
+    required int amount,
+    required DateTime startDate,
+    required DateTime endDate,
+    required DateTime renewalDate,
+  }) async {
+    // Format dates for display
+    String formatDate(DateTime date) {
+      return '${date.month}/${date.day}/${date.year}';
+    }
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6CA78A).withOpacity(0.2),
+                  blurRadius: 13.4,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Success icon with gradient background
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4CAF50), Color(0xFF195529)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF195529).withOpacity(0.36),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.check,
+                    color: Colors.white,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Success title
+                const Text(
+                  'Payment Successful!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF195529),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                // Payment details card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFF195529).withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildPaymentDetailRow(
+                        icon: Icons.workspace_premium,
+                        label: 'Plan',
+                        value: planName,
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: Color(0xFFD9D9D9)),
+                      const SizedBox(height: 12),
+                      _buildPaymentDetailRow(
+                        icon: Icons.attach_money,
+                        label: 'Amount',
+                        value: '\$$amount',
+                        valueColor: const Color(0xFFCEB838),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: Color(0xFFD9D9D9)),
+                      const SizedBox(height: 12),
+                      _buildPaymentDetailRow(
+                        icon: Icons.calendar_today,
+                        label: 'Billing',
+                        value: 'Monthly',
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: Color(0xFFD9D9D9)),
+                      const SizedBox(height: 12),
+                      _buildPaymentDetailRow(
+                        icon: Icons.play_arrow,
+                        label: 'Start Date',
+                        value: formatDate(startDate),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: Color(0xFFD9D9D9)),
+                      const SizedBox(height: 12),
+                      _buildPaymentDetailRow(
+                        icon: Icons.stop,
+                        label: 'End Date',
+                        value: formatDate(endDate),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: Color(0xFFD9D9D9)),
+                      const SizedBox(height: 12),
+                      _buildPaymentDetailRow(
+                        icon: Icons.autorenew,
+                        label: 'Renewal Date',
+                        value: formatDate(renewalDate),
+                        valueColor: const Color(0xFF195529),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Success message
+                Text(
+                  'Your subscription has been upgraded successfully. You can now enjoy all the premium features!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black.withOpacity(0.7),
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                
+                // Done button
+                Container(
+                  width: double.infinity,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF4CAF50), Color(0xFF195529)],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF195529).withOpacity(0.36),
+                        blurRadius: 4,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.of(context).pop();
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Center(
+                        child: Text(
+                          'Done',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Show payment failure dialog with beautiful design inspired by shipper_intransit_orders
+  Future<void> _showPaymentFailureDialog({
+    required String planName,
+    required int amount,
+    required String errorMessage,
+    required dynamic shipper,
+    required DateTime renewalDate,
+  }) async {
+    // Format dates for display
+    String formatDate(DateTime date) {
+      return '${date.month}/${date.day}/${date.year}';
+    }
+    return showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF6CA78A).withOpacity(0.2),
+                  blurRadius: 13.4,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Error icon with gradient background
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFE53935), Color(0xFFC62828)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFC62828).withOpacity(0.36),
+                        blurRadius: 8,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.white,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Failure title
+                const Text(
+                  'Payment Failed',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFFC62828),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                
+                // Payment details card
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: const Color(0xFFC62828).withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildPaymentDetailRow(
+                        icon: Icons.workspace_premium,
+                        label: 'Plan',
+                        value: planName,
+                        iconColor: const Color(0xFFC62828),
+                        labelColor: const Color(0xFFC62828),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: Color(0xFFD9D9D9)),
+                      const SizedBox(height: 12),
+                      _buildPaymentDetailRow(
+                        icon: Icons.attach_money,
+                        label: 'Amount',
+                        value: '\$$amount',
+                        valueColor: const Color(0xFFCEB838),
+                        iconColor: const Color(0xFFC62828),
+                        labelColor: const Color(0xFFC62828),
+                      ),
+                      const SizedBox(height: 12),
+                      const Divider(height: 1, color: Color(0xFFD9D9D9)),
+                      const SizedBox(height: 12),
+                      _buildPaymentDetailRow(
+                        icon: Icons.autorenew,
+                        label: 'Renewal Date',
+                        value: formatDate(renewalDate),
+                        iconColor: const Color(0xFFC62828),
+                        labelColor: const Color(0xFFC62828),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                
+                // Error message container
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFFC62828).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(
+                        Icons.error_outline,
+                        color: Color(0xFFC62828),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          errorMessage.length > 150 
+                              ? '${errorMessage.substring(0, 150)}...' 
+                              : errorMessage,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFC62828),
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Helpful message
+                Text(
+                  'Please check your payment method and try again. If the problem persists, contact support.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black.withOpacity(0.7),
+                    height: 1.4,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                
+                // Retry and Cancel buttons
+                Row(
+                  children: [
+                    // Cancel button
+                    Expanded(
+                      child: Container(
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFFC62828).withOpacity(0.5),
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFC62828).withOpacity(0.2),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.of(context).pop();
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Center(
+                              child: Text(
+                                'Cancel',
+                                style: TextStyle(
+                                  color: Color(0xFFC62828),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Retry button
+                    Expanded(
+                      child: Container(
+                        height: 50,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFE53935), Color(0xFFC62828)],
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFC62828).withOpacity(0.36),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              Navigator.of(context).pop();
+                              // Retry payment by calling _processPayment again
+                              _processPayment(
+                                amount: amount,
+                                planName: planName,
+                                shipper: shipper,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: const Center(
+                              child: Text(
+                                'Retry',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Build a payment detail row for the success dialog
+  Widget _buildPaymentDetailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+    Color? iconColor,
+    Color? labelColor,
+  }) {
+    return Row(
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: iconColor ?? const Color(0xFF195529),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: labelColor ?? const Color(0xFF195529),
+            ),
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: valueColor ?? const Color(0xFF195529),
+          ),
+        ),
+      ],
+    );
   }
 }
 

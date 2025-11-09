@@ -1,0 +1,438 @@
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'firebase_service.dart';
+
+/// Stripe Payment Service
+/// 
+/// This service handles Stripe payment processing for subscription plans.
+/// 
+/// IMPORTANT: You need to:
+/// 1. Get your Stripe publishable key from https://dashboard.stripe.com/apikeys
+/// 2. Set it in the StripeService.initialize() method
+/// 3. Create a backend endpoint to create payment intents securely
+///    (or use Stripe's test mode with test keys)
+class StripeService {
+  // TODO: Replace with your Stripe publishable key
+  // Get it from: https://dashboard.stripe.com/apikeys
+  static const String _publishableKey = 'pk_test_51RkhVRR1kSahGVhD3aSTz1c8p8TOJRKNYkITYLD7zmsTfY4TYX823mwMxfmaRjU1aGjEYLYG2u3lrMZOYKgHFNaC00RpxM6fkF';
+  
+  // TODO: Replace with your backend endpoint for creating payment intents
+  // This should be a secure endpoint that uses your Stripe secret key
+  // static const String _paymentIntentEndpoint = 'https://your-backend.com/create-payment-intent';
+  
+  /// Initialize Stripe with publishable key
+  static Future<void> initialize() async {
+    Stripe.publishableKey = 'pk_test_51RkhVRR1kSahGVhD3aSTz1c8p8TOJRKNYkITYLD7zmsTfY4TYX823mwMxfmaRjU1aGjEYLYG2u3lrMZOYKgHFNaC00RpxM6fkF';
+    await Stripe.instance.applySettings();
+  }
+  
+  /// Create a payment intent for the subscription amount using Firebase Cloud Functions
+  /// 
+  /// This calls the Firebase Cloud Function 'createPaymentIntent' which securely
+  /// creates a Stripe payment intent using the server-side secret key
+  /// 
+  /// Returns the client secret string needed for the Payment Sheet
+  static Future<String> createPaymentIntent({
+    required int amountInCents,
+    required String currency,
+    required Map<String, dynamic> metadata,
+  }) async {
+    try {
+      // Verify user is authenticated with Firebase Auth
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in with Firebase Auth to process payment');
+      }
+      
+      // Get a fresh auth token to ensure it's valid
+      final idToken = await currentUser.getIdToken(true);
+      if (idToken != null) {
+        debugPrint('Auth token obtained: ${idToken.substring(0, 20)}...');
+      }
+      
+      debugPrint('Creating payment intent via Firebase Functions...');
+      debugPrint('User ID: ${currentUser.uid}');
+      debugPrint('Amount: \$${(amountInCents / 100).toStringAsFixed(2)}');
+      debugPrint('Currency: $currency');
+      debugPrint('Metadata: $metadata');
+      
+      // Call Firebase Cloud Function (using Canadian region: northamerica-northeast1)
+      // NOTE: There's a known issue where instanceFor() might not automatically include
+      // the auth token. We need to ensure FirebaseAuth is the active instance.
+      
+      // Verify user is still authenticated right before the call
+      final userBeforeCall = FirebaseAuth.instance.currentUser;
+      if (userBeforeCall == null || userBeforeCall.uid != currentUser.uid) {
+        throw Exception('User authentication lost. Please login again.');
+      }
+      
+      // Get a fresh auth token to ensure it's valid
+      final freshToken = await userBeforeCall.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+      debugPrint('Fresh token obtained before call: ${freshToken.substring(0, 20)}...');
+      
+      // WORKAROUND: Manually make HTTP request to Canadian region function
+      // This bypasses the Flutter SDK bug where instanceFor() doesn't include auth token
+      // Using Canadian region (northamerica-northeast1) for data residency compliance
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/createPaymentIntent';
+      
+      debugPrint('Calling Canadian region function: $functionUrl');
+      
+      // Make HTTP POST request with auth token in header
+      // Firebase callable functions require specific headers and format
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken', // Firebase Auth ID token
+        },
+        body: jsonEncode({
+          'data': {
+            'amount': amountInCents,
+            'currency': currency,
+            'metadata': metadata,
+          },
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Payment intent creation timed out');
+        },
+      );
+      
+      debugPrint('Response status: ${response.statusCode}');
+      debugPrint('Response headers: ${response.headers}');
+      debugPrint('Response body: ${response.body}');
+      
+      debugPrint('Function response status: ${response.statusCode}');
+      
+      if (response.statusCode != 200) {
+        final errorBody = response.body;
+        debugPrint('Function error response: $errorBody');
+        
+        // Try to parse error message from Firebase Functions format
+        try {
+          final errorJson = jsonDecode(errorBody);
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          final errorCode = error?['status'] as String?;
+          final errorMessage = error?['message'] as String?;
+          
+          // Log to Crashlytics
+          await FirebaseService.recordError(
+            Exception(errorMessage ?? errorBody),
+            StackTrace.current,
+            reason: 'Firebase Functions error: $errorCode',
+          );
+          await FirebaseService.log('Payment Intent Creation Failed: $errorCode - $errorMessage');
+          await FirebaseService.setCustomKey('payment_error_type', 'firebase_functions');
+          if (errorCode != null) {
+            await FirebaseService.setCustomKey('payment_error_code', errorCode);
+          }
+          
+          // Log analytics event for payment intent failure
+          await FirebaseService.logEvent(
+            'payment_intent_failed',
+            parameters: FirebaseService.convertParameters({
+              'error_type': 'firebase_functions',
+              'error_code': errorCode ?? 'unknown',
+              'amount': amountInCents,
+              'currency': currency,
+            }),
+          );
+          
+          if (errorCode == 'UNAUTHENTICATED' || errorCode == 'unauthenticated') {
+            throw Exception('Please login to process payment');
+          } else if (errorCode == 'PERMISSION_DENIED' || errorCode == 'permission-denied') {
+            throw Exception('Permission denied. Please contact support.');
+          } else {
+            throw Exception('Payment intent creation failed: ${errorMessage ?? errorCode ?? response.statusCode}');
+          }
+        } catch (parseError) {
+          // If parsing fails, log and throw generic error
+          await FirebaseService.recordError(
+            Exception('HTTP ${response.statusCode}: $errorBody'),
+            StackTrace.current,
+            reason: 'Payment intent creation HTTP error',
+          );
+          
+          // Log analytics event for payment intent failure
+          await FirebaseService.logEvent(
+            'payment_intent_failed',
+            parameters: FirebaseService.convertParameters({
+              'error_type': 'http_error',
+              'status_code': response.statusCode,
+              'amount': amountInCents,
+              'currency': currency,
+            }),
+          );
+          
+          throw Exception('Payment intent creation failed: ${response.statusCode} - ${response.body}');
+        }
+      }
+      
+      // Parse response
+      final responseData = jsonDecode(response.body);
+      final result = responseData['result'] as Map<String, dynamic>?;
+      final clientSecret = result?['clientSecret'] as String?;
+      
+      if (clientSecret == null || clientSecret.isEmpty) {
+        throw Exception('Failed to get client secret from Firebase Function');
+      }
+      
+      debugPrint('Payment intent created successfully in Canadian region');
+      
+      // Log successful payment intent creation to Crashlytics
+      await FirebaseService.log('Payment Intent Created Successfully - Amount: \$${(amountInCents / 100).toStringAsFixed(2)}');
+      await FirebaseService.setCustomKey('payment_intent_created', 'true');
+      
+      // Log analytics event for payment intent creation
+      await FirebaseService.logEvent(
+        'payment_intent_created',
+        parameters: FirebaseService.convertParameters({
+          'amount': amountInCents,
+          'currency': currency,
+          'value': amountInCents / 100.0, // For revenue tracking
+        }),
+      );
+      
+      return clientSecret;
+    } on http.ClientException catch (e, stackTrace) {
+      debugPrint('HTTP Client Error: $e');
+      
+      // Log to Crashlytics
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'HTTP client error in createPaymentIntent',
+      );
+      await FirebaseService.log('Payment Intent Creation Failed: HTTP client error');
+      await FirebaseService.setCustomKey('payment_error_type', 'http_client_error');
+      
+      // Log analytics event for payment intent failure
+      await FirebaseService.logEvent(
+        'payment_intent_failed',
+        parameters: FirebaseService.convertParameters({
+          'error_type': 'http_client_error',
+          'amount': amountInCents,
+          'currency': currency,
+        }),
+      );
+      
+      throw Exception('Network error. Please check your connection and try again.');
+    } catch (e, stackTrace) {
+      debugPrint('Error creating payment intent: $e');
+      
+      // Log to Crashlytics
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Unexpected error in createPaymentIntent',
+      );
+      await FirebaseService.log('Payment Intent Creation Error: $e');
+      await FirebaseService.setCustomKey('payment_error_type', 'unexpected_error');
+      
+      // Log analytics event for payment intent failure
+      await FirebaseService.logEvent(
+        'payment_intent_failed',
+        parameters: FirebaseService.convertParameters({
+          'error_type': 'unexpected_error',
+          'amount': amountInCents,
+          'currency': currency,
+        }),
+      );
+      
+      rethrow;
+    }
+  }
+  
+  /// Process payment using Stripe Payment Sheet
+  /// 
+  /// This method:
+  /// 1. Creates a payment intent (via backend)
+  /// 2. Initializes the Stripe Payment Sheet
+  /// 3. Presents the payment sheet to the user
+  /// 4. Returns the payment result
+  static Future<bool> processPayment({
+    required int amountInCents,
+    required String currency,
+    required Map<String, dynamic> metadata,
+  }) async {
+    try {
+      // Step 1: Create payment intent via Firebase Functions
+      final clientSecret = await createPaymentIntent(
+        amountInCents: amountInCents,
+        currency: currency,
+        metadata: metadata,
+      );
+      
+      if (clientSecret.isEmpty) {
+        throw Exception('Payment intent client secret is missing');
+      }
+      
+      // Step 2: Initialize payment sheet parameters
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Remiles',
+        ),
+      );
+      
+      // Step 3: Present payment sheet
+      await Stripe.instance.presentPaymentSheet();
+      
+      // Step 4: Payment successful
+      // Log successful payment to Crashlytics
+      await FirebaseService.log('Payment Processed Successfully - Amount: \$${(amountInCents / 100).toStringAsFixed(2)}');
+      await FirebaseService.setCustomKey('payment_success', 'true');
+      await FirebaseService.setCustomKey('payment_amount', amountInCents);
+      
+      // Log analytics event for successful payment
+      final planName = metadata['plan_name'] as String? ?? 'unknown';
+      final transactionId = '${metadata['shipper_id']}_${DateTime.now().millisecondsSinceEpoch}';
+      
+      // Log standard purchase event for revenue tracking
+      await FirebaseService.logEvent(
+        'purchase',
+        parameters: FirebaseService.convertParameters({
+          'transaction_id': transactionId,
+          'value': amountInCents / 100.0,
+          'currency': currency.toUpperCase(),
+          'item_id': planName.toLowerCase().replaceAll(' ', '_'),
+          'item_name': planName,
+        }),
+      );
+      
+      // Also log a custom event for subscription upgrade
+      await FirebaseService.logEvent(
+        'subscription_upgrade',
+        parameters: FirebaseService.convertParameters({
+          'plan_name': planName,
+          'amount': amountInCents,
+          'currency': currency,
+          'value': amountInCents / 100.0,
+        }),
+      );
+      
+      return true;
+    } on StripeException catch (e, stackTrace) {
+      debugPrint('Stripe Error: ${e.error.message}');
+      
+      if (e.error.code == FailureCode.Canceled) {
+        // User canceled the payment - don't log to Crashlytics as this is expected
+        await FirebaseService.log('Payment canceled by user');
+        
+        // Log analytics event for payment cancellation
+        await FirebaseService.logEvent(
+          'payment_canceled',
+          parameters: FirebaseService.convertParameters({
+            'amount': amountInCents,
+            'currency': currency,
+          }),
+        );
+        
+        return false;
+      } else {
+        // Log Stripe errors to Crashlytics
+        await FirebaseService.recordError(
+          e,
+          stackTrace,
+          reason: 'Stripe payment error: ${e.error.code}',
+        );
+        await FirebaseService.log('Stripe Payment Error: ${e.error.code} - ${e.error.message}');
+        await FirebaseService.setCustomKey('payment_error_type', 'stripe_error');
+        await FirebaseService.setCustomKey('stripe_error_code', e.error.code.toString());
+        await FirebaseService.setCustomKey('stripe_error_message', e.error.message ?? 'Unknown');
+        
+        // Log analytics event for payment failure
+        final planName = metadata['plan_name'] as String? ?? 'unknown';
+        await FirebaseService.logEvent(
+          'payment_failed',
+          parameters: FirebaseService.convertParameters({
+            'error_type': 'stripe_error',
+            'error_code': e.error.code.toString(),
+            'plan_name': planName,
+            'amount': amountInCents,
+            'currency': currency,
+          }),
+        );
+        
+        rethrow;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Payment processing error: $e');
+      
+      // Log unexpected payment errors to Crashlytics
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Unexpected error in payment processing',
+      );
+      await FirebaseService.log('Payment Processing Error: $e');
+      await FirebaseService.setCustomKey('payment_error_type', 'processing_error');
+      
+      // Log analytics event for payment failure
+      final planName = metadata['plan_name'] as String? ?? 'unknown';
+      await FirebaseService.logEvent(
+        'payment_failed',
+        parameters: FirebaseService.convertParameters({
+          'error_type': 'processing_error',
+          'plan_name': planName,
+          'amount': amountInCents,
+          'currency': currency,
+        }),
+      );
+      
+      rethrow;
+    }
+  }
+  
+  /// Process payment using card details directly (Alternative method)
+  /// 
+  /// NOTE: This method is currently not fully implemented as it requires
+  /// complex backend integration. It's recommended to use the Payment Sheet
+  /// method instead (processPayment).
+  /// 
+  /// For card input, you should collect card details and then use the
+  /// Payment Sheet with those details, or implement a full backend flow.
+  static Future<bool> processPaymentWithCard({
+    required String cardNumber,
+    required String expiryMonth,
+    required String expiryYear,
+    required String cvv,
+    required int amountInCents,
+    required String currency,
+    required Map<String, dynamic> metadata,
+  }) async {
+    // For now, redirect to Payment Sheet method
+    // In a full implementation, you would:
+    // 1. Create payment intent on backend
+    // 2. Create payment method with card details
+    // 3. Attach payment method to payment intent on backend
+    // 4. Confirm payment on client
+    
+    throw UnimplementedError(
+      'Card input payment requires backend integration. '
+      'Please use the Payment Sheet method (processPayment) instead, '
+      'or implement a backend endpoint to handle payment intent creation and confirmation.'
+    );
+  }
+  
+  /// Get error message from Stripe exception
+  static String getErrorMessage(dynamic error) {
+    if (error is StripeException) {
+      return error.error.message ?? 'Payment failed. Please try again.';
+    } else if (error is Exception) {
+      return error.toString();
+    } else {
+      return 'An unexpected error occurred. Please try again.';
+    }
+  }
+}
+

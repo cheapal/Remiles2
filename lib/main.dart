@@ -8,6 +8,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'core/firebase_service.dart';
 import 'core/app_config.dart';
+import 'core/stripe_service.dart';
 import 'package:provider/provider.dart';
 import 'modules/auth/pages/choose_role.dart';
 import 'firebase_options.dart';
@@ -59,6 +60,18 @@ void main() async {
     } catch (e) {
       if (AppConfig.enableDebugLogging) {
         print('Firebase Crashlytics initialization failed: $e');
+      }
+    }
+    
+    // Initialize Stripe
+    try {
+      await StripeService.initialize();
+      if (AppConfig.enableDebugLogging) {
+        print('Stripe initialized successfully');
+      }
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Stripe initialization error: $e');
       }
     }
     

@@ -56,7 +56,8 @@
     <string>This app needs access to microphone for voice input in AI Miley chat assistant.</string>
     <key>NSSpeechRecognitionUsageDescription</key>
     <string>This app needs speech recognition permission to convert your voice to text in AI Miley chat assistant.</string>
-    
+     <key>pk_test_51RkhVRR1kSahGVhD3aSTz1c8p8TOJRKNYkITYLD7zmsTfY4TYX823mwMxfmaRjU1aGjEYLYG2u3lrMZOYKgHFNaC00RpxM6fkF</key>
+   <string>pk_test_YOUR_PUBLISHABLE_KEY_HERE</string>
     <!-- Google Sign-In URL Scheme -->
     <key>CFBundleURLTypes</key>
     <array>

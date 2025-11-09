@@ -789,7 +789,7 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Listing saved!'),
+            content: Text('Listing saved successfully!'),
             backgroundColor: Colors.green,
           ),
         );

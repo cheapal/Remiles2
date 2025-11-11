@@ -61,4 +61,7 @@ dependencies {
     // When using the BoM, you don't specify versions in Firebase library dependencies
     implementation("com.google.firebase:firebase-crashlytics-ndk")
     implementation("com.google.firebase:firebase-analytics")
+    
+    // Material Components for Android - Required for Stripe
+    implementation("com.google.android.material:material:1.11.0")
 }

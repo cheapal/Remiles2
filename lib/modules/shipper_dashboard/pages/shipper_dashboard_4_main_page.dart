@@ -1101,7 +1101,11 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
                         )
                       ],
                     ),
-                    child: const Icon(Icons.headset_mic, color: Colors.white, size: 36),
+                    child: const Image(
+                        image: AssetImage('assets/miley_icon.png'),
+                        width: 72,
+                        height: 72,
+                      ),
                   ),
                 ),
               ),

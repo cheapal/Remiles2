@@ -66,53 +66,91 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
 
   // Handle shipper signup
   Future<void> _handleSignup() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (!_agreeToTerms) {
+    print('_handleSignup called');
+    
+    // Validate form first
+    if (!_formKey.currentState!.validate()) {
+      print('Form validation failed');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please agree to the terms and conditions')),
+        const SnackBar(
+          content: Text('Please fill in all required fields correctly'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    if (!_agreeToTerms) {
+      print('Terms not agreed');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please agree to the terms and conditions'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
       );
       return;
     }
 
+    print('Starting signup process...');
     final authProvider = context.read<AuthProvider>();
     final appStateProvider = context.read<AppStateProvider>();
 
     appStateProvider.showLoadingWithMessage('Creating your account...');
 
-    final success = await authProvider.signUpShipper(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-      companyName: _companyNameController.text.trim(),
-      displayName: _companyNameController.text.trim(),
-      phoneNumber: '$_selectedCountryCode${_phoneController.text.trim()}',
-    );
+    try {
+      final success = await authProvider.signUpShipper(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        companyName: _companyNameController.text.trim(),
+        displayName: _companyNameController.text.trim(),
+        phoneNumber: '$_selectedCountryCode${_phoneController.text.trim()}',
+      );
 
-    if (success) {
-      appStateProvider.showSuccess();
-      // Show success message
+      if (success) {
+        print('Shipper signup successful, navigating based on user role');
+        appStateProvider.showSuccess();
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Account created successfully! Redirecting...'),
+            backgroundColor: Color(0xFF4B744F),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        
+        // Add a small delay to ensure user data is fully loaded
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Call onboarding completion callback if provided
+        widget.onOnboardingComplete?.call();
+        
+        // Direct navigation as fallback if AuthWrapper doesn't trigger
+        if (context.mounted) {
+          await _navigateBasedOnRole(context, authProvider);
+        }
+      } else {
+        print('Shipper signup failed: ${authProvider.errorMessage}');
+        appStateProvider.showError(authProvider.errorMessage ?? 'Signup failed');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage ?? 'Signup failed. Please try again.'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Exception during signup: $e');
+      appStateProvider.showError('An error occurred: ${e.toString()}');
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Account created successfully! Redirecting...'),
-          backgroundColor: Color(0xFF4B744F),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text('An error occurred: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
         ),
       );
-      
-      print('Shipper signup successful, navigating based on user role');
-      
-      // Add a small delay to ensure user data is fully loaded
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      // Call onboarding completion callback if provided
-      widget.onOnboardingComplete?.call();
-      
-      // Direct navigation as fallback if AuthWrapper doesn't trigger
-      if (context.mounted) {
-        await _navigateBasedOnRole(context, authProvider);
-      }
-    } else {
-      print('Shipper signup failed: ${authProvider.errorMessage}');
-      appStateProvider.showError(authProvider.errorMessage ?? 'Signup failed');
     }
   }
 
@@ -443,55 +481,6 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
                 ],
               ),
             ),
-            Positioned(
-              bottom: 190 * scale,
-              right: 30 * scale,
-              child: Consumer2<AuthProvider, AppStateProvider>(
-                builder: (context, authProvider, appStateProvider, child) {
-                  return GestureDetector(
-                    onTap: _handleSignup,
-                    child: Container(
-                      width: 110 * scale,
-                      height: 55 * scale,
-                      decoration: BoxDecoration(
-                        image: const DecorationImage(
-                          image: AssetImage('assets/signup_button.png'),
-                          fit: BoxFit.fill,
-                        ),
-                        borderRadius: BorderRadius.circular(24.5 * scale),
-                      ),
-                      child: Align(
-                        alignment: Alignment(0, -0.2),
-                        child: authProvider.isLoading
-                            ? SizedBox(
-                                width: 20 * scale,
-                                height: 20 * scale,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : Text(
-                                "Next",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  shadows: [
-                                    Shadow(
-                                      color: const Color(0xFF1C6B4A).withOpacity(0.95),
-                                      offset: Offset(0, 2),
-                                      blurRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
             // Error message display
             Consumer<AuthProvider>(
               builder: (context, authProvider, child) {
@@ -525,9 +514,81 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
               bottom: 0,
               left: 0,
               right: 0,
-              child: Image.asset(
-                'assets/leather_up.png',
-                fit: BoxFit.cover,
+              child: IgnorePointer(
+                child: Image.asset(
+                  'assets/leather_up.png',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ),
+            // Button positioned AFTER the image so it's on top and can receive taps
+            Positioned(
+              bottom: 190 * scale,
+              right: 30 * scale,
+              child: Consumer2<AuthProvider, AppStateProvider>(
+                builder: (context, authProvider, appStateProvider, child) {
+                  final isEnabled = _agreeToTerms && !authProvider.isLoading;
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      print('Button tapped! isEnabled: $isEnabled, _agreeToTerms: $_agreeToTerms, isLoading: ${authProvider.isLoading}');
+                      if (isEnabled) {
+                        _handleSignup();
+                      } else {
+                        if (!_agreeToTerms) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please agree to the terms and conditions'),
+                              backgroundColor: Colors.red,
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: Opacity(
+                      opacity: isEnabled ? 1.0 : 0.5,
+                      child: Container(
+                        width: 110 * scale,
+                        height: 55 * scale,
+                        decoration: BoxDecoration(
+                          image: const DecorationImage(
+                            image: AssetImage('assets/signup_button.png'),
+                            fit: BoxFit.fill,
+                          ),
+                          borderRadius: BorderRadius.circular(24.5 * scale),
+                        ),
+                        child: Align(
+                          alignment: Alignment(0, -0.2),
+                          child: authProvider.isLoading
+                              ? SizedBox(
+                                  width: 20 * scale,
+                                  height: 20 * scale,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : Text(
+                                  "Next",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [
+                                      Shadow(
+                                        color: const Color(0xFF1C6B4A).withOpacity(0.95),
+                                        offset: Offset(0, 2),
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],

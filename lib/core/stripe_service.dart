@@ -434,5 +434,313 @@ class StripeService {
       return 'An unexpected error occurred. Please try again.';
     }
   }
+
+  /// Create a Setup Intent for saving payment methods
+  /// Returns the client secret for the Setup Intent
+  static Future<String> createSetupIntent() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/createSetupIntent';
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken',
+        },
+        body: jsonEncode({
+          'data': {},
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Setup intent creation timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = response.body;
+        try {
+          final errorJson = jsonDecode(errorBody);
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          final errorMessage = error?['message'] as String?;
+          throw Exception(errorMessage ?? 'Failed to create setup intent');
+        } catch (parseError) {
+          throw Exception('Failed to create setup intent: ${response.statusCode}');
+        }
+      }
+
+      final responseData = jsonDecode(response.body);
+      final result = responseData['result'] as Map<String, dynamic>?;
+      final clientSecret = result?['clientSecret'] as String?;
+
+      if (clientSecret == null || clientSecret.isEmpty) {
+        throw Exception('Failed to get client secret from Firebase Function');
+      }
+
+      return clientSecret;
+    } catch (e, stackTrace) {
+      debugPrint('Error creating setup intent: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in createSetupIntent',
+      );
+      rethrow;
+    }
+  }
+
+  /// Save a payment method using Setup Intent
+  static Future<bool> savePaymentMethod() async {
+    try {
+      final clientSecret = await createSetupIntent();
+
+      // Initialize payment sheet with setup intent
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          setupIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Remiles',
+        ),
+      );
+
+      // Present payment sheet
+      await Stripe.instance.presentPaymentSheet();
+
+      // Payment method saved successfully
+      await FirebaseService.log('Payment method saved successfully');
+      await FirebaseService.logEvent(
+        'payment_method_added',
+        parameters: FirebaseService.convertParameters({}),
+      );
+
+      return true;
+    } on StripeException catch (e) {
+      if (e.error.code == FailureCode.Canceled) {
+        await FirebaseService.log('Payment method setup canceled by user');
+        return false;
+      } else {
+        await FirebaseService.recordError(
+          e,
+          StackTrace.current,
+          reason: 'Stripe error in savePaymentMethod: ${e.error.code}',
+        );
+        rethrow;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Error saving payment method: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in savePaymentMethod',
+      );
+      rethrow;
+    }
+  }
+
+  /// List all payment methods for the current user
+  static Future<List<Map<String, dynamic>>> listPaymentMethods() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/listPaymentMethods';
+
+      final response = await http.get(
+        Uri.parse(functionUrl),
+        headers: {
+          'Authorization': 'Bearer $freshToken',
+        },
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('List payment methods timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = response.body;
+        try {
+          final errorJson = jsonDecode(errorBody);
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          final errorMessage = error?['message'] as String?;
+          throw Exception(errorMessage ?? 'Failed to list payment methods');
+        } catch (parseError) {
+          throw Exception('Failed to list payment methods: ${response.statusCode}');
+        }
+      }
+
+      final responseData = jsonDecode(response.body);
+      final result = responseData['result'] as Map<String, dynamic>?;
+      final paymentMethods = result?['paymentMethods'] as List<dynamic>?;
+
+      return paymentMethods != null
+          ? List<Map<String, dynamic>>.from(
+              paymentMethods.map((e) => e as Map<String, dynamic>),
+            )
+          : [];
+    } catch (e, stackTrace) {
+      debugPrint('Error listing payment methods: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in listPaymentMethods',
+      );
+      rethrow;
+    }
+  }
+
+  /// Set a payment method as default
+  static Future<bool> setDefaultPaymentMethod(String paymentMethodId) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/setDefaultPaymentMethod';
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken',
+        },
+        body: jsonEncode({
+          'data': {
+            'paymentMethodId': paymentMethodId,
+          },
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Set default payment method timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = response.body;
+        try {
+          final errorJson = jsonDecode(errorBody);
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          final errorMessage = error?['message'] as String?;
+          throw Exception(errorMessage ?? 'Failed to set default payment method');
+        } catch (parseError) {
+          throw Exception('Failed to set default payment method: ${response.statusCode}');
+        }
+      }
+
+      await FirebaseService.log('Default payment method set successfully');
+      await FirebaseService.logEvent(
+        'payment_method_set_default',
+        parameters: FirebaseService.convertParameters({
+          'payment_method_id': paymentMethodId,
+        }),
+      );
+
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('Error setting default payment method: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in setDefaultPaymentMethod',
+      );
+      rethrow;
+    }
+  }
+
+  /// Delete a payment method
+  static Future<bool> deletePaymentMethod(String paymentMethodId) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl = 'https://$region-$projectId.cloudfunctions.net/deletePaymentMethod';
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken',
+        },
+        body: jsonEncode({
+          'data': {
+            'paymentMethodId': paymentMethodId,
+          },
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Delete payment method timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = response.body;
+        try {
+          final errorJson = jsonDecode(errorBody);
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          final errorMessage = error?['message'] as String?;
+          throw Exception(errorMessage ?? 'Failed to delete payment method');
+        } catch (parseError) {
+          throw Exception('Failed to delete payment method: ${response.statusCode}');
+        }
+      }
+
+      await FirebaseService.log('Payment method deleted successfully');
+      await FirebaseService.logEvent(
+        'payment_method_deleted',
+        parameters: FirebaseService.convertParameters({
+          'payment_method_id': paymentMethodId,
+        }),
+      );
+
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('Error deleting payment method: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in deletePaymentMethod',
+      );
+      rethrow;
+    }
+  }
 }
 

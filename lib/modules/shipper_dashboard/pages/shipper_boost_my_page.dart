@@ -72,7 +72,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
               } else {
                 setState(() {
                   _renewalDate = null;
-                });
+              });
               }
             } else {
               // No plan subscribed, set to empty
@@ -101,7 +101,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
               : int.tryParse(currentData['postsUsedThisPeriod'].toString()) ?? 0;
         } else {
           // Fallback to total count if postsUsedThisPeriod not set
-          final loadStats = await FirebaseService.getShipperLoadStats(shipper.uid);
+        final loadStats = await FirebaseService.getShipperLoadStats(shipper.uid);
           usedPosts = loadStats['total'] ?? 0;
         }
         
@@ -475,17 +475,17 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           if (data != null) {
             // Get current active subscription
             if (data['subscriptionPlan'] != null) {
-              currentSubscription = {
-                'subscriptionPlan': data['subscriptionPlan'],
+            currentSubscription = {
+              'subscriptionPlan': data['subscriptionPlan'],
                 'subscriptionPrice': data['subscriptionPrice'] ?? _getPlanPrice(activePlan),
-                'loadPostingsLimit': data['loadPostingsLimit'] ?? _postLimit,
+              'loadPostingsLimit': data['loadPostingsLimit'] ?? _postLimit,
                 'boostCredits': data['boostCredits'] ?? _getPlanBoostCredits(activePlan),
-                'subscriptionType': data['subscriptionType'] ?? 'monthly',
-                'subscriptionStartDate': data['subscriptionStartDate'],
+              'subscriptionType': data['subscriptionType'] ?? 'monthly',
+              'subscriptionStartDate': data['subscriptionStartDate'],
                 'subscriptionEndDate': data['subscriptionEndDate'],
                 'renewalDate': data['renewalDate'],
-                'status': 'active',
-              };
+              'status': 'active',
+            };
             }
             
             // Get fresh subscription history from Firestore
@@ -611,8 +611,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   children: [
                     Expanded(
                       child: Text(title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.bold, color: Colors.black)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.black)),
                     ),
                     // Active Plan Chip - ONLY show for actually active plan
                     AnimatedSwitcher(

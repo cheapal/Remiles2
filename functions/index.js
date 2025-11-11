@@ -299,3 +299,440 @@ exports.handleStripeWebhook = functions
       res.json({received: true});
     });
 
+/**
+ * Create a Setup Intent for saving payment methods
+ * This allows users to save payment methods without making a payment
+ */
+exports.createSetupIntent = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      // Set CORS headers
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      // Handle preflight
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      // Only allow POST
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      // Get auth token from header
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+
+      // Verify the token
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const stripe = getStripe();
+
+        // Get or create Stripe customer
+        let customerId;
+        const userDoc = await admin.firestore()
+            .collection("shippers")
+            .doc(decodedToken.uid)
+            .get();
+
+        if (userDoc.exists && userDoc.data().stripeCustomerId) {
+          customerId = userDoc.data().stripeCustomerId;
+        } else {
+          // Create new Stripe customer
+          const customer = await stripe.customers.create({
+            email: decodedToken.email,
+            metadata: {
+              userId: decodedToken.uid,
+            },
+          });
+          customerId = customer.id;
+
+          // Save customer ID to Firestore
+          await admin.firestore()
+              .collection("shippers")
+              .doc(decodedToken.uid)
+              .update({
+                stripeCustomerId: customerId,
+              });
+        }
+
+        // Create setup intent
+        const setupIntent = await stripe.setupIntents.create({
+          customer: customerId,
+          payment_method_types: ["card"],
+        });
+
+        res.status(200).json({
+          result: {
+            clientSecret: setupIntent.client_secret,
+            setupIntentId: setupIntent.id,
+          },
+        });
+      } catch (error) {
+        console.error("Error creating setup intent:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to create setup intent",
+          },
+        });
+      }
+    });
+
+/**
+ * List payment methods for a user
+ */
+exports.listPaymentMethods = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      // Set CORS headers
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      if (req.method !== "GET") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      // Get auth token
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+
+      // Verify token
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const stripe = getStripe();
+
+        // Get Stripe customer ID
+        const userDoc = await admin.firestore()
+            .collection("shippers")
+            .doc(decodedToken.uid)
+            .get();
+
+        if (!userDoc.exists || !userDoc.data().stripeCustomerId) {
+          res.status(200).json({
+            result: {
+              paymentMethods: [],
+            },
+          });
+          return;
+        }
+
+        const customerId = userDoc.data().stripeCustomerId;
+
+        // Get default payment method
+        const customer = await stripe.customers.retrieve(customerId);
+        const defaultPaymentMethodId = customer.invoice_settings &&
+            customer.invoice_settings.default_payment_method;
+
+        // List payment methods
+        const paymentMethods = await stripe.paymentMethods.list({
+          customer: customerId,
+          type: "card",
+        });
+
+        // Format payment methods
+        const formattedMethods = paymentMethods.data.map((pm) => ({
+          id: pm.id,
+          type: pm.type,
+          card: {
+            brand: pm.card.brand,
+            last4: pm.card.last4,
+            expMonth: pm.card.exp_month,
+            expYear: pm.card.exp_year,
+          },
+          isDefault: pm.id === defaultPaymentMethodId,
+        }));
+
+        res.status(200).json({
+          result: {
+            paymentMethods: formattedMethods,
+          },
+        });
+      } catch (error) {
+        console.error("Error listing payment methods:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to list payment methods",
+          },
+        });
+      }
+    });
+
+/**
+ * Set default payment method
+ */
+exports.setDefaultPaymentMethod = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      // Set CORS headers
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      // Get auth token
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+
+      // Verify token
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const requestData = req.body.data || req.body;
+        const {paymentMethodId} = requestData;
+
+        if (!paymentMethodId) {
+          res.status(400).json({
+            error: {
+              status: "INVALID_ARGUMENT",
+              message: "Payment method ID is required",
+            },
+          });
+          return;
+        }
+
+        const stripe = getStripe();
+
+        // Get Stripe customer ID
+        const userDoc = await admin.firestore()
+            .collection("shippers")
+            .doc(decodedToken.uid)
+            .get();
+
+        if (!userDoc.exists || !userDoc.data().stripeCustomerId) {
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Stripe customer not found",
+            },
+          });
+          return;
+        }
+
+        const customerId = userDoc.data().stripeCustomerId;
+
+        // Set default payment method
+        await stripe.customers.update(customerId, {
+          invoice_settings: {
+            default_payment_method: paymentMethodId,
+          },
+        });
+
+        res.status(200).json({
+          result: {
+            success: true,
+          },
+        });
+      } catch (error) {
+        console.error("Error setting default payment method:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to set default payment method",
+          },
+        });
+      }
+    });
+
+/**
+ * Delete payment method
+ */
+exports.deletePaymentMethod = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      // Set CORS headers
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      // Get auth token
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+
+      // Verify token
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const requestData = req.body.data || req.body;
+        const {paymentMethodId} = requestData;
+
+        if (!paymentMethodId) {
+          res.status(400).json({
+            error: {
+              status: "INVALID_ARGUMENT",
+              message: "Payment method ID is required",
+            },
+          });
+          return;
+        }
+
+        const stripe = getStripe();
+
+        // Get Stripe customer ID
+        const userDoc = await admin.firestore()
+            .collection("shippers")
+            .doc(decodedToken.uid)
+            .get();
+
+        if (!userDoc.exists || !userDoc.data().stripeCustomerId) {
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Stripe customer not found",
+            },
+          });
+          return;
+        }
+
+        const customerId = userDoc.data().stripeCustomerId;
+
+        // Check if this is the default payment method
+        const customer = await stripe.customers.retrieve(customerId);
+        const defaultPaymentMethodId = customer.invoice_settings &&
+            customer.invoice_settings.default_payment_method;
+
+        // Delete payment method
+        await stripe.paymentMethods.detach(paymentMethodId);
+
+        // If it was the default, clear the default
+        if (paymentMethodId === defaultPaymentMethodId) {
+          await stripe.customers.update(customerId, {
+            invoice_settings: {
+              default_payment_method: null,
+            },
+          });
+        }
+
+        res.status(200).json({
+          result: {
+            success: true,
+          },
+        });
+      } catch (error) {
+        console.error("Error deleting payment method:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to delete payment method",
+          },
+        });
+      }
+    });
+

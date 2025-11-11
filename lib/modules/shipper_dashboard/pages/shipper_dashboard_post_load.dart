@@ -997,6 +997,21 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
   }
 
   Map<String, dynamic> _buildLoadData({required bool isDraft}) {
+    // Check if this is a repost (editing a cancelled load)
+    final isRepost = widget.editLoadData != null && 
+                     (widget.editLoadData!['status'] == 'cancelled' || 
+                      widget.editLoadData!['status'] == 'completed');
+    
+    // Determine status: draft -> 'draft', repost -> 'available', new/update -> 'active'
+    String status;
+    if (isDraft) {
+      status = 'draft';
+    } else if (isRepost) {
+      status = 'available';
+    } else {
+      status = 'active';
+    }
+    
     return {
       'originAddress': _originAddressController.text.trim(),
       'destinationAddress': _destinationAddressController.text.trim(),
@@ -1013,7 +1028,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       'equipmentNeeded': _equipmentNeededController.text.trim(),
       'quoteBudget': _quoteBudgetController.text.trim(),
       'isDraft': isDraft,
-      'status': isDraft ? 'draft' : 'active',
+      'status': status,
       'isBooked': false, // New loads are not booked initially
       'createdAt': DateTime.now().toIso8601String(),
       'updatedAt': DateTime.now().toIso8601String(),

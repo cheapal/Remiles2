@@ -43,7 +43,25 @@ Your Stripe integration is now connected to Firebase Cloud Functions. The app wi
 2. Go to "Boost My Load"
 3. Select a plan
 4. Use test card: `4242 4242 4242 4242`
+    Expiry: 12/25 (or any future date)
+    CVC: 123 (or any 3 digits)
+    ZIP: 12345 (or any 5 digits)
 5. Complete payment
+
+
+## other states
+Other test cards
+Decline:
+4000 0000 0000 0002
+
+Requires authentication (3D Secure):
+4000 0025 0000 3155
+
+Insufficient funds:
+4000 0000 0000 9995
+
+Generic decline:
+4000 0000 0000 0002
 
 ## 📚 Full Documentation
 

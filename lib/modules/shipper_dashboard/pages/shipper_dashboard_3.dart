@@ -168,8 +168,13 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
                         context: context,
                         hintText: "What is your Business Number (BN)?",
                         subtext:
-                        "9-digit CRA-assigned number used for tax purposes.",
+                        "15-digit CRA-assigned number used for tax purposes.",
                         controller: _businessNumberController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(15),
+                        ],
                       ),
                       const SizedBox(height: 25),
                       const Text(
@@ -325,8 +330,14 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
   
   Future<void> _handleSubmit() async {
     // Validate required fields
-    if (_businessNumberController.text.trim().isEmpty) {
+    final businessNumber = _businessNumberController.text.trim();
+    if (businessNumber.isEmpty) {
       _showAlertDialog(context, 'Please enter your Business Number (BN).');
+      return;
+    }
+    
+    if (businessNumber.length != 15) {
+      _showAlertDialog(context, 'Business Number (BN) must be exactly 15 digits.');
       return;
     }
     
@@ -410,6 +421,8 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
     required String hintText,
     String? subtext,
     TextEditingController? controller,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,6 +449,8 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
                 Expanded(
                   child: TextField(
                     controller: controller,
+                    keyboardType: keyboardType,
+                    inputFormatters: inputFormatters,
                     decoration: InputDecoration(
                       hintText: hintText,
                       border: InputBorder.none,

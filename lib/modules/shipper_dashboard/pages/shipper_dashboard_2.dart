@@ -4,8 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:intl/intl.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
+import '../../../core/utils/google_places_autocomplete.dart';
+import '../../../core/utils/canadian_provinces_autocomplete.dart';
+import '../../../core/utils/multi_select_dialog.dart';
 
 class ShipperDashboard2 extends StatefulWidget {
   const ShipperDashboard2({super.key});
@@ -24,12 +28,51 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
   // Form controllers
   final TextEditingController _businessAddressController = TextEditingController();
   final TextEditingController _operatingProvincesController = TextEditingController();
-  final TextEditingController _industryTypeController = TextEditingController();
-  final TextEditingController _shipmentTypeController = TextEditingController();
   final TextEditingController _insuranceProviderController = TextEditingController();
   final TextEditingController _policyNumberController = TextEditingController();
   final TextEditingController _expiryDateController = TextEditingController();
   final TextEditingController _coverageLimitController = TextEditingController();
+  
+  // Multi-select state
+  List<String> _selectedIndustryTypes = [];
+  List<String> _selectedShipmentTypes = [];
+  
+  // Options for multi-select
+  static const List<String> _industryTypeOptions = [
+    'Manufacturing',
+    'Retail',
+    'Agriculture',
+    'Construction',
+    'Food & Beverage',
+    'Healthcare',
+    'Technology',
+    'Automotive',
+    'Textiles',
+    'Chemicals',
+    'Mining',
+    'Energy',
+    'Logistics & Transportation',
+    'E-commerce',
+    'Other',
+  ];
+  
+  static const List<String> _shipmentTypeOptions = [
+    'Pallets',
+    'Containers',
+    'Oversized Loads',
+    'Flatbed',
+    'Refrigerated',
+    'Dry Van',
+    'LTL (Less Than Truckload)',
+    'FTL (Full Truckload)',
+    'Hazmat',
+    'Intermodal',
+    'Bulk',
+    'Other',
+  ];
+  
+  // Google Places API Key
+  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
   
   // Image picker
   final ImagePicker _picker = ImagePicker();
@@ -54,8 +97,6 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
     _progressController1.dispose();
     _businessAddressController.dispose();
     _operatingProvincesController.dispose();
-    _industryTypeController.dispose();
-    _shipmentTypeController.dispose();
     _insuranceProviderController.dispose();
     _policyNumberController.dispose();
     _expiryDateController.dispose();
@@ -171,34 +212,45 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const SizedBox(height: 25),
-                      _buildTextInputField(
-                        context: context,
+                      GooglePlacesAutocomplete(
+                        controller: _businessAddressController,
                         hintText: "Business Address",
                         icon: Icons.location_on_outlined,
-                        controller: _businessAddressController,
+                        apiKey: _googleApiKey,
                       ),
                       const SizedBox(height: 25),
-                      _buildTextInputField(
-                        context: context,
+                      CanadianProvincesAutocomplete(
+                        controller: _operatingProvincesController,
                         hintText: "Operating Province(s)",
                         icon: Icons.flag_outlined,
-                        controller: _operatingProvincesController,
                       ),
                       const SizedBox(height: 25),
-                      _buildTextInputField(
-                        context: context,
+                      MultiSelectField(
                         hintText: "Industry Type",
                         icon: Icons.business_center_outlined,
                         subtext: "(manufacturing, retail, agriculture etc.)",
-                        controller: _industryTypeController,
+                        selectedItems: _selectedIndustryTypes,
+                        title: "Select Industry Type(s)",
+                        options: _industryTypeOptions,
+                        onSelectionChanged: (List<String> selected) {
+                          setState(() {
+                            _selectedIndustryTypes = selected;
+                          });
+                        },
                       ),
                       const SizedBox(height: 25),
-                      _buildTextInputField(
-                        context: context,
+                      MultiSelectField(
                         hintText: "Frequent shipment type",
                         icon: Icons.local_shipping_outlined,
                         subtext: "(pallets, containers, oversized loads, etc.)",
-                        controller: _shipmentTypeController,
+                        selectedItems: _selectedShipmentTypes,
+                        title: "Select Shipment Type(s)",
+                        options: _shipmentTypeOptions,
+                        onSelectionChanged: (List<String> selected) {
+                          setState(() {
+                            _selectedShipmentTypes = selected;
+                          });
+                        },
                       ),
                       const SizedBox(height: 25),
                       const Text(
@@ -260,7 +312,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                         controller: _policyNumberController,
                       ),
                       const SizedBox(height: 25),
-                      _buildTextInputField(
+                      _buildDatePickerField(
                         context: context,
                         hintText: "Expiry Date",
                         icon: Icons.calendar_today_outlined,
@@ -272,6 +324,10 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                         hintText: "Coverage Limit",
                         icon: Icons.attach_money_outlined,
                         controller: _coverageLimitController,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
                       ),
                       const SizedBox(height: 25),
                       _buildChecklistSection(),
@@ -525,8 +581,8 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
     // Validate required fields
     if (_businessAddressController.text.trim().isEmpty ||
         _operatingProvincesController.text.trim().isEmpty ||
-        _industryTypeController.text.trim().isEmpty ||
-        _shipmentTypeController.text.trim().isEmpty ||
+        _selectedIndustryTypes.isEmpty ||
+        _selectedShipmentTypes.isEmpty ||
         _insuranceProviderController.text.trim().isEmpty ||
         _policyNumberController.text.trim().isEmpty ||
         _expiryDateController.text.trim().isEmpty ||
@@ -590,8 +646,8 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
         final response = {
           'businessAddress': _businessAddressController.text.trim(),
           'operatingProvinces': _operatingProvincesController.text.trim(),
-          'industryType': _industryTypeController.text.trim(),
-          'shipmentType': _shipmentTypeController.text.trim(),
+          'industryType': _selectedIndustryTypes,
+          'shipmentType': _selectedShipmentTypes,
           'insuranceProvider': _insuranceProviderController.text.trim(),
           'policyNumber': _policyNumberController.text.trim(),
           'expiryDate': _expiryDateController.text.trim(),
@@ -666,6 +722,8 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
     required IconData icon,
     String? subtext,
     TextEditingController? controller,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,6 +753,8 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                 Expanded(
                   child: TextField(
                     controller: controller,
+                    keyboardType: keyboardType,
+                    inputFormatters: inputFormatters,
                     decoration: InputDecoration(
                       hintText: hintText,
                       border: InputBorder.none,
@@ -832,6 +892,83 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
               fontSize: 14,
               color: Colors.black,
               fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDatePickerField({
+    required BuildContext context,
+    required String hintText,
+    required IconData icon,
+    required TextEditingController controller,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: DateTime.now(),
+              firstDate: DateTime.now(),
+              lastDate: DateTime(2100),
+              builder: (context, child) {
+                return Theme(
+                  data: Theme.of(context).copyWith(
+                    colorScheme: const ColorScheme.light(
+                      primary: Color(0xFF4B744F),
+                      onPrimary: Colors.white,
+                      onSurface: Colors.black,
+                    ),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) {
+              setState(() {
+                controller.text = DateFormat('yyyy-MM-dd').format(picked);
+              });
+            }
+          },
+          child: Container(
+            width: double.infinity,
+            height: 49,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color.fromRGBO(108, 167, 138, 0.5),
+                  blurRadius: 4,
+                  spreadRadius: 1,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              child: Row(
+                children: [
+                  Icon(icon, size: 24, color: const Color.fromRGBO(0, 0, 0, 0.45)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      controller.text.isEmpty ? hintText : controller.text,
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: controller.text.isEmpty
+                            ? const Color.fromRGBO(0, 0, 0, 0.45)
+                            : const Color(0xFF000000),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

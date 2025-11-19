@@ -15,7 +15,6 @@ import 'package:Remiles/models/load_model.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   const MarketplaceScreen({super.key});
@@ -122,6 +121,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             _updateLoadData();
           } else {
             _errorMessage = 'No booked loads found';
+            _isLoadingMap = false; // Stop map loading when no loads available
           }
         });
       }
@@ -153,13 +153,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     
     final load = _selectedLoad!;
     
-    // Update location data
-    _shipperName = load.shipperName;
-    _pickupAddress = "${load.originAddress}, ${load.originCity}, ${load.originState}";
-    _deliveryAddress = "${load.destinationAddress}, ${load.destinationCity}, ${load.destinationState}";
-    
-    // Reset map state first
+    // Reset map state first and update location data
     setState(() {
+      // Update location data immediately
+      _shipperName = load.shipperName;
+      _pickupAddress = "${load.originAddress}, ${load.originCity}, ${load.originState}";
+      _deliveryAddress = "${load.destinationAddress}, ${load.destinationCity}, ${load.destinationState}";
+      
+      // Reset map state
       _isLoadingMap = true;
       _errorMessage = null;
       _pickupLocation = null;
@@ -1068,7 +1069,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                         ),
                           Expanded(
                               child: _isLoadingLoads
-                                  ? const CircularProgressIndicator()
+                                  ? const Text(
+                                          "Loading loads...",
+                                          style: TextStyle(
+                                            fontSize: 20,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey,
+                                          ),
+                                        )
                                   : _bookedLoads.isEmpty
                                       ? const Text(
                                           "No loads available",
@@ -1162,24 +1170,64 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                         ],
                                       ),
                                     )
-                                  : _pickupLocation != null && _deliveryLocation != null
-                                      ? GoogleMap(
-                                          key: ValueKey('map_${_routePoints.length}_${_selectedLoad?.id}'), // Force rebuild when route changes
-                                          onMapCreated: _onMapCreated,
-                                          initialCameraPosition: CameraPosition(
-                                            target: _pickupLocation!,
-                                            zoom: 10.0,
+                                  : _selectedLoad == null
+                                      ? Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.inbox_outlined,
+                                                size: 48,
+                                                color: Colors.grey.shade400,
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                'No load selected',
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade700,
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ],
                                           ),
-                                          markers: _markers,
-                                          polylines: _polylines,
-                                          mapType: MapType.normal,
-                                          myLocationButtonEnabled: false,
-                                          zoomControlsEnabled: false,
-                                          compassEnabled: false,
                                         )
-                                      : const Center(
-                                          child: Text('Loading map...'),
-                                        ),
+                                      : _pickupLocation != null && _deliveryLocation != null
+                                          ? GoogleMap(
+                                              key: ValueKey('map_${_routePoints.length}_${_selectedLoad?.id}'), // Force rebuild when route changes
+                                              onMapCreated: _onMapCreated,
+                                              initialCameraPosition: CameraPosition(
+                                                target: _pickupLocation!,
+                                                zoom: 10.0,
+                                              ),
+                                              markers: _markers,
+                                              polylines: _polylines,
+                                              mapType: MapType.normal,
+                                              myLocationButtonEnabled: false,
+                                              zoomControlsEnabled: false,
+                                              compassEnabled: false,
+                                            )
+                                          : Center(
+                                              child: Column(
+                                                mainAxisAlignment: MainAxisAlignment.center,
+                                                children: [
+                                                  const CircularProgressIndicator(
+                                                    valueColor: AlwaysStoppedAnimation<Color>(green),
+                                                  ),
+                                                  const SizedBox(height: 12),
+                                                  Text(
+                                                    'Loading route...',
+                                                    style: TextStyle(
+                                                      color: Colors.grey.shade700,
+                                                      fontSize: 16,
+                                                      fontWeight: FontWeight.w500,
+                                                    ),
+                                                    textAlign: TextAlign.center,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
                         ),
                       ),
 
@@ -1233,14 +1281,34 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                         ),
                                       ),
                                         const SizedBox(height: 8),
-                                      Text(
-                                          _shipperName.isNotEmpty 
-                                              ? _shipperPhone.isNotEmpty
+                                      _shipperName.isNotEmpty 
+                                          ? Text(
+                                              _shipperPhone.isNotEmpty
                                                   ? "$_shipperName\n$_shipperPhone"
-                                                  : _shipperName
-                                              : "Loading...",
-                                          style: const TextStyle(fontSize: 16),
-                                        ),
+                                                  : _shipperName,
+                                              style: const TextStyle(fontSize: 16),
+                                            )
+                                          : Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(green),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Loading shipper info...',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey.shade600,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                       ],
                                     ),
                                   ),
@@ -1284,12 +1352,32 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                         ),
                                       ),
                                         const SizedBox(height: 8),
-                                      Text(
-                                          _pickupAddress.isNotEmpty 
-                                              ? _pickupAddress 
-                                              : "Loading...",
-                                          style: const TextStyle(fontSize: 16),
-                                        ),
+                                      _pickupAddress.isNotEmpty 
+                                          ? Text(
+                                              _pickupAddress,
+                                              style: const TextStyle(fontSize: 16),
+                                            )
+                                          : Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(green),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Loading address...',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey.shade600,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                       ],
                                     ),
                                   ),
@@ -1333,12 +1421,32 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                           ),
                                         ),
                                         const SizedBox(height: 8),
-                                      Text(
-                                          _deliveryAddress.isNotEmpty 
-                                              ? _deliveryAddress 
-                                              : "Loading...",
-                                          style: const TextStyle(fontSize: 16),
-                                        ),
+                                      _deliveryAddress.isNotEmpty 
+                                          ? Text(
+                                              _deliveryAddress,
+                                              style: const TextStyle(fontSize: 16),
+                                            )
+                                          : Row(
+                                              children: [
+                                                SizedBox(
+                                                  width: 16,
+                                                  height: 16,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    valueColor: AlwaysStoppedAnimation<Color>(green),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  'Loading address...',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey.shade600,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                       ],
                                     ),
                                   ),

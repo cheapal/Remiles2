@@ -1,10 +1,10 @@
+import 'dart:ui';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_2.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';
-
-import 'business_form_screen.dart';
 
 
 // Define the dark color for the side navigation and bottom bar.
@@ -23,6 +23,8 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
     with TickerProviderStateMixin {
   late AnimationController _progressController1;
   late AnimationController _progressController2;
+  late AnimationController _topSectionController;
+  late Animation<double> _topSectionAnimation;
   // A key to control the Scaffold's drawer
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedTab = 0;
@@ -41,6 +43,17 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
       duration: const Duration(seconds: 3),
     )..addListener(() => setState(() {}))
       ..forward();
+    // Animation for top section to indicate it's tappable
+    _topSectionController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    _topSectionAnimation = Tween<double>(begin: 1.0, end: 1.05).animate(
+      CurvedAnimation(
+        parent: _topSectionController,
+        curve: Curves.easeInOut,
+      ),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final screenHeight = MediaQuery.of(context).size.height;
       final screenWidth = MediaQuery.of(context).size.width;
@@ -59,6 +72,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
   void dispose() {
     _progressController1.dispose();
     _progressController2.dispose();
+    _topSectionController.dispose();
     super.dispose();
   }
 
@@ -126,7 +140,12 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
 
                             }
                           },
-                          child: Container(
+                          child: AnimatedBuilder(
+                            animation: _topSectionAnimation,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: _topSectionAnimation.value,
+                                child: Container(
                             width: double.infinity,
                             padding: const EdgeInsets.fromLTRB(
                                 20, 70, 20, 20), // Adjust top padding for AppBar
@@ -144,10 +163,16 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.6),
-                                  spreadRadius: -3,
-                                  blurRadius: 1,
-                                  offset: const Offset(0, 1),
+                                  color: Colors.black.withOpacity(0.4),
+                                  spreadRadius: 0,
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 8),
+                                ),
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  spreadRadius: 0,
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
@@ -203,15 +228,20 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                               ],
                             ),
                           ),
+                            );
+                            },
+                          ),
                         ),
                         SizedBox(height: isWide ? 50.0 : 16.0),
-                        // Main content
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: horizontalPadding + 16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
+                        // Main content with blur effect
+                        ImageFiltered(
+                          imageFilter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: horizontalPadding + 16.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
                               // Welcome + avatar
                               Row(
                                 mainAxisAlignment:
@@ -770,6 +800,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                             ],
                           ),
                         ),
+                      ),
                       ],
                     ),
                   ),
@@ -778,6 +809,14 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                     left: _xPosition,
                     top: _yPosition,
                     child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AiMileyScreen(),
+                          ),
+                        );
+                      },
                       onPanUpdate: (details) {
                         setState(() {
                           _xPosition = (_xPosition + details.delta.dx)
@@ -810,24 +849,26 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
         ),
         bottomNavigationBar: isWide
             ? null
-            : Container(
-            height: bottomNavHeight,
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/nav_leather.png'),
-                fit: BoxFit.cover,
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(50),
-                topRight: Radius.circular(50),
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(50),
-                topRight: Radius.circular(50),
-              ),
-              child: BottomNavigationBar(
+            : ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: Container(
+                  height: bottomNavHeight,
+                  decoration: const BoxDecoration(
+                    image: DecorationImage(
+                      image: AssetImage('assets/nav_leather.png'),
+                      fit: BoxFit.cover,
+                    ),
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(50),
+                      topRight: Radius.circular(50),
+                    ),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(50),
+                      topRight: Radius.circular(50),
+                    ),
+                    child: BottomNavigationBar(
                 currentIndex: _selectedTab,
                 onTap: (index) => setState(() => _selectedTab = index),
                 backgroundColor: Colors.transparent,
@@ -865,9 +906,10 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                     label: 'More',
                   ),
                 ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
       ),
     );
   }

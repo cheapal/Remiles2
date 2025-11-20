@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../../core/firebase_service.dart';
 import '../../../models/product_listing.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../core/utils/google_places_autocomplete.dart';
 import 'package:provider/provider.dart';
 
 // Helper class to represent images (either existing URL or new file)
@@ -51,20 +53,8 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
   List<String> _existingImageUrls = [];
   String? _existingVideoUrl;
 
-  // Location picker
-  String? _selectedLocation;
-  final List<String> _locations = [
-    'Vancouver, BC',
-    'Toronto, ON',
-    'Montreal, QC',
-    'Calgary, AB',
-    'Edmonton, AB',
-    'Ottawa, ON',
-    'Winnipeg, MB',
-    'Quebec City, QC',
-    'Hamilton, ON',
-    'Kitchener, ON',
-  ];
+  // Google Places API Key
+  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
 
   final List<String> conditions = [
     "New",
@@ -88,7 +78,6 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
     _titleController.text = listing.title;
     _descriptionController.text = listing.description;
     _priceController.text = listing.price.toStringAsFixed(0);
-    _selectedLocation = listing.location;
     _locationController.text = listing.location;
     selectedCondition = listing.condition;
     _existingImageUrls = List<String>.from(listing.imageUrls);
@@ -257,10 +246,12 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                 const SizedBox(height: 12),
 
                 // Price
-                _inputField(
-                  "Price", 
-                  keyboard: TextInputType.number,
+                TextFormField(
                   controller: _priceController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                  ],
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Price is required';
@@ -277,39 +268,23 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                     }
                     return null;
                   },
-                ),
-                const SizedBox(height: 12),
-
-                // Location
-                DropdownButtonFormField<String>(
-                  value: _selectedLocation,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please select a location';
-                    }
-                    return null;
-                  },
                   decoration: InputDecoration(
-                    hintText: "Select Location",
-                    suffixIcon: const Icon(Icons.location_on),
+                    hintText: "Price",
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                         vertical: 14, horizontal: 16),
                   ),
-                  items: _locations.map((String location) {
-                    return DropdownMenuItem<String>(
-                      value: location,
-                      child: Text(location),
-                    );
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _selectedLocation = newValue;
-                      _locationController.text = newValue ?? '';
-                    });
-                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Location
+                GooglePlacesAutocomplete(
+                  controller: _locationController,
+                  hintText: "Location",
+                  icon: Icons.location_on,
+                  apiKey: _googleApiKey,
                 ),
                 const SizedBox(height: 16),
 
@@ -537,6 +512,12 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
 
   // Form submission
   Future<void> _publishListing() async {
+    // Validate location first (since it's not in the form)
+    if (_locationController.text.trim().isEmpty) {
+      _showErrorSnackBar('Please select a location');
+      return;
+    }
+    
     // Validate form fields
     if (!_formKey.currentState!.validate()) {
       _showErrorSnackBar('Please fill in all required fields correctly');
@@ -563,7 +544,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
     }
 
     // Validate location
-    if (_selectedLocation == null || _selectedLocation!.isEmpty) {
+    if (_locationController.text.trim().isEmpty) {
       _showErrorSnackBar('Please select a location');
       return;
     }
@@ -655,7 +636,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
         description: _descriptionController.text.trim(),
         price: double.parse(_priceController.text.trim()),
         condition: selectedCondition,
-        location: _selectedLocation ?? _locationController.text.trim(),
+        location: _locationController.text.trim(),
         imageUrls: imageUrls,
         videoUrl: videoUrl,
         createdAt: _isEditing ? widget.listingToEdit!.createdAt : DateTime.now(),
@@ -929,7 +910,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       return _titleController.text.trim() != listing.title ||
              _descriptionController.text.trim() != listing.description ||
              _priceController.text.trim() != listing.price.toStringAsFixed(0) ||
-             _selectedLocation != listing.location ||
+             _locationController.text.trim() != listing.location ||
              selectedCondition != listing.condition ||
              _selectedImages.isNotEmpty ||
              (_selectedVideo != null && _existingVideoUrl != listing.videoUrl);

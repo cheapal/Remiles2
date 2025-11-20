@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../../../../providers/auth_provider.dart';
 import '../../../../../providers/app_state_provider.dart';
 import '../../../../../core/firebase_service.dart';
+import '../../../../../core/utils/google_places_autocomplete.dart';
+import '../../../../../core/utils/multi_select_dialog.dart';
 
 class AccountDetailsPage extends StatefulWidget {
   const AccountDetailsPage({super.key});
@@ -19,12 +21,36 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
   late TextEditingController _displayNameController;
   late TextEditingController _phoneNumberController;
   late TextEditingController _companyNameController;
-  late TextEditingController _businessTypeController;
   late TextEditingController _addressController;
   late TextEditingController _cityController;
   late TextEditingController _stateController;
   late TextEditingController _zipCodeController;
   late TextEditingController _emailController;
+  
+  // Business type multi-select
+  List<String> _selectedBusinessTypes = [];
+  
+  // Business type options
+  static const List<String> _businessTypeOptions = [
+    'Manufacturing',
+    'Retail',
+    'Agriculture',
+    'Construction',
+    'Food & Beverage',
+    'Healthcare',
+    'Technology',
+    'Automotive',
+    'Textiles',
+    'Chemicals',
+    'Mining',
+    'Energy',
+    'Logistics & Transportation',
+    'E-commerce',
+    'Other',
+  ];
+  
+  // Google Places API Key
+  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
 
   @override
   void initState() {
@@ -34,12 +60,16 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
     _displayNameController = TextEditingController(text: carrier?.displayName ?? '');
     _phoneNumberController = TextEditingController(text: carrier?.phoneNumber ?? '');
     _companyNameController = TextEditingController(text: carrier?.companyName ?? '');
-    _businessTypeController = TextEditingController(text: carrier?.businessType ?? '');
     _addressController = TextEditingController(text: carrier?.address ?? '');
     _cityController = TextEditingController(text: carrier?.city ?? '');
     _stateController = TextEditingController(text: carrier?.state ?? '');
     _zipCodeController = TextEditingController(text: carrier?.zipCode ?? '');
     _emailController = TextEditingController(text: carrier?.email ?? '');
+    
+    // Parse business type from string to list
+    if (carrier?.businessType != null && carrier!.businessType!.isNotEmpty) {
+      _selectedBusinessTypes = carrier.businessType!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
   }
 
   @override
@@ -47,7 +77,6 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
     _displayNameController.dispose();
     _phoneNumberController.dispose();
     _companyNameController.dispose();
-    _businessTypeController.dispose();
     _addressController.dispose();
     _cityController.dispose();
     _stateController.dispose();
@@ -76,6 +105,10 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
 
       appStateProvider.showLoadingWithMessage('Updating profile...');
 
+      // Prepare business type string
+      final businessTypeString = _selectedBusinessTypes.join(', ');
+      final currentBusinessType = carrier.businessType ?? '';
+      
       // Prepare updates
       final updates = <String, dynamic>{
         if (_displayNameController.text != carrier.displayName)
@@ -84,8 +117,8 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
           'phoneNumber': _phoneNumberController.text.trim().isEmpty ? null : _phoneNumberController.text.trim(),
         if (_companyNameController.text != carrier.companyName)
           'companyName': _companyNameController.text.trim().isEmpty ? null : _companyNameController.text.trim(),
-        if (_businessTypeController.text != carrier.businessType)
-          'businessType': _businessTypeController.text.trim().isEmpty ? null : _businessTypeController.text.trim(),
+        if (businessTypeString != currentBusinessType)
+          'businessType': _selectedBusinessTypes.isEmpty ? null : businessTypeString,
         if (_addressController.text != carrier.address)
           'address': _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
         if (_cityController.text != carrier.city)
@@ -213,19 +246,43 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Business Type
-                    _buildTextField(
-                      label: 'Business Type',
-                      controller: _businessTypeController,
+                    // Business Type (Multi-select)
+                    MultiSelectField(
+                      hintText: 'Business Type',
                       icon: Icons.category,
+                      selectedItems: _selectedBusinessTypes,
+                      title: 'Select Business Type(s)',
+                      options: _businessTypeOptions,
+                      onSelectionChanged: (List<String> selected) {
+                        setState(() {
+                          _selectedBusinessTypes = selected;
+                        });
+                      },
                     ),
                     const SizedBox(height: 16),
 
-                    // Address
-                    _buildTextField(
-                      label: 'Address',
+                    // Address (Google Places Autocomplete)
+                    GooglePlacesAutocomplete(
                       controller: _addressController,
+                      hintText: 'Address',
                       icon: Icons.location_on,
+                      apiKey: _googleApiKey,
+                      onAddressComponents: (AddressComponents components) {
+                        setState(() {
+                          if (components.address != null) {
+                            _addressController.text = components.address!;
+                          }
+                          if (components.city != null) {
+                            _cityController.text = components.city!;
+                          }
+                          if (components.state != null) {
+                            _stateController.text = components.state!;
+                          }
+                          if (components.zipCode != null) {
+                            _zipCodeController.text = components.zipCode!;
+                          }
+                        });
+                      },
                     ),
                     const SizedBox(height: 16),
 

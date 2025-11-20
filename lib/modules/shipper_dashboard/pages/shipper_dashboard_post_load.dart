@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import '../../../core/utils/google_places_autocomplete.dart';
 
 class ShipperDashboardPostLoad extends StatefulWidget {
   final Map<String, dynamic>? editLoadData;
@@ -38,6 +40,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
   bool _isSavingDraft = false;
   File? _additionalDocument;
   final ImagePicker _picker = ImagePicker();
+  String _weightUnit = 'kg'; // Default weight unit
   
   // DateTime variables
   DateTime? _pickupDateTime;
@@ -48,6 +51,60 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
   String? _previousDocumentUrl;
   String? _previousDocumentName;
   bool _isPreviousDocumentImage = false;
+  
+  // Google Places API Key
+  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+  
+  // Load Type Options
+  static const List<String> _loadTypeOptions = [
+    'General Freight',
+    'Food & Beverages',
+    'Electronics',
+    'Automotive Parts',
+    'Machinery & Equipment',
+    'Building Materials',
+    'Furniture',
+    'Textiles & Apparel',
+    'Chemicals',
+    'Pharmaceuticals',
+    'Agricultural Products',
+    'Livestock',
+    'Hazardous Materials',
+    'Oversized Loads',
+    'Fragile Goods',
+    'Temperature Controlled',
+    'High Value Cargo',
+    'Bulk Materials',
+    'Retail Goods',
+    'Industrial Supplies',
+  ];
+  
+  // Load Sensitivity Options
+  static const List<String> _loadSensitivityOptions = [
+    'Standard',
+    'Fragile',
+    'Hazardous',
+    'Temperature Sensitive',
+    'High Value',
+    'Oversized',
+    'Time Sensitive',
+    'Perishable',
+    'Flammable',
+    'Corrosive',
+    'Explosive',
+    'Radioactive',
+    'Medical/Pharmaceutical',
+    'Electronics',
+    'Artwork/Antiques',
+  ];
+  
+  // Weight Unit Options
+  static const List<String> _weightUnitOptions = [
+    'kg',
+    'lbs',
+    'tons',
+    'tonnes',
+  ];
 
   @override
   void initState() {
@@ -89,8 +146,14 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
     }
     
     _weightController.text = data['weight']?.toString() ?? '';
+    // Parse weight unit if it exists, otherwise default to 'kg'
+    if (data['weightUnit'] != null) {
+      _weightUnit = data['weightUnit'].toString();
+    } else {
+      _weightUnit = 'kg'; // Default
+    }
     
-    // Parse delivery window
+    // Parse delivery window (single date/time)
     if (data['deliveryWindowStart'] != null && data['deliveryWindowEnd'] != null) {
       try {
         _deliveryWindowStart = data['deliveryWindowStart'] is DateTime 
@@ -99,8 +162,28 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
         _deliveryWindowEnd = data['deliveryWindowEnd'] is DateTime 
             ? data['deliveryWindowEnd'] 
             : DateTime.parse(data['deliveryWindowEnd'].toString());
-        _deliveryWindowController.text = _deliveryWindowStart != null && _deliveryWindowEnd != null
-            ? '${_deliveryWindowStart!.day}/${_deliveryWindowStart!.month}/${_deliveryWindowStart!.year} - ${_deliveryWindowEnd!.day}/${_deliveryWindowEnd!.month}/${_deliveryWindowEnd!.year}'
+        // Display date and time
+        if (_deliveryWindowStart != null) {
+          _deliveryWindowController.text = '${_deliveryWindowStart!.day}/${_deliveryWindowStart!.month}/${_deliveryWindowStart!.year} ${_deliveryWindowStart!.hour.toString().padLeft(2, '0')}:${_deliveryWindowStart!.minute.toString().padLeft(2, '0')}';
+          // If end date is different, still set it but display only start date/time
+          if (_deliveryWindowEnd == null) {
+            _deliveryWindowEnd = _deliveryWindowStart;
+          }
+        }
+      } catch (e) {
+        _deliveryWindowStart = null;
+        _deliveryWindowEnd = null;
+        _deliveryWindowController.text = data['deliveryWindow']?.toString() ?? '';
+      }
+    } else if (data['deliveryWindowStart'] != null) {
+      // Handle case where only start date/time exists
+      try {
+        _deliveryWindowStart = data['deliveryWindowStart'] is DateTime 
+            ? data['deliveryWindowStart'] 
+            : DateTime.parse(data['deliveryWindowStart'].toString());
+        _deliveryWindowEnd = _deliveryWindowStart;
+        _deliveryWindowController.text = _deliveryWindowStart != null
+            ? '${_deliveryWindowStart!.day}/${_deliveryWindowStart!.month}/${_deliveryWindowStart!.year} ${_deliveryWindowStart!.hour.toString().padLeft(2, '0')}:${_deliveryWindowStart!.minute.toString().padLeft(2, '0')}'
             : '';
       } catch (e) {
         _deliveryWindowStart = null;
@@ -157,62 +240,103 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
 
   // Date/Time picker methods
   Future<void> _selectPickupDateTime() async {
-    final DateTime? pickedDate = await showDatePicker(
-      context: context,
-      initialDate: _pickupDateTime ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    
-    if (pickedDate != null) {
-      final TimeOfDay? pickedTime = await showTimePicker(
-        context: context,
-        initialTime: _pickupDateTime != null 
-            ? TimeOfDay.fromDateTime(_pickupDateTime!)
-            : TimeOfDay.now(),
-      );
-      
-      if (pickedTime != null) {
+    DatePicker.showDateTimePicker(
+      context,
+      showTitleActions: true,
+      minTime: DateTime.now(),
+      maxTime: DateTime.now().add(const Duration(days: 365)),
+      currentTime: _pickupDateTime ?? DateTime.now(),
+      locale: LocaleType.en,
+      onConfirm: (date) {
         setState(() {
-          _pickupDateTime = DateTime(
-            pickedDate.year,
-            pickedDate.month,
-            pickedDate.day,
-            pickedTime.hour,
-            pickedTime.minute,
-          );
-          _pickupDateTimeController.text = '${_pickupDateTime!.day}/${_pickupDateTime!.month}/${_pickupDateTime!.year} ${_pickupDateTime!.hour.toString().padLeft(2, '0')}:${_pickupDateTime!.minute.toString().padLeft(2, '0')}';
+          _pickupDateTime = date;
+          _pickupDateTimeController.text = '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+          
+          // If delivery is set and is before the new pickup time, clear it
+          if (_deliveryWindowStart != null && _deliveryWindowStart!.isBefore(date)) {
+            _deliveryWindowStart = null;
+            _deliveryWindowEnd = null;
+            _deliveryWindowController.clear();
+            
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Delivery date/time has been cleared as it was before pickup time. Please select a new delivery date/time.'),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
         });
-      }
-    }
+      },
+    );
   }
 
   Future<void> _selectDeliveryWindow() async {
-    // Select start date
-    final DateTime? startDate = await showDatePicker(
-      context: context,
-      initialDate: _deliveryWindowStart ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    
-    if (startDate != null) {
-      // Select end date
-      final DateTime? endDate = await showDatePicker(
-        context: context,
-        initialDate: _deliveryWindowEnd ?? startDate.add(const Duration(days: 1)),
-        firstDate: startDate,
-        lastDate: DateTime.now().add(const Duration(days: 365)),
-      );
-      
-      if (endDate != null) {
-        setState(() {
-          _deliveryWindowStart = startDate;
-          _deliveryWindowEnd = endDate;
-          _deliveryWindowController.text = '${startDate.day}/${startDate.month}/${startDate.year} - ${endDate.day}/${endDate.month}/${endDate.year}';
-        });
-      }
+    // Calculate minimum delivery time (must be after pickup time)
+    DateTime minDeliveryTime;
+    if (_pickupDateTime != null) {
+      // Delivery must be at least 1 hour after pickup
+      minDeliveryTime = _pickupDateTime!.add(const Duration(hours: 1));
+    } else {
+      // If no pickup time set, delivery can be from now
+      minDeliveryTime = DateTime.now();
     }
+    
+    // Ensure minDeliveryTime is not in the past
+    if (minDeliveryTime.isBefore(DateTime.now())) {
+      minDeliveryTime = DateTime.now().add(const Duration(hours: 1));
+    }
+    
+    // Set current delivery time, ensuring it's not before pickup
+    DateTime currentDeliveryTime = _deliveryWindowStart ?? minDeliveryTime;
+    if (currentDeliveryTime.isBefore(minDeliveryTime)) {
+      currentDeliveryTime = minDeliveryTime;
+    }
+    
+    DatePicker.showDateTimePicker(
+      context,
+      showTitleActions: true,
+      minTime: minDeliveryTime,
+      maxTime: DateTime.now().add(const Duration(days: 365)),
+      currentTime: currentDeliveryTime,
+      locale: LocaleType.en,
+      onConfirm: (date) {
+        // Validate that delivery is after pickup
+        if (_pickupDateTime != null && date.isBefore(_pickupDateTime!)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Delivery date/time must be after pickup date/time. Please select a later time.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+          return;
+        }
+        
+        // Validate that delivery is at least 1 hour after pickup
+        if (_pickupDateTime != null) {
+          final difference = date.difference(_pickupDateTime!);
+          if (difference.inHours < 1) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Delivery must be at least 1 hour after pickup time.'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+            return;
+          }
+        }
+        
+        setState(() {
+          // Set both start and end to the same date/time (delivery date/time)
+          // This represents the delivery date/time of the journey
+          _deliveryWindowStart = date;
+          _deliveryWindowEnd = date;
+          _deliveryWindowController.text = '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+        });
+      },
+    );
   }
 
   @override
@@ -263,29 +387,43 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
                     const SizedBox(height: 25),
                     Row(
                       children: [
-                        Expanded(child: _buildInputField(context, "Origin Address", _originAddressController)),
+                        Expanded(
+                          child: GooglePlacesAutocomplete(
+                            controller: _originAddressController,
+                            hintText: 'Origin Address',
+                            icon: Icons.location_on,
+                            apiKey: _googleApiKey,
+                          ),
+                        ),
                         const SizedBox(width: 15),
-                        Expanded(child: _buildInputField(context, "Destination Address", _destinationAddressController)),
+                        Expanded(
+                          child: GooglePlacesAutocomplete(
+                            controller: _destinationAddressController,
+                            hintText: 'Destination Address',
+                            icon: Icons.location_on,
+                            apiKey: _googleApiKey,
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 25),
                     Row(
                       children: [
-                        Expanded(child: _buildInputField(context, "Load Type", _loadTypeController)),
+                        Expanded(child: _buildDropdownField(context, "Load Type", _loadTypeController, _loadTypeOptions)),
                         const SizedBox(width: 15),
-                        Expanded(child: _buildInputField(context, "Load Sensitivity", _loadSensitivityController)),
+                        Expanded(child: _buildDropdownField(context, "Load Sensitivity", _loadSensitivityController, _loadSensitivityOptions)),
                       ],
                     ),
                     const SizedBox(height: 25),
                     _buildTextArea(context, "Please Provide a Specific Load Description", _loadDescriptionController),
                     const SizedBox(height: 25),
-                    _buildInputField(context, "Declared Value (For Insurance) (CAD)", _declaredValueController),
+                    _buildNumericInputField(context, "Declared Value (For Insurance) (CAD)", _declaredValueController),
                     const SizedBox(height: 25),
                     Row(
                       children: [
                         Expanded(child: _buildDateTimeField(context, "Pick Up Date/Time", _pickupDateTimeController, _selectPickupDateTime)),
                         const SizedBox(width: 15),
-                        Expanded(child: _buildInputField(context, "Weight Kg / lbs", _weightController)),
+                        Expanded(child: _buildWeightField(context, "Weight", _weightController)),
                       ],
                     ),
                     const SizedBox(height: 25),
@@ -299,7 +437,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
                     const SizedBox(height: 25),
                     _buildInputField(context, "Equipment Needed (Optional)", _equipmentNeededController),
                     const SizedBox(height: 25),
-                    _buildInputField(context, "Quote/Budget", _quoteBudgetController),
+                    _buildNumericInputField(context, "Quote/Budget (CAD)", _quoteBudgetController),
                     const SizedBox(height: 25),
                     _buildUploadField(
                       context,
@@ -385,6 +523,316 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDropdownField(
+      BuildContext context,
+      String hintText,
+      TextEditingController controller,
+      List<String> options,
+      ) {
+    return GestureDetector(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.white,
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (BuildContext context) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 12, bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: options.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          final option = options[index];
+                          final isSelected = controller.text == option;
+                          return ListTile(
+                            title: Text(
+                              option,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? const Color(0xFF43975A) : Colors.black,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check, color: Color(0xFF43975A))
+                                : null,
+                            onTap: () {
+                              setState(() {
+                                controller.text = option;
+                              });
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromRGBO(183, 123, 40, 0.44),
+              blurRadius: 2.8,
+              spreadRadius: 1,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    controller.text.isEmpty ? hintText : controller.text,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: controller.text.isEmpty ? const Color(0xFF959595) : Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  size: 20,
+                  color: Color(0xFF959595),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNumericInputField(
+      BuildContext context,
+      String hintText,
+      TextEditingController controller,
+      ) {
+    return Container(
+      width: double.infinity,
+      height: 36,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(183, 123, 40, 0.44),
+            blurRadius: 2.8,
+            spreadRadius: 1,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
+          child: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
+            decoration: InputDecoration(
+              hintText: hintText,
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: EdgeInsets.zero,
+              hintStyle: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF959595),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: const TextStyle(
+              fontSize: 13,
+              color: Colors.black,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeightField(
+      BuildContext context,
+      String hintText,
+      TextEditingController controller,
+      ) {
+    return Container(
+      width: double.infinity,
+      height: 36,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(183, 123, 40, 0.44),
+            blurRadius: 2.8,
+            spreadRadius: 1,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 15),
+              child: TextField(
+                controller: controller,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
+                  hintStyle: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF959595),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Colors.black,
+                ),
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: Colors.white,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (BuildContext context) {
+                  return DraggableScrollableSheet(
+                    initialChildSize: 0.4,
+                    minChildSize: 0.3,
+                    maxChildSize: 0.6,
+                    expand: false,
+                    builder: (context, scrollController) {
+                      return Column(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(top: 12, bottom: 20),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          Expanded(
+                            child: ListView.builder(
+                              controller: scrollController,
+                              itemCount: _weightUnitOptions.length,
+                              itemBuilder: (BuildContext context, int index) {
+                                final unit = _weightUnitOptions[index];
+                                final isSelected = _weightUnit == unit;
+                                return ListTile(
+                                  title: Text(
+                                    unit,
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      color: isSelected ? const Color(0xFF43975A) : Colors.black,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check, color: Color(0xFF43975A))
+                                      : null,
+                                  onTap: () {
+                                    setState(() {
+                                      _weightUnit = unit;
+                                    });
+                                    Navigator.pop(context);
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
+                },
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFF43975A).withOpacity(0.1),
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(10),
+                  bottomRight: Radius.circular(10),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _weightUnit,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF43975A),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.arrow_drop_down,
+                    size: 18,
+                    color: Color(0xFF43975A),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -954,12 +1402,24 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
     }
     
     if (_loadTypeController.text.trim().isEmpty) {
-      _showAlertDialog(context, 'Please enter load type.');
+      _showAlertDialog(context, 'Please select load type.');
+      return false;
+    }
+    
+    // Validate load type is from the options
+    if (!_loadTypeOptions.contains(_loadTypeController.text.trim())) {
+      _showAlertDialog(context, 'Please select a valid load type from the dropdown.');
       return false;
     }
     
     if (_loadSensitivityController.text.trim().isEmpty) {
-      _showAlertDialog(context, 'Please enter load sensitivity.');
+      _showAlertDialog(context, 'Please select load sensitivity.');
+      return false;
+    }
+    
+    // Validate load sensitivity is from the options
+    if (!_loadSensitivityOptions.contains(_loadSensitivityController.text.trim())) {
+      _showAlertDialog(context, 'Please select a valid load sensitivity from the dropdown.');
       return false;
     }
     
@@ -968,8 +1428,20 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       return false;
     }
     
+    if (_loadDescriptionController.text.trim().length < 10) {
+      _showAlertDialog(context, 'Load description must be at least 10 characters long.');
+      return false;
+    }
+    
     if (_declaredValueController.text.trim().isEmpty) {
       _showAlertDialog(context, 'Please enter declared value.');
+      return false;
+    }
+    
+    // Validate declared value is a valid positive number
+    final declaredValue = double.tryParse(_declaredValueController.text.trim());
+    if (declaredValue == null || declaredValue <= 0) {
+      _showAlertDialog(context, 'Please enter a valid declared value (must be a positive number).');
       return false;
     }
     
@@ -978,18 +1450,53 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       return false;
     }
     
+    // Validate pickup date is not in the past
+    if (_pickupDateTime!.isBefore(DateTime.now())) {
+      _showAlertDialog(context, 'Pickup date/time cannot be in the past.');
+      return false;
+    }
+    
     if (_weightController.text.trim().isEmpty) {
       _showAlertDialog(context, 'Please enter weight.');
       return false;
     }
     
-    if (_deliveryWindowStart == null || _deliveryWindowEnd == null) {
-      _showAlertDialog(context, 'Please select delivery window.');
+    // Validate weight is a valid positive number
+    final weight = double.tryParse(_weightController.text.trim());
+    if (weight == null || weight <= 0) {
+      _showAlertDialog(context, 'Please enter a valid weight (must be a positive number).');
       return false;
+    }
+    
+    if (_deliveryWindowStart == null || _deliveryWindowEnd == null) {
+      _showAlertDialog(context, 'Please select delivery date/time.');
+      return false;
+    }
+    
+    // Validate that delivery is after pickup
+    if (_pickupDateTime != null && _deliveryWindowStart != null) {
+      if (_deliveryWindowStart!.isBefore(_pickupDateTime!) || _deliveryWindowStart!.isAtSameMomentAs(_pickupDateTime!)) {
+        _showAlertDialog(context, 'Delivery date/time must be after pickup date/time.');
+        return false;
+      }
+      
+      // Validate that delivery is at least 1 hour after pickup
+      final difference = _deliveryWindowStart!.difference(_pickupDateTime!);
+      if (difference.inHours < 1) {
+        _showAlertDialog(context, 'Delivery must be at least 1 hour after pickup time.');
+        return false;
+      }
     }
     
     if (_quoteBudgetController.text.trim().isEmpty) {
       _showAlertDialog(context, 'Please enter quote/budget.');
+      return false;
+    }
+    
+    // Validate quote/budget is a valid positive number
+    final quoteBudget = double.tryParse(_quoteBudgetController.text.trim());
+    if (quoteBudget == null || quoteBudget <= 0) {
+      _showAlertDialog(context, 'Please enter a valid quote/budget (must be a positive number).');
       return false;
     }
     
@@ -1021,6 +1528,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       'declaredValue': _declaredValueController.text.trim(),
       'pickupDateTime': _pickupDateTime?.toIso8601String(),
       'weight': _weightController.text.trim(),
+      'weightUnit': _weightUnit,
       'deliveryWindowStart': _deliveryWindowStart?.toIso8601String(),
       'deliveryWindowEnd': _deliveryWindowEnd?.toIso8601String(),
       'deliveryWindow': _deliveryWindowController.text.trim(), // Keep for backward compatibility
@@ -1053,6 +1561,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       _pickupDateTime = null;
       _deliveryWindowStart = null;
       _deliveryWindowEnd = null;
+      _weightUnit = 'kg'; // Reset to default
     });
   }
 

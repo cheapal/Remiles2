@@ -341,11 +341,6 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
       return;
     }
     
-    if (_isCarbonFootprintInterested == null) {
-      _showAlertDialog(context, 'Please select your interest in carbon footprint tracking.');
-      return;
-    }
-    
     setState(() => _saving = true);
     try {
       final authProvider = context.read<AuthProvider>();
@@ -355,7 +350,12 @@ class _ShipperDashboard3State extends State<ShipperDashboard3>
         final response = {
           'businessNumber': _businessNumberController.text.trim(),
           'isGstRegistered': _isGstRegistered,
-          'isCarbonFootprintInterested': _isCarbonFootprintInterested!,
+          'isCarbonFootprintInterested': _isCarbonFootprintInterested, // Can be true, false, or null
+          'carbonFootprintStatus': _isCarbonFootprintInterested == true 
+              ? 'interested' 
+              : _isCarbonFootprintInterested == false 
+                  ? 'maybe_later' 
+                  : 'remind_later',
           'timestamp': DateTime.now().toIso8601String(),
         };
         

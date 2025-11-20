@@ -1,9 +1,11 @@
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/filter_manage_loads.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_post_load.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_details_page.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
@@ -339,7 +341,7 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
 
   void _repostLoad(Map<String, dynamic> load) async {
     // Open post load screen with pre-filled data
-    final result = await Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ShipperDashboardPostLoad(
           editLoadData: load, // Pass the load data for editing
@@ -347,16 +349,14 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
       ),
     );
     
-    // If load was updated, refresh the loads list
-    if (result != null && result['loadUpdated'] == true) {
-      _loadLoads(reset: true);
-      _loadLoadStats();
-    }
+    // Always refresh when returning from repost screen
+    _loadLoads(reset: true);
+    _loadLoadStats();
   }
 
   void _editLoad(Map<String, dynamic> load) async {
     // Open post load screen with pre-filled data for editing
-    final result = await Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => ShipperDashboardPostLoad(
           editLoadData: load, // Pass the load data for editing
@@ -364,11 +364,9 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
       ),
     );
     
-    // If load was updated, refresh the loads list
-    if (result != null && result['loadUpdated'] == true) {
-      _loadLoads(reset: true);
-      _loadLoadStats();
-    }
+    // Always refresh when returning from edit screen
+    _loadLoads(reset: true);
+    _loadLoadStats();
   }
 
   void _showDeleteConfirmation(String loadId) {
@@ -453,17 +451,15 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                         GestureDetector(
                           onTap: () async {
                             // Navigate to post load screen
-                            final result = await Navigator.of(context).push(
+                            await Navigator.of(context).push(
                               MaterialPageRoute(
                                 builder: (context) => ShipperDashboardPostLoad(),
                               ),
                             );
                             
-                            // If load was created, refresh the loads list
-                            if (result != null && result['loadUpdated'] == true) {
-                              _loadLoads(reset: true);
-                              _loadLoadStats();
-                            }
+                            // Always refresh when returning from post load screen
+                            _loadLoads(reset: true);
+                            _loadLoadStats();
                           },
                           child: Row(
                             children: [
@@ -768,28 +764,30 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
     final statusColor = _getStatusColor(status);
     final statusText = _getStatusText(status);
     
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: const [
-          BoxShadow(
-            color: Color.fromRGBO(0, 0, 0, 0.25),
-            blurRadius: 13.4,
-            spreadRadius: 0,
-            offset: Offset(0, 13.4),
-          ),
-        ],
-      ),
-      child: Padding(
+    return GestureDetector(
+      onTap: () => _showLoadDetails(load),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromRGBO(0, 0, 0, 0.25),
+              blurRadius: 13.4,
+              spreadRadius: 0,
+              offset: Offset(0, 13.4),
+            ),
+          ],
+        ),
+        child: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header rows
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
@@ -799,11 +797,12 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                         children: [
                           const Icon(Icons.location_on, color: Color(0xFF386544), size: 18),
                           const SizedBox(width: 5),
-                          Expanded(
+                          Flexible(
                             child: Text(
                               'From: ${load['originAddress'] ?? 'N/A'}',
                               style: const TextStyle(fontWeight: FontWeight.w500),
                               overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ),
                         ],
@@ -813,11 +812,12 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                         children: [
                           const Icon(Icons.location_on, color: Color(0xFF386544), size: 18),
                           const SizedBox(width: 5),
-                          Expanded(
+                          Flexible(
                             child: Text(
                               'To: ${load['destinationAddress'] ?? 'N/A'}',
                               style: const TextStyle(fontWeight: FontWeight.w500),
                               overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
                             ),
                           ),
                         ],
@@ -825,51 +825,59 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                // Edit button for active loads only
-                if (status == 'active')
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: GestureDetector(
-                      onTap: () => _editLoad(load),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF386544).withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.edit, size: 12, color: Color(0xFF386544)),
-                            const SizedBox(width: 4),
-                            const Text(
-                              'Edit',
-                              style: TextStyle(
-                                color: Color(0xFF386544),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
+                const SizedBox(width: 8),
+                // Edit button and status badge - always visible
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    // Edit button for active loads only
+                    if (status == 'active')
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: GestureDetector(
+                          onTap: () => _editLoad(load),
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF386544).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
                             ),
-                          ],
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.edit, size: 12, color: Color(0xFF386544)),
+                                const SizedBox(width: 4),
+                                const Text(
+                                  'Edit',
+                                  style: TextStyle(
+                                    color: Color(0xFF386544),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
-                    ),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: statusColor,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    statusText,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                   
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: statusColor,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          statusText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -994,83 +1002,93 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
               ],
             ),
             
-            // Action buttons - Horizontal ListView for single line
-            Padding(
-              padding: const EdgeInsets.only(top: 15),
-              child: SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    // Book/Unbook button
-                    if (load['id'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: TextButton(
-                          onPressed: () => _toggleBookedStatus(load['id'], load['status'] != 'booked'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: load['status'] == 'booked' ? Colors.orange : const Color(0xFF195529),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            // Action buttons - Horizontal ListView for single line (only in debug mode)
+            if (kDebugMode)
+              Padding(
+                padding: const EdgeInsets.only(top: 15),
+                child: SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      // Book/Unbook button
+                      if (load['id'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: TextButton(
+                            onPressed: () => _toggleBookedStatus(load['id'], load['status'] != 'booked'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: load['status'] == 'booked' ? Colors.orange : const Color(0xFF195529),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            child: Text(load['status'] == 'booked' ? 'Unbook' : 'Mark as Booked'),
                           ),
-                          child: Text(load['status'] == 'booked' ? 'Unbook' : 'Mark as Booked'),
                         ),
-                      ),
-                    // Mark In-Transit button
-                    if (load['id'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: TextButton(
-                          onPressed: () => _updateLoadStatus(load['id'], 'inTransit'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      // Mark In-Transit button
+                      if (load['id'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: TextButton(
+                            onPressed: () => _updateLoadStatus(load['id'], 'inTransit'),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            child: const Text('Mark In-Transit'),
                           ),
-                          child: const Text('Mark In-Transit'),
                         ),
-                      ),
-                    // Mark Completed button
-                    if (load['id'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: TextButton(
-                          onPressed: () => _updateLoadStatus(load['id'], 'completed'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      // Mark Completed button
+                      if (load['id'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: TextButton(
+                            onPressed: () => _updateLoadStatus(load['id'], 'completed'),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            child: const Text('Mark Completed'),
                           ),
-                          child: const Text('Mark Completed'),
                         ),
-                      ),
-                    // Cancel button
-                    if (load['id'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: TextButton(
-                          onPressed: () => _updateLoadStatus(load['id'], 'cancelled'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      // Cancel button
+                      if (load['id'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: TextButton(
+                            onPressed: () => _updateLoadStatus(load['id'], 'cancelled'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            child: const Text('Cancel'),
                           ),
-                          child: const Text('Cancel'),
                         ),
-                      ),
-                    // Delete button
-                    if (load['id'] != null)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: TextButton(
-                          onPressed: () => _showDeleteConfirmation(load['id']),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      // Delete button
+                      if (load['id'] != null)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: TextButton(
+                            onPressed: () => _showDeleteConfirmation(load['id']),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            child: const Text('Delete'),
                           ),
-                          child: const Text('Delete'),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
           ],
         ),
+      ),
+      ),
+    );
+  }
+
+  void _showLoadDetails(Map<String, dynamic> load) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ShipperLoadDetailsPage(load: load),
       ),
     );
   }

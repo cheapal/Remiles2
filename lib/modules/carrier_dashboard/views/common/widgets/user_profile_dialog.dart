@@ -171,8 +171,8 @@ class _UserProfileDialogState extends State<UserProfileDialog> {
                                         color: Colors.grey.shade600,
                                       ),
                                     ),
-                                    if (isShipper && (_shipper?.isVerified ?? false) ||
-                                        (isCarrier && (_carrier?.isVerified ?? false))) ...[
+                                    if ((isShipper && ((_shipper?.isVerified ?? false) || (_shipper?.isPhoneVerified ?? false))) ||
+                                        (isCarrier && ((_carrier?.isVerified ?? false) || (_carrier?.isPhoneVerified ?? false)))) ...[
                                       const SizedBox(width: 8),
                                       Icon(
                                         Icons.verified,

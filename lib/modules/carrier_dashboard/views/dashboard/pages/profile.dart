@@ -301,12 +301,12 @@ class _ProfileState extends State<Profile> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        // Verified Badge - always show
+                        // Verified Badge - always show (based on account or phone verification)
                         Container(
                           width: 14,
                           height: 14,
                           decoration: BoxDecoration(
-                            color: carrier.isVerified
+                            color: (carrier.isVerified || carrier.isPhoneVerified)
                                 ? const Color(0xFF81AB3A)
                                 : Colors.grey.shade400,
                             borderRadius: BorderRadius.circular(2),
@@ -320,12 +320,12 @@ class _ProfileState extends State<Profile> {
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
-                            carrier.isVerified ? 'Verified' : 'Unverified',
+                            (carrier.isVerified || carrier.isPhoneVerified) ? 'Verified' : 'Unverified',
                             style: TextStyle(
                                 fontFamily: 'Roboto',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
-                                color: carrier.isVerified ? Colors.black87 : Colors.grey),
+                                color: (carrier.isVerified || carrier.isPhoneVerified) ? Colors.black87 : Colors.grey),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),

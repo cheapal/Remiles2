@@ -11,6 +11,7 @@ class UserModel {
   final DateTime createdAt;
   final DateTime? lastLoginAt;
   final bool isEmailVerified;
+  final bool isPhoneVerified;
   final String? profileImageUrl;
   final Map<String, dynamic>? additionalData;
 
@@ -23,6 +24,7 @@ class UserModel {
     required this.createdAt,
     this.lastLoginAt,
     this.isEmailVerified = false,
+    this.isPhoneVerified = false,
     this.profileImageUrl,
     this.additionalData,
   });
@@ -44,6 +46,7 @@ class UserModel {
           ? (data['lastLoginAt'] as Timestamp).toDate()
           : null,
       isEmailVerified: data['isEmailVerified'] ?? false,
+      isPhoneVerified: data['isPhoneVerified'] ?? false,
       profileImageUrl: data['profileImageUrl'],
       additionalData: data['additionalData'],
     );
@@ -65,6 +68,7 @@ class UserModel {
           ? DateTime.parse(json['lastLoginAt'])
           : null,
       isEmailVerified: json['isEmailVerified'] ?? false,
+      isPhoneVerified: json['isPhoneVerified'] ?? false,
       profileImageUrl: json['profileImageUrl'],
       additionalData: json['additionalData'],
     );
@@ -81,6 +85,7 @@ class UserModel {
       'createdAt': createdAt.toIso8601String(),
       'lastLoginAt': lastLoginAt?.toIso8601String(),
       'isEmailVerified': isEmailVerified,
+      'isPhoneVerified': isPhoneVerified,
       'profileImageUrl': profileImageUrl,
       'additionalData': additionalData,
     };
@@ -96,6 +101,7 @@ class UserModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'lastLoginAt': lastLoginAt != null ? Timestamp.fromDate(lastLoginAt!) : null,
       'isEmailVerified': isEmailVerified,
+      'isPhoneVerified': isPhoneVerified,
       'profileImageUrl': profileImageUrl,
       'additionalData': additionalData,
     };
@@ -111,6 +117,7 @@ class UserModel {
     DateTime? createdAt,
     DateTime? lastLoginAt,
     bool? isEmailVerified,
+    bool? isPhoneVerified,
     String? profileImageUrl,
     Map<String, dynamic>? additionalData,
   }) {
@@ -123,6 +130,7 @@ class UserModel {
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       additionalData: additionalData ?? this.additionalData,
     );

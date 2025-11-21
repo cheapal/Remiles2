@@ -311,8 +311,10 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children:  [
                       Expanded(
+                        flex: 2,
                         child: Text(
                           '${_currentListing.title}\n\$${_currentListing.price.toStringAsFixed(0)}',
                           style: TextStyle(
@@ -322,24 +324,29 @@ class _ProductPagePreciseState extends State<ProductPagePrecise> {
                           ),
                         ),
                       ),
-                      Expanded(
-                        child:
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.location_on, color: green, size: 20),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _currentListing.location,
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        flex: 1,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Icon(Icons.location_on, color: green, size: 20),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                _currentListing.location,
+                                style: TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
                                 ),
-                              ],
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 2,
+                                textAlign: TextAlign.end,
+                              ),
                             ),
+                          ],
+                        ),
                       ),
                     ],
                   ),

@@ -6,6 +6,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'app_config.dart';
 import 'dart:io';
+import 'dart:async';
 import '../models/user_model.dart';
 import '../models/shipper_model.dart';
 import '../models/carrier_model.dart';
@@ -1046,6 +1047,173 @@ class FirebaseService {
       }
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to reauthenticate user');
+      rethrow;
+    }
+  }
+
+  // Phone verification methods
+  /// Send OTP to phone number for verification
+  /// Returns a Future that completes with the verificationId when code is sent
+  static Future<String> sendPhoneOTP(
+    String phoneNumber, {
+    Function(PhoneAuthCredential)? onVerificationCompleted,
+    Function(String)? onCodeSent,
+  }) async {
+    final completer = Completer<String>();
+    
+    try {
+      // Log analytics event for sending OTP
+      await logEvent('phone_otp_send_attempt', parameters: _convertParameters({
+        'phone_number_length': phoneNumber.length.toString(),
+        'has_country_code': phoneNumber.startsWith('+').toString(),
+      }));
+
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Auto-verification completed (Android only)
+          if (onVerificationCompleted != null) {
+            onVerificationCompleted(credential);
+          } else {
+            final user = _auth.currentUser;
+            if (user != null) {
+              await user.updatePhoneNumber(credential);
+              // Update Firestore
+              final role = await getUserRole(user.uid);
+              if (role == UserRole.shipper) {
+                await updateShipper(user.uid, {
+                  'isPhoneVerified': true,
+                  'phoneNumber': phoneNumber,
+                });
+              } else if (role == UserRole.carrier) {
+                await updateCarrier(user.uid, {
+                  'isPhoneVerified': true,
+                  'phoneNumber': phoneNumber,
+                });
+              }
+              
+              // Log successful auto-verification
+              await logEvent('phone_verification_auto_completed', parameters: _convertParameters({
+                'user_role': role.toString().split('.').last,
+              }));
+            }
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) async {
+          // Log analytics for failed verification
+          await logEvent('phone_otp_send_failed', parameters: _convertParameters({
+            'error_code': e.code,
+            'error_message': e.message ?? 'Unknown error',
+          }));
+          
+          // Record error in Crashlytics
+          await recordError(e, StackTrace.current, reason: 'Phone OTP send failed: ${e.code}');
+          
+          if (!completer.isCompleted) {
+            completer.completeError(e);
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) async {
+          // Log successful OTP send
+          await logEvent('phone_otp_sent', parameters: _convertParameters({
+            'has_resend_token': (resendToken != null).toString(),
+          }));
+          
+          if (onCodeSent != null) {
+            onCodeSent(verificationId);
+          }
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          // Auto-retrieval timeout - code not received automatically
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        timeout: const Duration(seconds: 60),
+      );
+      
+      return completer.future;
+    } catch (e) {
+      // Log analytics for exception
+      await logEvent('phone_otp_send_error', parameters: _convertParameters({
+        'error': e.toString(),
+      }));
+      
+      await recordError(e, StackTrace.current, reason: 'Failed to send phone OTP');
+      if (!completer.isCompleted) {
+        completer.completeError(e);
+      }
+      rethrow;
+    }
+  }
+
+  /// Verify OTP code and update phone verification status
+  static Future<void> verifyPhoneOTP({
+    required String verificationId,
+    required String smsCode,
+    required String phoneNumber,
+    required String userUid,
+    required UserRole userRole,
+  }) async {
+    try {
+      // Log analytics event for verification attempt
+      await logEvent('phone_otp_verify_attempt', parameters: _convertParameters({
+        'user_role': userRole.toString().split('.').last,
+        'otp_length': smsCode.length.toString(),
+      }));
+
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+
+      final user = _auth.currentUser;
+      if (user != null) {
+        // Link phone number to user account
+        await user.updatePhoneNumber(credential);
+        
+        // Update Firestore with verified phone number
+        final updateData = {
+          'isPhoneVerified': true,
+          'phoneNumber': phoneNumber,
+        };
+
+        if (userRole == UserRole.shipper) {
+          await updateShipper(userUid, updateData);
+        } else if (userRole == UserRole.carrier) {
+          await updateCarrier(userUid, updateData);
+        }
+
+        // Log successful verification
+        await logEvent('phone_verification_success', parameters: _convertParameters({
+          'user_role': userRole.toString().split('.').last,
+          'phone_number_length': phoneNumber.length.toString(),
+        }));
+      } else {
+        throw Exception('User not authenticated');
+      }
+    } on FirebaseAuthException catch (e) {
+      // Log analytics for Firebase auth errors
+      await logEvent('phone_otp_verify_failed', parameters: _convertParameters({
+        'error_code': e.code,
+        'error_message': e.message ?? 'Unknown error',
+        'user_role': userRole.toString().split('.').last,
+      }));
+      
+      // Record error in Crashlytics
+      await recordError(e, StackTrace.current, reason: 'Phone OTP verification failed: ${e.code}');
+      rethrow;
+    } catch (e) {
+      // Log analytics for general errors
+      await logEvent('phone_otp_verify_error', parameters: _convertParameters({
+        'error': e.toString(),
+        'user_role': userRole.toString().split('.').last,
+      }));
+      
+      await recordError(e, StackTrace.current, reason: 'Failed to verify phone OTP');
       rethrow;
     }
   }

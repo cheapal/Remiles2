@@ -29,6 +29,7 @@ class ShipperModel extends UserModel {
     required DateTime createdAt,
     DateTime? lastLoginAt,
     bool isEmailVerified = false,
+    bool isPhoneVerified = false,
     String? profileImageUrl,
     Map<String, dynamic>? additionalData,
     required this.companyName,
@@ -56,6 +57,7 @@ class ShipperModel extends UserModel {
           createdAt: createdAt,
           lastLoginAt: lastLoginAt,
           isEmailVerified: isEmailVerified,
+          isPhoneVerified: isPhoneVerified,
           profileImageUrl: profileImageUrl,
           additionalData: additionalData,
         );
@@ -73,6 +75,7 @@ class ShipperModel extends UserModel {
           ? (data['lastLoginAt'] as Timestamp).toDate()
           : null,
       isEmailVerified: data['isEmailVerified'] ?? false,
+      isPhoneVerified: data['isPhoneVerified'] ?? false,
       profileImageUrl: data['profileImageUrl'],
       additionalData: data['additionalData'],
       companyName: data['companyName'] ?? '',
@@ -112,6 +115,7 @@ class ShipperModel extends UserModel {
           ? DateTime.parse(json['lastLoginAt'])
           : null,
       isEmailVerified: json['isEmailVerified'] ?? false,
+      isPhoneVerified: json['isPhoneVerified'] ?? false,
       profileImageUrl: json['profileImageUrl'],
       additionalData: json['additionalData'],
       companyName: json['companyName'] ?? '',
@@ -196,6 +200,7 @@ class ShipperModel extends UserModel {
     DateTime? createdAt,
     DateTime? lastLoginAt,
     bool? isEmailVerified,
+    bool? isPhoneVerified,
     String? profileImageUrl,
     Map<String, dynamic>? additionalData,
     String? companyName,
@@ -223,6 +228,7 @@ class ShipperModel extends UserModel {
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       additionalData: additionalData ?? this.additionalData,
       companyName: companyName ?? this.companyName,

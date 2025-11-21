@@ -2,6 +2,7 @@ import 'package:Remiles/core/theme/colors.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/load_model.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/marketplace_screen.dart';
 import 'package:flutter/material.dart';
 
 class BookedNow extends StatefulWidget {
@@ -347,6 +348,36 @@ class _BookedNowState extends State<BookedNow> {
                 ),
               ),
             ],
+
+            // Show "View on Map" button only if load was booked by current user
+            if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && _isBookedByCurrentUser()) ...[
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _navigateToMarketplace(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Icon(Icons.map, color: Colors.white, size: 20),
+                      SizedBox(width: 8),
+                      Text(
+                        "View on Map",
+                        style: TextStyle(fontSize: 16, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -359,6 +390,12 @@ class _BookedNowState extends State<BookedNow> {
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  bool _isBookedByCurrentUser() {
+    final currentUser = FirebaseService.currentUser;
+    if (currentUser == null) return false;
+    return widget.load.bookedByCarrierId == currentUser.uid;
   }
 
   Color _getStatusColor(String status) {
@@ -499,6 +536,28 @@ class _BookedNowState extends State<BookedNow> {
 
   Future<void> _navigateToNegotiation() async {
     await _navigateToChat();
+  }
+
+  Future<void> _navigateToMarketplace() async {
+    if (context.mounted) {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MarketplaceScreen(
+            initialLoadId: widget.load.id,
+          ),
+        ),
+      );
+      
+      // Refresh load status when returning from marketplace
+      if (context.mounted) {
+        await _refreshLoadStatus();
+        // Notify parent to refresh if callback provided
+        if (widget.onLoadBooked != null) {
+          widget.onLoadBooked!();
+        }
+      }
+    }
   }
 
   Future<void> _navigateToChat() async {

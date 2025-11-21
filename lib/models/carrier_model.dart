@@ -33,6 +33,7 @@ class CarrierModel extends UserModel {
     required DateTime createdAt,
     DateTime? lastLoginAt,
     bool isEmailVerified = false,
+    bool isPhoneVerified = false,
     String? profileImageUrl,
     Map<String, dynamic>? additionalData,
     this.companyName,
@@ -64,6 +65,7 @@ class CarrierModel extends UserModel {
           createdAt: createdAt,
           lastLoginAt: lastLoginAt,
           isEmailVerified: isEmailVerified,
+          isPhoneVerified: isPhoneVerified,
           profileImageUrl: profileImageUrl,
           additionalData: additionalData,
         );
@@ -81,6 +83,7 @@ class CarrierModel extends UserModel {
           ? (data['lastLoginAt'] as Timestamp).toDate()
           : null,
       isEmailVerified: data['isEmailVerified'] ?? false,
+      isPhoneVerified: data['isPhoneVerified'] ?? false,
       profileImageUrl: data['profileImageUrl'],
       additionalData: data['additionalData'],
       companyName: data['companyName'],
@@ -126,6 +129,7 @@ class CarrierModel extends UserModel {
           ? DateTime.parse(json['lastLoginAt'])
           : null,
       isEmailVerified: json['isEmailVerified'] ?? false,
+      isPhoneVerified: json['isPhoneVerified'] ?? false,
       profileImageUrl: json['profileImageUrl'],
       additionalData: json['additionalData'],
       companyName: json['companyName'],
@@ -228,6 +232,7 @@ class CarrierModel extends UserModel {
     DateTime? createdAt,
     DateTime? lastLoginAt,
     bool? isEmailVerified,
+    bool? isPhoneVerified,
     String? profileImageUrl,
     Map<String, dynamic>? additionalData,
     String? companyName,
@@ -259,6 +264,7 @@ class CarrierModel extends UserModel {
       createdAt: createdAt ?? this.createdAt,
       lastLoginAt: lastLoginAt ?? this.lastLoginAt,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       additionalData: additionalData ?? this.additionalData,
       companyName: companyName ?? this.companyName,

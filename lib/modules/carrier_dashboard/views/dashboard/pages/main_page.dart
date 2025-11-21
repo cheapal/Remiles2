@@ -1,5 +1,6 @@
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/bottom_navigation_bar.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/profile.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_Screen.dart';
 import 'package:flutter/material.dart';
 
 import 'carrier_dashboard.dart';
@@ -59,7 +60,7 @@ class _MainPageState extends State<MainPage> {
           children: [
             _buildTabNavigator(_tabKeys[0],  CarrierDashboardScreen()),
             _buildTabNavigator(_tabKeys[1], const ManageLoadScreen()),
-            _buildTabNavigator(_tabKeys[2], const MarketplaceScreen()),
+            _buildTabNavigator(_tabKeys[2], const ShipperMarketplaceScreen()),
             _buildTabNavigator(_tabKeys[3],  Profile()),
             _buildTabNavigator(_tabKeys[4], More()),
           ],

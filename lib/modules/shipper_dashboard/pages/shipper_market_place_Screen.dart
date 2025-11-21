@@ -1110,12 +1110,12 @@ class _AdCardState extends State<_AdCard> {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // Verified Badge
+                            // Verified Badge (based on account or phone verification)
                             Container(
                               width: 12,
                               height: 12,
                               decoration: BoxDecoration(
-                                color: _shipperData?.isVerified == true
+                                color: ((_shipperData?.isVerified == true) || (_shipperData?.isPhoneVerified == true))
                                     ? const Color(0xFF81AB3A)
                                     : Colors.grey.shade400,
                                 borderRadius: BorderRadius.circular(2),
@@ -1126,15 +1126,16 @@ class _AdCardState extends State<_AdCard> {
                                 color: Colors.white,
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _shipperData?.isVerified == true ? 'Verified' : '',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                                color: _shipperData?.isVerified == true ? Colors.black87 : Colors.grey,
-                              ),
-                            ),
+                            /// Hiding this for now - need solution for that
+                            // const SizedBox(width: 4),
+                            // Text(
+                            //   ((_shipperData?.isVerified == true) || (_shipperData?.isPhoneVerified == true)) ? 'Verified' : '',
+                            //   style: TextStyle(
+                            //     fontSize: 10,
+                            //     fontWeight: FontWeight.w500,
+                            //     color: ((_shipperData?.isVerified == true) || (_shipperData?.isPhoneVerified == true)) ? Colors.black87 : Colors.grey,
+                            //   ),
+                            // ),
                             const Spacer(),
                             // Shipments
                             Icon(Icons.local_shipping, size: 12, color: Colors.black87),

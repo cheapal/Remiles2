@@ -17,7 +17,9 @@ import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_scr
 import 'package:geolocator/geolocator.dart';
 
 class MarketplaceScreen extends StatefulWidget {
-  const MarketplaceScreen({super.key});
+  final String? initialLoadId;
+  
+  const MarketplaceScreen({super.key, this.initialLoadId});
 
   @override
   State<MarketplaceScreen> createState() => _MarketplaceScreenState();
@@ -115,9 +117,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           _bookedLoads = filteredLoads;
           _isLoadingLoads = false;
           
-          // Select first load by default if available
+          // Select load based on initialLoadId if provided, otherwise select first load
           if (_bookedLoads.isNotEmpty) {
-            _selectedLoad = _bookedLoads.first;
+            if (widget.initialLoadId != null) {
+              // Try to find the load with the specified ID
+              final foundLoad = _bookedLoads.firstWhere(
+                (load) => load.id == widget.initialLoadId,
+                orElse: () => _bookedLoads.first,
+              );
+              _selectedLoad = foundLoad;
+            } else {
+              _selectedLoad = _bookedLoads.first;
+            }
             _updateLoadData();
           } else {
             _errorMessage = 'No booked loads found';

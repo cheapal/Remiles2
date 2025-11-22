@@ -109,12 +109,19 @@ class _ShipperAccountDetailsPageState extends State<ShipperAccountDetailsPage> {
       final businessTypeString = _selectedBusinessTypes.join(', ');
       final currentBusinessType = shipper.businessType ?? '';
       
+      // Check if phone number has changed
+      final newPhoneNumber = _phoneNumberController.text.trim();
+      final currentPhoneNumber = shipper.phoneNumber ?? '';
+      final phoneNumberChanged = newPhoneNumber != currentPhoneNumber;
+      
       // Prepare updates
       final updates = <String, dynamic>{
         if (_displayNameController.text != (shipper.displayName ?? ''))
           'displayName': _displayNameController.text.trim().isEmpty ? null : _displayNameController.text.trim(),
-        if (_phoneNumberController.text != (shipper.phoneNumber ?? ''))
-          'phoneNumber': _phoneNumberController.text.trim().isEmpty ? null : _phoneNumberController.text.trim(),
+        if (phoneNumberChanged)
+          'phoneNumber': newPhoneNumber.isEmpty ? null : newPhoneNumber,
+        if (phoneNumberChanged)
+          'isPhoneVerified': false, // Reset verification status when phone number changes
         if (_companyNameController.text != shipper.companyName)
           'companyName': _companyNameController.text.trim().isEmpty ? '' : _companyNameController.text.trim(),
         if (businessTypeString != currentBusinessType)

@@ -50,7 +50,7 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
       final result = await FirebaseService.getAvailableLoadsForCarrier(
         carrierUid: user.uid,
         searchQuery: '',
-        limit: 3, // Show top 3 recommended loads
+        limit: 1, // Show only top match
       );
       
       setState(() {
@@ -92,180 +92,194 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
   Widget _buildDashboard(BuildContext context, String displayName) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body:
+      body: Column(
+        children: [
+          /// Fixed Header Section (Top Nav, Welcome, Action Buttons)
+          Column(
+            children: [
+              /// Top Navigation Bar
+              TopNavigationBar(context),
 
-      SingleChildScrollView(
-        child: Column(
-          children: [
-            /// Top Navigation Bar
-            TopNavigationBar(context),
+              const SizedBox(height: 20),
 
-            const SizedBox(height: 20),
+              /// Welcome Row
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        "Welcome\n$displayName",
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children:  [
+                        SvgPicture.asset('assets/eco.svg',
+                            width: 50, height: 50,),
 
-            /// Welcome Row
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                        SizedBox(width: 20),
+                        SvgPicture.asset('assets/person.svg',
+                            width: 75, height: 65,),
+                        SizedBox(width: 20),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              /// Action Buttons
+              Padding(
+                padding: const EdgeInsets.only(left:15, right: 32),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: yellowColor,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 42, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ManageLoadScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text(
+                        "Find Loads",
+                        style: TextStyle(color: Colors.black, fontSize: 16),
+                      ),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 42, vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                      ),
+                      onPressed: () {},
+                      child: const Text(
+                        "\$ Payment",
+                        style: TextStyle(color: Colors.white, fontSize: 16),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+            ],
+          ),
+
+          /// Scrollable Content Section (from Carrier Preferences onwards)
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      "Welcome\n$displayName",
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                        height: 1.2,
-                      ),
-                    ),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children:  [
-                      SvgPicture.asset('assets/eco.svg',
-                          width: 50, height: 50,),
-
-                      SizedBox(width: 20),
-                      SvgPicture.asset('assets/person.svg',
-                          width: 75, height: 65,),
-                      SizedBox(width: 20),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            /// Action Buttons
-            Padding(
-              padding: const EdgeInsets.only(left:15, right: 32),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: yellowColor,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 42, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ManageLoadScreen(),
+                  /// Carrier Preferences
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children:  [
+                        Text(
+                          "Carrier Preferences",
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      );
-                    },
-                    child: const Text(
-                      "Find Loads",
-                      style: TextStyle(color: Colors.black, fontSize: 16),
-                    ),
-                  ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 42, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                    ),
-                    onPressed: () {},
-                    child: const Text(
-                      "\$ Payment",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            /// Carrier Preferences
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children:  [
-                  Text(
-                    "Carrier Preferences",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ManageLoadScreen(),
-                        ),
-                      );
-                    },
-                    child: SvgPicture.asset('assets/filter.svg',
-                        width: 20, height: 20, color: Colors.black54),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            /// Recommended Loads Section
-            _buildRecommendedLoadsSection(),
-            const SizedBox(height: 20),
-
-            /// View All Button
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 26),
-                child: GestureDetector(
-                  onTap: () {},
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1CAFFF),
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 6,
-                          offset: const Offset(0, 3),
-                        ),
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const ManageLoadScreen(),
+                              ),
+                            );
+                          },
+                          child: SvgPicture.asset('assets/filter.svg',
+                              width: 20, height: 20, color: Colors.black54),
                         ),
                       ],
                     ),
-                    child: const Text("View All", style: TextStyle(color: Colors.black,fontSize: 14, fontWeight: FontWeight.bold)),
                   ),
-                ),
-              ),
-            ),
 
-            const SizedBox(height: 10),
+                  const SizedBox(height: 24),
 
-            /// Stats Grid
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GridView.count(
-                shrinkWrap: true,
-                crossAxisCount: 2,
-                childAspectRatio: 1.6,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
+                  /// Recommended Loads Section (only top match)
+                  _buildRecommendedLoadsSection(),
+                  const SizedBox(height: 20),
+
+                  /// View All Button
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 26),
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ManageLoadScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1CAFFF),
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 6,
+                                offset: const Offset(0, 3),
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Text("View All", style: TextStyle(color: Colors.black,fontSize: 14, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  /// Stats Grid
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: GridView.count(
+                      shrinkWrap: true,
+                      crossAxisCount: 2,
+                      childAspectRatio: 1.6,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -472,16 +486,17 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
                     ),
                   ),
 
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 80), // space for bottom nav
                 ],
               ),
             ),
-
-            const SizedBox(height: 80), // space for bottom nav
-          ],
-        ),
+          ),
+        ],
       ),
-
-
     );
   }
 
@@ -608,134 +623,15 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
       );
     }
 
-    return Column(
-      children: [
-        // Show the top recommended load (highest match percentage)
-        if (_recommendedLoads.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: RecommendedLoad(load: _recommendedLoads.first),
-          ),
-        
-        // Show additional loads if available
-        if (_recommendedLoads.length > 1) ...[
-          const SizedBox(height: 12),
-          ...(_recommendedLoads.skip(1).take(2).map((load) => 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: _buildLoadPreviewCard(load),
-            ),
-          ).toList()),
-        ],
-      ],
-    );
+    // Show only the top recommended load (highest match percentage)
+    if (_recommendedLoads.isNotEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: RecommendedLoad(load: _recommendedLoads.first),
+      );
+    }
+    
+    return const SizedBox.shrink();
   }
 
-  Widget _buildLoadPreviewCard(LoadModel load) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.green.shade200, width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: primaryColor.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      "\$${load.price.toStringAsFixed(0)}",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: primaryColor,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "${load.distance.toStringAsFixed(0)} mi",
-                      style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                    ),
-                    const Spacer(),
-                    if (load.matchPercentage != null)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: load.matchPercentage! >= 90 
-                            ? Colors.green 
-                            : load.matchPercentage! >= 70 
-                              ? Colors.orange 
-                              : Colors.red,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          "${load.matchPercentage!.toStringAsFixed(0)}%",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  "${load.originCity}, ${load.originState} → ${load.destinationCity}, ${load.destinationState}",
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "Pickup: ${_formatDate(load.pickupDate)}",
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ManageLoadScreen(),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            child: const Text(
-              'View',
-              style: TextStyle(color: Colors.white, fontSize: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-    ];
-    return '${months[date.month - 1]} ${date.day}';
-  }
 }

@@ -669,29 +669,144 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
   // ======== Methods ========
   
   String _findClosestWeightOption(int weight) {
-    // Parse all weight options to get their numeric values
-    final weightValues = _maxWeightOptions.map((option) {
-      if (option == 'No Limit') return 999999;
-      final match = RegExp(r'(\d{1,3}(?:,\d{3})*)').firstMatch(option);
-      if (match != null) {
-        return int.parse(match.group(1)!.replaceAll(',', ''));
+    try {
+      // Parse all weight options to get their numeric values
+      final weightValues = _maxWeightOptions.map((option) {
+        if (option == 'No Limit') return 999999;
+        final match = RegExp(r'(\d{1,3}(?:,\d{3})*)').firstMatch(option);
+        if (match != null && match.group(1) != null) {
+          try {
+            return int.parse(match.group(1)!.replaceAll(',', ''));
+          } catch (e) {
+            print('Error parsing weight option: $option, error: $e');
+            return 0;
+          }
+        }
+        return 0;
+      }).toList();
+      
+      // Find the closest option
+      if (weightValues.isEmpty) return _maxWeightOptions.first;
+      
+      int closestIndex = 0;
+      int minDifference = (weight - weightValues[0]).abs();
+      
+      for (int i = 1; i < weightValues.length; i++) {
+        final difference = (weight - weightValues[i]).abs();
+        if (difference < minDifference) {
+          minDifference = difference;
+          closestIndex = i;
+        }
       }
-      return 0;
-    }).toList();
+      
+      return _maxWeightOptions[closestIndex];
+    } catch (e) {
+      print('Error in _findClosestWeightOption: $e');
+      return _maxWeightOptions.first; // Return first option as fallback
+    }
+  }
+  
+  // Convert distance string to numeric value for storage
+  // "Nationwide" -> 999999.0, "50 miles" -> 50.0
+  double? _parseDistanceToNumber(String? distanceString) {
+    if (distanceString == null || distanceString.isEmpty) return null;
+    if (distanceString == 'Nationwide') return 999999.0; // 999999 represents unlimited/nationwide
     
-    // Find the closest option
-    int closestIndex = 0;
-    int minDifference = (weight - weightValues[0]).abs();
+    try {
+      // Extract number from strings like "50 miles", "1,000 miles"
+      final match = RegExp(r'(\d{1,3}(?:,\d{3})*)').firstMatch(distanceString);
+      if (match != null && match.group(1) != null) {
+        final numberString = match.group(1)!.replaceAll(',', '');
+        final parsed = double.tryParse(numberString);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      print('Error parsing distance: $distanceString, error: $e');
+    }
+    return null;
+  }
+  
+  // Convert numeric distance value back to display string
+  // null or 999999 -> "Nationwide", 50.0 -> "50 miles"
+  String? _formatDistanceFromNumber(dynamic distanceValue) {
+    if (distanceValue == null) return 'Nationwide';
     
-    for (int i = 1; i < weightValues.length; i++) {
-      final difference = (weight - weightValues[i]).abs();
-      if (difference < minDifference) {
-        minDifference = difference;
-        closestIndex = i;
+    // If it's already a string, check if it's in our options
+    if (distanceValue is String) {
+      if (_maxDistanceOptions.contains(distanceValue)) {
+        return distanceValue;
+      }
+      // If it's "Nationwide" but not in options, return it anyway
+      if (distanceValue == 'Nationwide') {
+        return distanceValue;
       }
     }
     
-    return _maxWeightOptions[closestIndex];
+    // If it's a number, convert to string format
+    if (distanceValue is num) {
+      final distance = distanceValue.toDouble();
+      
+      // Check if it's the "Nationwide" value (999999 or very large numbers)
+      if (distance >= 999999) {
+        return 'Nationwide';
+      }
+      
+      // Format with comma for thousands
+      final distanceString = '${distance.toStringAsFixed(0).replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
+        (Match m) => '${m[1]},'
+      )} miles';
+      
+      // Check if this distance exists in our options
+      if (_maxDistanceOptions.contains(distanceString)) {
+        return distanceString;
+      }
+      
+      // Find the closest match
+      return _findClosestDistanceOption(distance.toInt());
+    }
+    
+    return null;
+  }
+  
+  String _findClosestDistanceOption(int distance) {
+    try {
+      // Parse all distance options to get their numeric values
+      final distanceValues = _maxDistanceOptions.map((option) {
+        if (option == 'Nationwide') return 999999;
+        final match = RegExp(r'(\d{1,3}(?:,\d{3})*)').firstMatch(option);
+        if (match != null && match.group(1) != null) {
+          try {
+            return int.parse(match.group(1)!.replaceAll(',', ''));
+          } catch (e) {
+            print('Error parsing distance option: $option, error: $e');
+            return 0;
+          }
+        }
+        return 0;
+      }).toList();
+      
+      // Find the closest option
+      if (distanceValues.isEmpty) return _maxDistanceOptions.first;
+      
+      int closestIndex = 0;
+      int minDifference = (distance - distanceValues[0]).abs();
+      
+      for (int i = 1; i < distanceValues.length; i++) {
+        final difference = (distance - distanceValues[i]).abs();
+        if (difference < minDifference) {
+          minDifference = difference;
+          closestIndex = i;
+        }
+      }
+      
+      return _maxDistanceOptions[closestIndex];
+    } catch (e) {
+      print('Error in _findClosestDistanceOption: $e');
+      return _maxDistanceOptions.first; // Return first option as fallback
+    }
   }
   
   Future<void> _loadPreferences() async {
@@ -715,30 +830,70 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
           
           // Convert maxWeight back to string format for display
           if (carrier.carrierPreferences?['maxWeight'] != null) {
-            final weight = carrier.carrierPreferences!['maxWeight'] as num;
-            print('Raw weight from DB: $weight');
-            
-            // Format with comma for thousands
-            final weightString = '${weight.toStringAsFixed(0).replaceAllMapped(
-              RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
-              (Match m) => '${m[1]},'
-            )} lbs';
-            
-            print('Formatted weight string: $weightString');
-            print('Available options: $_maxWeightOptions');
-            
-            // Check if this weight exists in our options
-            if (_maxWeightOptions.contains(weightString)) {
-              _selectedMaxWeight = weightString;
-              print('Exact match found: $weightString');
-            } else {
-              // Find the closest match from our options
-              _selectedMaxWeight = _findClosestWeightOption(weight.toInt());
-              print('Using closest match: $_selectedMaxWeight');
+            try {
+              final weightValue = carrier.carrierPreferences!['maxWeight'];
+              num? weight;
+              
+              // Safely convert to number
+              if (weightValue is num) {
+                weight = weightValue;
+              } else if (weightValue is String) {
+                // Try to parse string value
+                final cleaned = weightValue.replaceAll(RegExp(r'[^\d.]'), '');
+                if (cleaned.isNotEmpty) {
+                  weight = double.tryParse(cleaned);
+                }
+              }
+              
+              if (weight != null) {
+                print('Raw weight from DB: $weight');
+                
+                // Check if it's the "No Limit" value
+                if (weight >= 999999) {
+                  _selectedMaxWeight = 'No Limit';
+                  print('Weight is "No Limit"');
+                } else {
+                  // Format with comma for thousands
+                  final weightString = '${weight.toStringAsFixed(0).replaceAllMapped(
+                    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
+                    (Match m) => '${m[1]},'
+                  )} lbs';
+                  
+                  print('Formatted weight string: $weightString');
+                  print('Available options: $_maxWeightOptions');
+                  
+                  // Check if this weight exists in our options
+                  if (_maxWeightOptions.contains(weightString)) {
+                    _selectedMaxWeight = weightString;
+                    print('Exact match found: $weightString');
+                  } else {
+                    // Find the closest match from our options
+                    _selectedMaxWeight = _findClosestWeightOption(weight.toInt());
+                    print('Using closest match: $_selectedMaxWeight');
+                  }
+                }
+              } else {
+                print('Warning: Could not parse weight value: $weightValue');
+              }
+            } catch (e) {
+              print('Error loading maxWeight: $e');
             }
           }
           
-          _selectedMaxDistance = carrier.carrierPreferences?['maxDistance'];
+          // Convert maxDistance back to string format for display
+          if (carrier.carrierPreferences?['maxDistance'] != null) {
+            try {
+              final distanceValue = carrier.carrierPreferences!['maxDistance'];
+              _selectedMaxDistance = _formatDistanceFromNumber(distanceValue);
+              print('Raw distance from DB: $distanceValue');
+              print('Formatted distance string: $_selectedMaxDistance');
+            } catch (e) {
+              print('Error loading maxDistance: $e');
+              _selectedMaxDistance = null;
+            }
+          } else {
+            _selectedMaxDistance = null;
+          }
           print('Max Distance: $_selectedMaxDistance');
           print('Preferred Load Types: $_selectedPreferredLoadTypes');
           
@@ -780,13 +935,41 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
       final carrier = authProvider.carrierUser;
       
       if (carrier != null) {
+        // Parse maxWeight safely
+        double? parsedMaxWeight;
+        if (_selectedMaxWeight != null && _selectedMaxWeight!.isNotEmpty) {
+          if (_selectedMaxWeight == 'No Limit') {
+            // Handle "No Limit" similar to "Nationwide" - use a very large number
+            parsedMaxWeight = 999999.0;
+          } else {
+            try {
+              // Remove all non-digit and non-decimal characters
+              final cleanedWeight = _selectedMaxWeight!.replaceAll(RegExp(r'[^\d.]'), '');
+              if (cleanedWeight.isNotEmpty) {
+                parsedMaxWeight = double.tryParse(cleanedWeight);
+                if (parsedMaxWeight == null) {
+                  print('Warning: Failed to parse maxWeight: $_selectedMaxWeight');
+                }
+              }
+            } catch (e) {
+              print('Error parsing maxWeight: $_selectedMaxWeight, error: $e');
+            }
+          }
+        }
+        
+        // Parse maxDistance safely
+        double? parsedMaxDistance;
+        try {
+          parsedMaxDistance = _parseDistanceToNumber(_selectedMaxDistance);
+        } catch (e) {
+          print('Error parsing maxDistance: $_selectedMaxDistance, error: $e');
+        }
+        
         // Prepare preferences data
         final preferencesData = {
           'preferredLoadTypes': _selectedPreferredLoadTypes,
-          'maxWeight': _selectedMaxWeight != null 
-              ? double.parse(_selectedMaxWeight!.replaceAll(RegExp(r'[^\d.]'), ''))
-              : null,
-          'maxDistance': _selectedMaxDistance,
+          'maxWeight': parsedMaxWeight,
+          'maxDistance': parsedMaxDistance,
           'updatedAt': DateTime.now().toIso8601String(),
         };
         

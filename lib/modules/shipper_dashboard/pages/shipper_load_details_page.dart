@@ -72,7 +72,7 @@ class ShipperLoadDetailsPage extends StatelessWidget {
                           _buildDetailRow('Weight', '${load['weight'] ?? 'N/A'} ${load['weightUnit'] ?? 'kg'}'),
                           _buildDetailRow('Dimensions', load['dimensions'] ?? 'N/A'),
                           _buildDetailRow('Equipment Needed', load['equipmentNeeded'] ?? 'N/A'),
-                          _buildDetailRow('Declared Value', '\$${load['declaredValue'] ?? 'N/A'}'),
+                          _buildDetailRow('Declared Value', '${load['declaredValue'] ?? 'N/A'}'),
                           _buildDetailRow('Quote/Budget', '\$${load['quoteBudget'] ?? 'N/A'}'),
                           _buildDetailRow('Pickup Date/Time', _formatDate(load['pickupDateTime'], includeTime: true)),
                           _buildDetailRow('Delivery Window', _formatDeliveryWindow(load)),

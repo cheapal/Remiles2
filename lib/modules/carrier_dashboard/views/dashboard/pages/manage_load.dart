@@ -108,6 +108,16 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
       // Debug print
       print('Loaded ${_loads.length} loads for filter: $_selectedFilter');
       print('Has more: $_hasMore');
+      
+      // Debug: Check match percentages
+      final matchedCount = _loads.where((load) => load.matchPercentage != null && load.matchPercentage! > 0).length;
+      print('Loads with matchPercentage > 0: $matchedCount');
+      if (matchedCount > 0) {
+        final topMatches = _loads.where((load) => load.matchPercentage != null && load.matchPercentage! > 0)
+            .toList()
+          ..sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
+        print('Top 3 matches: ${topMatches.take(3).map((l) => '${l.id}: ${l.matchPercentage?.toStringAsFixed(1)}%').join(', ')}');
+      }
     } catch (e) {
       String errorMessage;
       print('Error loading loads: $e'); // Debug print
@@ -375,17 +385,34 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
     );
   }
 
-  /// Get loads that have matchPercentage (matched/recommended loads)
+  /// Get loads that have matchPercentage > 0 (matched/recommended loads)
+  /// These are loads that have a meaningful match score
   List<LoadModel> _getMatchedLoads() {
-    return _loads.where((load) => load.matchPercentage != null).toList();
+    return _loads.where((load) => 
+      load.matchPercentage != null && load.matchPercentage! > 0
+    ).toList();
   }
 
-  /// Get loads that don't have matchPercentage (regular loads)
+  /// Get all loads for regular cards (excluding the top recommended one)
+  /// This includes all loads with any match percentage
   List<LoadModel> _getNonMatchedLoads() {
-    return _loads.where((load) => load.matchPercentage == null).toList();
+    final matchedLoads = _getMatchedLoads();
+    
+    // If there are matched loads, exclude the top one (shown in recommended section)
+    if (matchedLoads.isNotEmpty) {
+      matchedLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
+      final topMatchId = matchedLoads.first.id;
+      
+      // Return all loads except the top matched one
+      return _loads.where((load) => load.id != topMatchId).toList();
+    }
+    
+    // If no matched loads, return all loads
+    return _loads;
   }
 
-  /// Build recommended loads section (only matched loads)
+  /// Build recommended loads section (only top matched load with matchPercentage > 20%)
+  /// Shows only the best match to highlight it
   List<Widget> _buildRecommendedLoads() {
     final matchedLoads = _getMatchedLoads();
     
@@ -396,9 +423,15 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
     // Sort by match percentage (highest first) and take the first one
     matchedLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
     
-    return [
-      RecommendedLoad(load: matchedLoads.first),
-    ];
+    // Only show in recommended if match is above 20% threshold
+    final topMatch = matchedLoads.first;
+    if (topMatch.matchPercentage != null && topMatch.matchPercentage! >= 20.0) {
+      return [
+        RecommendedLoad(load: topMatch),
+      ];
+    }
+    
+    return [];
   }
 
   Widget _buildFilterButton(String text, int index) {

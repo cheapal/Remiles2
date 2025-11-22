@@ -18,11 +18,13 @@ class BookedNow extends StatefulWidget {
 class _BookedNowState extends State<BookedNow> {
   bool _isBooking = false;
   String _currentStatus = '';
+  String? _bookedByCarrierId; // Store bookedByCarrierId in state
 
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.load.status;
+    _bookedByCarrierId = widget.load.bookedByCarrierId;
     _refreshLoadStatus();
   }
 
@@ -30,14 +32,16 @@ class _BookedNowState extends State<BookedNow> {
   void didUpdateWidget(BookedNow oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Refresh status when widget is updated
-    if (oldWidget.load.id != widget.load.id || oldWidget.load.status != widget.load.status) {
+    if (oldWidget.load.id != widget.load.id || 
+        oldWidget.load.status != widget.load.status ||
+        oldWidget.load.bookedByCarrierId != widget.load.bookedByCarrierId) {
       _refreshLoadStatus();
     }
   }
 
   Future<void> _refreshLoadStatus() async {
     try {
-      // Find the load in shipper subcollections to get latest status
+      // Find the load in shipper subcollections to get latest status and bookedByCarrierId
       final shippersSnapshot = await FirebaseService.shippers.get();
       for (final shipperDoc in shippersSnapshot.docs) {
         final loadDoc = await FirebaseService.shippers
@@ -49,10 +53,22 @@ class _BookedNowState extends State<BookedNow> {
         if (loadDoc.exists) {
           final loadData = loadDoc.data();
           final status = loadData?['status'] as String?;
+          final bookedByCarrierId = loadData?['bookedByCarrierId'] as String?;
           
-          if (status != null && status != _currentStatus && mounted) {
+          bool needsUpdate = false;
+          if (status != null && status != _currentStatus) {
+            needsUpdate = true;
+          }
+          if (bookedByCarrierId != _bookedByCarrierId) {
+            needsUpdate = true;
+          }
+          
+          if (needsUpdate && mounted) {
             setState(() {
-              _currentStatus = status;
+              if (status != null) {
+                _currentStatus = status;
+              }
+              _bookedByCarrierId = bookedByCarrierId;
             });
           }
           break;
@@ -395,7 +411,9 @@ class _BookedNowState extends State<BookedNow> {
   bool _isBookedByCurrentUser() {
     final currentUser = FirebaseService.currentUser;
     if (currentUser == null) return false;
-    return widget.load.bookedByCarrierId == currentUser.uid;
+    // Use state value if available, otherwise fall back to widget.load
+    final bookedById = _bookedByCarrierId ?? widget.load.bookedByCarrierId;
+    return bookedById == currentUser.uid;
   }
 
   Color _getStatusColor(String status) {
@@ -487,7 +505,12 @@ class _BookedNowState extends State<BookedNow> {
         setState(() {
           _currentStatus = 'booked';
           _isBooking = false;
+          // Update bookedByCarrierId after successful booking
+          _bookedByCarrierId = user.uid;
         });
+        
+        // Refresh load status to ensure we have latest data from Firestore
+        await _refreshLoadStatus();
         
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

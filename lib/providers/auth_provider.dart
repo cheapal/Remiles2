@@ -149,6 +149,43 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // Save remembered email for "Remember me" feature
+  Future<void> saveRememberedEmail(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('remembered_email', email);
+      await prefs.setBool('remember_me_enabled', true);
+    } catch (e) {
+      debugPrint('Failed to save remembered email: $e');
+    }
+  }
+
+  // Get remembered email
+  Future<String?> getRememberedEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rememberMeEnabled = prefs.getBool('remember_me_enabled') ?? false;
+      if (rememberMeEnabled) {
+        return prefs.getString('remembered_email');
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Failed to get remembered email: $e');
+      return null;
+    }
+  }
+
+  // Clear remembered email
+  Future<void> clearRememberedEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('remembered_email');
+      await prefs.remove('remember_me_enabled');
+    } catch (e) {
+      debugPrint('Failed to clear remembered email: $e');
+    }
+  }
+
   // Sign in with email and password
   Future<bool> signInWithEmailAndPassword(String email, String password) async {
     try {
@@ -333,6 +370,8 @@ class AuthProvider with ChangeNotifier {
       await FirebaseService.signOut();
       _setUser(null, null);
       await _clearStoredAuth();
+      // Note: We don't clear remembered email on sign out
+      // so user can still use "Remember me" feature
     } catch (e) {
       _setError('Sign out failed: ${e.toString()}');
     } finally {

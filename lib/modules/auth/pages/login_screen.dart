@@ -28,6 +28,32 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
+  
+  // Track validation errors to display them without layout shift
+  String? _emailError;
+  String? _passwordError;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load remembered email after the first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadRememberedEmail();
+    });
+  }
+
+  // Load remembered email on screen initialization
+  Future<void> _loadRememberedEmail() async {
+    if (!mounted) return;
+    final authProvider = context.read<AuthProvider>();
+    final rememberedEmail = await authProvider.getRememberedEmail();
+    if (rememberedEmail != null && rememberedEmail.isNotEmpty && mounted) {
+      setState(() {
+        _emailController.text = rememberedEmail;
+        rememberMe = true;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -38,7 +64,29 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // Handle login
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+    // Clear previous errors
+    setState(() {
+      _emailError = null;
+      _passwordError = null;
+    });
+    
+    if (!_formKey.currentState!.validate()) {
+      // Update error states after validation
+      setState(() {
+        if (_emailController.text.isEmpty) {
+          _emailError = 'Please enter your email';
+        } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text)) {
+          _emailError = 'Please enter a valid email';
+        }
+        
+        if (_passwordController.text.isEmpty) {
+          _passwordError = 'Please enter your password';
+        } else if (_passwordController.text.length < 6) {
+          _passwordError = 'Password must be at least 6 characters';
+        }
+      });
+      return;
+    }
 
     final authProvider = context.read<AuthProvider>();
     final appStateProvider = context.read<AppStateProvider>();
@@ -51,6 +99,14 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success) {
+      // Save email if "Remember me" is checked
+      if (rememberMe) {
+        await authProvider.saveRememberedEmail(_emailController.text.trim());
+      } else {
+        // Clear saved email if "Remember me" is unchecked
+        await authProvider.clearRememberedEmail();
+      }
+
       appStateProvider.showSuccess();
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -256,110 +312,190 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(height: 61 * scale),
 
                             // Email Field (from XML rectangle_2)
-                            Container(
-                              width: 314 * scale,
-                              height: 49 * scale,
-                              margin: EdgeInsets.symmetric(horizontal: (456 - 314) / 2 * scale),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFFFFF),
-                                borderRadius: BorderRadius.circular(24.5 * scale),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x40000000),
-                                    blurRadius: 4,
-                                    offset: Offset(0, 4),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 314 * scale,
+                                  height: 49 * scale,
+                                  margin: EdgeInsets.symmetric(horizontal: (456 - 314) / 2 * scale),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFFFFF),
+                                    borderRadius: BorderRadius.circular(24.5 * scale),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x40000000),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 4),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 24.5 * scale),
-                                child: TextFormField(
-                                  controller: _emailController,
-                                  keyboardType: TextInputType.emailAddress,
-                                  cursorColor: Colors.black,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your email';
-                                    }
-                                    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                                      return 'Please enter a valid email';
-                                    }
-                                    return null;
-                                  },
-                                  decoration: InputDecoration(
-                                    hintText: "Email Address",
-                                    border: InputBorder.none,
-                                    hintStyle: TextStyle(
-                                      fontSize: 16 * scale,
-                                      color: const Color(0x40000000),
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 24.5 * scale),
+                                    child: TextFormField(
+                                      controller: _emailController,
+                                      keyboardType: TextInputType.emailAddress,
+                                      cursorColor: Colors.black,
+                                      validator: (value) {
+                                        String? error;
+                                        if (value == null || value.isEmpty) {
+                                          error = 'Please enter your email';
+                                        } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                          error = 'Please enter a valid email';
+                                        }
+                                        // Update error state
+                                        if (mounted) {
+                                          setState(() {
+                                            _emailError = error;
+                                          });
+                                        }
+                                        return error;
+                                      },
+                                      onChanged: (value) {
+                                        // Clear error when user starts typing
+                                        if (_emailError != null && mounted) {
+                                          setState(() {
+                                            _emailError = null;
+                                          });
+                                        }
+                                      },
+                                      decoration: InputDecoration(
+                                        hintText: "Email Address",
+                                        border: InputBorder.none,
+                                        hintStyle: TextStyle(
+                                          fontSize: 16 * scale,
+                                          color: const Color(0x40000000),
+                                        ),
+                                        errorStyle: const TextStyle(height: 0, fontSize: 0),
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 16 * scale,
+                                        color: const Color(0xFF000000),
+                                      ),
                                     ),
                                   ),
-                                  style: TextStyle(
-                                    fontSize: 16 * scale,
-                                    color: const Color(0xFF000000),
-                                  ),
                                 ),
-                              ),
+                                // Error message space for email (reserved to prevent layout shift)
+                                SizedBox(
+                                  width: 314 * scale,
+                                  height: 20 * scale,
+                                  child: _emailError != null
+                                      ? Padding(
+                                          padding: EdgeInsets.only(
+                                            left: (456 - 314) / 2 * scale + 24.5 * scale,
+                                            top: 4 * scale,
+                                          ),
+                                          child: Text(
+                                            _emailError!,
+                                            style: TextStyle(
+                                              color: Colors.red.shade700,
+                                              fontSize: 12 * scale,
+                                            ),
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
                             ),
                             SizedBox(height: 17 * scale),
 
                             // Password Field (from XML rectangle_3)
-                            Container(
-                              width: 314 * scale,
-                              height: 49 * scale,
-                              margin: EdgeInsets.symmetric(horizontal: (456 - 314) / 2 * scale),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFFFFFFF),
-                                borderRadius: BorderRadius.circular(24.5 * scale),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x40000000),
-                                    blurRadius: 4,
-                                    offset: Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(horizontal: 24.5 * scale),
-                                child: TextFormField(
-                                  controller: _passwordController,
-                                  obscureText: _obscurePassword,
-                                  cursorColor: Colors.black,
-                                  validator: (value) {
-                                    if (value == null || value.isEmpty) {
-                                      return 'Please enter your password';
-                                    }
-                                    if (value.length < 6) {
-                                      return 'Password must be at least 6 characters';
-                                    }
-                                    return null;
-                                  },
-                                  decoration: InputDecoration(
-                                    hintText: "Password",
-                                    border: InputBorder.none,
-                                    hintStyle: TextStyle(
-                                      fontSize: 16 * scale,
-                                      color: const Color(0x40000000),
-                                    ),
-                                    suffixIcon: IconButton(
-                                      icon: Icon(
-                                        _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                                        color: Colors.grey,
-                                        size: 24 * scale,
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 314 * scale,
+                                  height: 49 * scale,
+                                  margin: EdgeInsets.symmetric(horizontal: (456 - 314) / 2 * scale),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFFFFF),
+                                    borderRadius: BorderRadius.circular(24.5 * scale),
+                                    boxShadow: const [
+                                      BoxShadow(
+                                        color: Color(0x40000000),
+                                        blurRadius: 4,
+                                        offset: Offset(0, 4),
                                       ),
-                                      onPressed: () {
-                                        setState(() {
-                                          _obscurePassword = !_obscurePassword;
-                                        });
-                                      },
-                                    ),
+                                    ],
                                   ),
-                                  style: TextStyle(
-                                    fontSize: 16 * scale,
-                                    color: const Color(0xFF000000),
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: 24.5 * scale),
+                                    child: TextFormField(
+                                      controller: _passwordController,
+                                      obscureText: _obscurePassword,
+                                      cursorColor: Colors.black,
+                                      validator: (value) {
+                                        String? error;
+                                        if (value == null || value.isEmpty) {
+                                          error = 'Please enter your password';
+                                        } else if (value.length < 6) {
+                                          error = 'Password must be at least 6 characters';
+                                        }
+                                        // Update error state
+                                        if (mounted) {
+                                          setState(() {
+                                            _passwordError = error;
+                                          });
+                                        }
+                                        return error;
+                                      },
+                                      onChanged: (value) {
+                                        // Clear error when user starts typing
+                                        if (_passwordError != null && mounted) {
+                                          setState(() {
+                                            _passwordError = null;
+                                          });
+                                        }
+                                      },
+                                      decoration: InputDecoration(
+                                        hintText: "Password",
+                                        border: InputBorder.none,
+                                        hintStyle: TextStyle(
+                                          fontSize: 16 * scale,
+                                          color: const Color(0x40000000),
+                                        ),
+                                        errorStyle: const TextStyle(height: 0, fontSize: 0),
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                            color: Colors.grey,
+                                            size: 24 * scale,
+                                          ),
+                                          onPressed: () {
+                                            setState(() {
+                                              _obscurePassword = !_obscurePassword;
+                                            });
+                                          },
+                                        ),
+                                      ),
+                                      style: TextStyle(
+                                        fontSize: 16 * scale,
+                                        color: const Color(0xFF000000),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                              ),
+                                // Error message space for password (reserved to prevent layout shift)
+                                SizedBox(
+                                  width: 314 * scale,
+                                  height: 20 * scale,
+                                  child: _passwordError != null
+                                      ? Padding(
+                                          padding: EdgeInsets.only(
+                                            left: (456 - 314) / 2 * scale + 24.5 * scale,
+                                            top: 4 * scale,
+                                          ),
+                                          child: Text(
+                                            _passwordError!,
+                                            style: TextStyle(
+                                              color: Colors.red.shade700,
+                                              fontSize: 12 * scale,
+                                            ),
+                                          ),
+                                        )
+                                      : const SizedBox.shrink(),
+                                ),
+                              ],
                             ),
                             SizedBox(height: 35 * scale),
 
@@ -372,10 +508,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                   Row(
                                     children: [
                                       GestureDetector(
-                                        onTap: () {
+                                        onTap: () async {
                                           setState(() {
                                             rememberMe = !rememberMe;
                                           });
+                                          // If unchecked, clear saved email
+                                          if (!rememberMe) {
+                                            final authProvider = context.read<AuthProvider>();
+                                            await authProvider.clearRememberedEmail();
+                                          }
                                         },
                                         child: Container(
                                           width: 20 * scale,

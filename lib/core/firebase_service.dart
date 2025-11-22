@@ -16,6 +16,7 @@ import '../models/product_listing.dart';
 import '../models/chat_model.dart';
 import '../models/load_model.dart';
 import '../models/offer_model.dart';
+// import 'utils/distance_service.dart'; // Temporarily disabled until Distance Matrix API is activated
 
 /// Firebase service class to handle all Firebase operations
 class FirebaseService {
@@ -2638,52 +2639,268 @@ class FirebaseService {
   // ========== LOAD MANAGEMENT METHODS ==========
 
   /// Calculate match percentage between load and carrier preferences
-  static double calculateLoadMatchPercentage(LoadModel load, CarrierModel carrier) {
+  /// 
+  /// MATCHING SCORING SYSTEM (Total: 100 points):
+  /// - Equipment/Vehicle Type Match: 35 points (35%)
+  /// - Location/Service Area Match: 30 points (30%)
+  /// - Weight Capacity Match: 20 points (20%)
+  /// - Distance Preference Match: 10 points (10%)
+  /// - Preferred Load Type Match: 5 points (5%)
+  /// 
+  /// To adjust weights, modify the point values below and ensure they sum to 100.
+  /// 
+  /// [carrierLocation] - Optional carrier's current location address for distance calculation
+  /// [apiKey] - Google API key for distance calculations
+  static Future<double> calculateLoadMatchPercentage(
+    LoadModel load, 
+    CarrierModel carrier, {
+    String? carrierLocation,
+    String? apiKey,
+  }) async {
     double totalScore = 0.0;
-    double maxScore = 100.0;
+    const double maxScore = 100.0;
 
-    // Equipment match (40% weight)
-    if (carrier.vehicleTypes != null && carrier.vehicleTypes!.isNotEmpty) {
-      final equipmentMatch = carrier.vehicleTypes!.any((vehicleType) => 
-        vehicleType.toLowerCase().contains(load.equipmentNeeded.toLowerCase()) ||
-        load.equipmentNeeded.toLowerCase().contains(vehicleType.toLowerCase())
-      );
-      totalScore += equipmentMatch ? 40.0 : 0.0;
+    // ============================================================================
+    // 1. EQUIPMENT/VEHICLE TYPE MATCH (35 points) - MADE MORE LENIENT
+    // ============================================================================
+    // Matches carrier's vehicle types against load's equipment needed
+    // Example: "Dry Van" matches "Dry Van", "Refrigerated" matches "Reefer"
+    // Made more lenient - partial matches also get points
+    // 
+    // TO ADJUST: Change the 35.0 value below (currently 35% of total score)
+    if (carrier.vehicleTypes != null && carrier.vehicleTypes!.isNotEmpty && load.equipmentNeeded.isNotEmpty) {
+      final equipmentLower = load.equipmentNeeded.toLowerCase();
+      bool exactMatch = false;
+      bool partialMatch = false;
+      
+      for (final vehicleType in carrier.vehicleTypes!) {
+        final vehicleTypeLower = vehicleType.toLowerCase();
+        
+        // Check for exact or partial match
+        if (equipmentLower == vehicleTypeLower || 
+            equipmentLower.contains(vehicleTypeLower) || 
+            vehicleTypeLower.contains(equipmentLower)) {
+          exactMatch = true;
+          break;
+        }
+        
+        // Check for partial word matches (e.g., "Dry Van" matches "Van")
+        final equipmentWords = equipmentLower.split(RegExp(r'[\s\-_]+'));
+        final vehicleWords = vehicleTypeLower.split(RegExp(r'[\s\-_]+'));
+        
+        for (final equipmentWord in equipmentWords) {
+          for (final vehicleWord in vehicleWords) {
+            if (equipmentWord.length >= 3 && vehicleWord.length >= 3 &&
+                (equipmentWord.contains(vehicleWord) || vehicleWord.contains(equipmentWord))) {
+              partialMatch = true;
+              break;
+            }
+          }
+          if (partialMatch) break;
+        }
+      }
+      
+      if (exactMatch) {
+        totalScore += 35.0; // Full points for exact match
+      } else if (partialMatch) {
+        totalScore += 20.0; // Partial points for partial match
+      }
+    } else if (load.equipmentNeeded.isEmpty) {
+      // If equipment is not specified, don't penalize - give some points
+      totalScore += 10.0;
     }
 
-    // Location match (30% weight)
+    // ============================================================================
+    // 2. LOCATION/SERVICE AREA MATCH (30 points) - SIMPLIFIED
+    // ============================================================================
+    // Matches carrier's service areas against load's origin and destination
+    // Uses simple string contains matching - no complex parsing
+    // 
+    // Scoring:
+    // - Origin OR destination matches any service area: 30 points (full score)
+    // - Partial match (service area appears in address): 15 points (half score)
+    // 
+    // TO ADJUST: Change the 30.0 and 15.0 values below
     if (carrier.serviceAreas != null && carrier.serviceAreas!.isNotEmpty) {
-      final originMatch = carrier.serviceAreas!.any((area) => 
-        area.toLowerCase().contains(load.originCity.toLowerCase()) ||
-        area.toLowerCase().contains(load.originState.toLowerCase()) ||
-        load.originCity.toLowerCase().contains(area.toLowerCase()) ||
-        load.originState.toLowerCase().contains(area.toLowerCase())
-      );
-      final destinationMatch = carrier.serviceAreas!.any((area) => 
-        area.toLowerCase().contains(load.destinationCity.toLowerCase()) ||
-        area.toLowerCase().contains(load.destinationState.toLowerCase()) ||
-        load.destinationCity.toLowerCase().contains(area.toLowerCase()) ||
-        load.destinationState.toLowerCase().contains(area.toLowerCase())
-      );
+      final originLower = load.originAddress.toLowerCase();
+      final destinationLower = load.destinationAddress.toLowerCase();
       
-      if (originMatch && destinationMatch) {
-        totalScore += 30.0;
-      } else if (originMatch || destinationMatch) {
-        totalScore += 15.0;
+      // Check if any service area matches origin or destination
+      bool originMatch = false;
+      bool destinationMatch = false;
+      bool partialOriginMatch = false;
+      bool partialDestinationMatch = false;
+      
+      for (final area in carrier.serviceAreas!) {
+        final areaLower = area.toLowerCase();
+        
+        // Check for exact or partial match in origin
+        if (originLower.contains(areaLower) || areaLower.contains(originLower)) {
+          // Check if it's a full match (service area format: "City, Province")
+          if (areaLower.contains(',') && originLower.contains(areaLower.split(',')[0].trim())) {
+            originMatch = true;
+          } else {
+            partialOriginMatch = true;
+          }
+        }
+        
+        // Check for exact or partial match in destination
+        if (destinationLower.contains(areaLower) || areaLower.contains(destinationLower)) {
+          // Check if it's a full match
+          if (areaLower.contains(',') && destinationLower.contains(areaLower.split(',')[0].trim())) {
+            destinationMatch = true;
+          } else {
+            partialDestinationMatch = true;
+          }
+        }
+      }
+      
+      // Award points - make it easier to get matches
+      // Give points for ANY match, even partial
+      if (originMatch || destinationMatch) {
+        totalScore += 30.0; // Full points if either origin or destination matches
+      } else if (partialOriginMatch || partialDestinationMatch) {
+        totalScore += 20.0; // More points for partial matches (increased from 15)
+      } else {
+        // Even if no direct match, check if any service area city appears in addresses
+        bool cityMatch = false;
+        for (final area in carrier.serviceAreas!) {
+          final areaLower = area.toLowerCase();
+          final cityName = areaLower.split(',')[0].trim();
+          if (cityName.isNotEmpty && 
+              (originLower.contains(cityName) || destinationLower.contains(cityName))) {
+            cityMatch = true;
+            break;
+          }
+        }
+        if (cityMatch) {
+          totalScore += 10.0; // Small points for city name match
+        }
       }
     }
 
-    // Weight capacity match (20% weight)
+    // ============================================================================
+    // 3. WEIGHT CAPACITY MATCH (20 points)
+    // ============================================================================
+    // Checks if load weight is within carrier's max weight capacity
+    // Special value 999999 means "No Limit" - accepts all weights
+    // 
+    // Scoring: Full points if within capacity, bonus for lighter loads
+    // 
+    // TO ADJUST: Change the 20.0 value below and the 0.3 bonus multiplier
     if (carrier.carrierPreferences != null && 
         carrier.carrierPreferences!['maxWeight'] != null) {
-      final maxWeight = (carrier.carrierPreferences!['maxWeight'] as num).toDouble();
-      if (load.weight <= maxWeight) {
+      try {
+        final maxWeightValue = carrier.carrierPreferences!['maxWeight'];
+        double? maxWeight;
+        
+        // Handle different data types from Firestore
+        if (maxWeightValue is num) {
+          maxWeight = maxWeightValue.toDouble();
+        } else if (maxWeightValue is String) {
+          maxWeight = double.tryParse(maxWeightValue.replaceAll(RegExp(r'[^\d.]'), ''));
+        }
+        
+        if (maxWeight != null && maxWeight > 0) {
+          // 999999 = "No Limit" - accept all loads
+          if (maxWeight >= 999999) {
+            totalScore += 20.0; // Full points for unlimited capacity
+          } else if (load.weight <= maxWeight) {
+            // Calculate score with bonus for lighter loads
         final weightRatio = load.weight / maxWeight;
-        totalScore += 20.0 * (1.0 - weightRatio * 0.3); // Bonus for lighter loads
+            // Bonus multiplier: 0.3 means lighter loads get up to 30% bonus
+            totalScore += 20.0 * (1.0 - weightRatio * 0.3);
+          }
+          // If load.weight > maxWeight, no points (outside capacity)
+        }
+      } catch (e) {
+        print('Error parsing maxWeight in matching: $e');
       }
     }
 
-    // Historical patterns (10% weight)
+    // ============================================================================
+    // 4. DISTANCE PREFERENCE MATCH (10 points) - TEMPORARILY DISABLED Distance Matrix API
+    // ============================================================================
+    // Checks if load's origin-to-destination distance is within carrier's max distance preference
+    // NOTE: Distance Matrix API calls are commented out until API is activated
+    // Special value 999999 means "Nationwide" - accepts all distances
+    // 
+    // Scoring: Full points if within range, bonus for shorter distances
+    // 
+    // TO ADJUST: Change the 10.0 value below and the 0.2 bonus multiplier
+    if (carrier.carrierPreferences != null && 
+        carrier.carrierPreferences!['maxDistance'] != null) {
+      try {
+        final maxDistanceValue = carrier.carrierPreferences!['maxDistance'];
+        double? maxDistance;
+        
+        // Handle different data types from Firestore
+        if (maxDistanceValue is num) {
+          maxDistance = maxDistanceValue.toDouble();
+        } else if (maxDistanceValue is String) {
+          // Parse distance string like "50 miles" or "1,000 miles"
+          final match = RegExp(r'(\d{1,3}(?:,\d{3})*)').firstMatch(maxDistanceValue);
+          if (match != null) {
+            maxDistance = double.tryParse(match.group(1)!.replaceAll(',', ''));
+          }
+        }
+        
+        if (maxDistance != null && maxDistance > 0) {
+          // 999999 = "Nationwide" - accept all distances
+          if (maxDistance >= 999999) {
+            totalScore += 10.0; // Full points for nationwide service
+          } else {
+            // TEMPORARILY DISABLED: Distance Matrix API calls
+            // TODO: Re-enable when Distance Matrix API is activated in Google Cloud Console
+            /*
+            bool withinDistance = false;
+            double? distanceToUse;
+            
+            // Check carrier-to-origin distance if carrier location is provided
+            if (carrierLocation != null && carrierLocation.isNotEmpty && apiKey != null) {
+              try {
+                final carrierToOriginDistance = await DistanceService.calculateDistance(
+                  carrierLocation,
+                  load.originAddress,
+                  apiKey,
+                );
+                
+                if (carrierToOriginDistance != null && carrierToOriginDistance <= maxDistance) {
+                  withinDistance = true;
+                  distanceToUse = carrierToOriginDistance;
+                }
+              } catch (e) {
+                print('Error calculating carrier-to-origin distance: $e');
+                // Fall through to check load distance
+              }
+            }
+            */
+            
+            // Check load's origin-to-destination distance (using stored distance field)
+            // If load.distance is 0 or not set, skip distance matching (don't penalize)
+            if (load.distance > 0 && load.distance <= maxDistance) {
+              // Calculate score with bonus for shorter distances
+              final distanceRatio = load.distance / maxDistance;
+              // Bonus multiplier: 0.2 means shorter distances get up to 20% bonus
+              totalScore += 10.0 * (1.0 - distanceRatio * 0.2);
+            } else if (load.distance == 0) {
+              // If distance is not calculated yet, give partial points to not exclude the load
+              totalScore += 5.0; // Half points if distance not available
+            }
+          }
+        }
+      } catch (e) {
+        print('Error parsing maxDistance in matching: $e');
+      }
+    }
+
+    // ============================================================================
+    // 5. PREFERRED LOAD TYPE MATCH (5 points)
+    // ============================================================================
+    // Checks if load type matches carrier's preferred load types
+    // Example: If carrier prefers "Electronics" and load is "Electronics", award points
+    // 
+    // TO ADJUST: Change the 5.0 value below
     if (carrier.carrierPreferences != null) {
       final preferredLoadTypesRaw = carrier.carrierPreferences!['preferredLoadTypes'];
       if (preferredLoadTypesRaw != null) {
@@ -2697,13 +2914,26 @@ class FirebaseService {
           preferredLoadTypes = [];
         }
         
-        if (preferredLoadTypes.contains(load.loadType)) {
-          totalScore += 10.0;
+        // Award points if load type is in preferred list
+        if (preferredLoadTypes.isNotEmpty && preferredLoadTypes.contains(load.loadType)) {
+          totalScore += 5.0;
         }
       }
     }
 
-    return (totalScore / maxScore * 100).clamp(0.0, 100.0);
+    // ============================================================================
+    // FINAL CALCULATION
+    // ============================================================================
+    // Convert score to percentage (0-100%)
+    // Clamp ensures result is between 0 and 100
+    // Show all loads with any match (even 5% match percentage)
+    final finalScore = (totalScore / maxScore * 100).clamp(0.0, 100.0);
+    
+    // Debug: Print final score breakdown
+    print('Total Score: $totalScore / $maxScore = ${finalScore.toStringAsFixed(1)}%');
+    print('====================');
+    
+    return finalScore;
   }
 
   /// Get available loads for carrier with matching percentage calculation
@@ -2738,19 +2968,41 @@ class FirebaseService {
             .where('status', isEqualTo: 'available');
 
         // Apply equipment filter
-        if (equipmentFilter != 'all') {
-          query = query.where('equipmentNeeded', isEqualTo: equipmentFilter);
-        }
+        // if (equipmentFilter != 'all') {
+        //   query = query.where('equipmentNeeded', isEqualTo: equipmentFilter);
+        // }
 
         // Apply sorting (same as getShipperLoads)
         query = query.orderBy('createdAt', descending: true);
 
         final snapshot = await query.get();
         
+        // Google API key for distance calculations (temporarily not used)
+        // const String googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+        
+        // Get carrier's current location (use address if currentLocation is not available)
+        // Temporarily not used until Distance Matrix API is activated
+        // final carrierLocation = carrier.currentLocation ?? 
+        //                        (carrier.address != null && carrier.address!.isNotEmpty 
+        //                         ? carrier.address! 
+        //                         : null);
+        
         for (final doc in snapshot.docs) {
           try {
             final load = LoadModel.fromFirestore(doc);
-            final matchPercentage = calculateLoadMatchPercentage(load, carrier);
+            // Use async version without distance API calls (commented out)
+            final matchPercentage = await calculateLoadMatchPercentage(
+              load, 
+              carrier,
+              carrierLocation: null, // Temporarily disabled
+              apiKey: null, // Temporarily disabled
+            );
+            
+            // Only log matches above 10% to reduce console spam
+            if (matchPercentage >= 10.0) {
+              print('Load ${load.id}: ${matchPercentage.toStringAsFixed(1)}% match');
+            }
+            
             final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
             allLoads.add(loadWithMatch);
           } catch (e) {
@@ -2763,9 +3015,12 @@ class FirebaseService {
       // Filter out loads booked by other carriers (only show unbooked loads or loads booked by this carrier)
       final availableLoads = allLoads.where((load) {
         // Exclude loads that are booked by other carriers
-        if (load.bookedByCarrierId != null && load.bookedByCarrierId != carrierUid) {
-          return false;
+        // Check for null, empty string, or different carrier ID
+        final bookedById = load.bookedByCarrierId;
+        if (bookedById != null && bookedById.isNotEmpty && bookedById != carrierUid) {
+          return false; // Booked by another carrier - exclude
         }
+        // Include if: null, empty string, or booked by this carrier
         return true;
       }).toList();
 
@@ -2860,13 +3115,36 @@ class FirebaseService {
         final availableSnapshot = await availableQuery.get();
         final bookedSnapshot = await bookedQuery.get();
         
+        // Google API key for distance calculations (temporarily not used)
+        // const String googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+        
+        // Get carrier's current location (temporarily not used)
+        // final carrierLocation = carrier.currentLocation ?? 
+        //                        (carrier.address != null && carrier.address!.isNotEmpty 
+        //                         ? carrier.address! 
+        //                         : null);
+        
         // Process available loads (exclude those booked by other carriers)
         for (final doc in availableSnapshot.docs) {
           try {
             final load = LoadModel.fromFirestore(doc);
             // Only include if not booked by another carrier
-            if (load.bookedByCarrierId == null || load.bookedByCarrierId == carrierUid) {
-              final matchPercentage = calculateLoadMatchPercentage(load, carrier);
+            // Check for null, empty string, or same carrier ID
+            final bookedById = load.bookedByCarrierId;
+            if (bookedById == null || bookedById.isEmpty || bookedById == carrierUid) {
+              // Use async version without distance API calls (commented out)
+              final matchPercentage = await calculateLoadMatchPercentage(
+                load, 
+                carrier,
+                carrierLocation: null, // Temporarily disabled
+                apiKey: null, // Temporarily disabled
+              );
+              
+              // Debug logging
+              if (matchPercentage > 0) {
+                print('Load ${load.id} match: $matchPercentage% - Equipment: ${load.equipmentNeeded}');
+              }
+              
               final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
               allLoads.add(loadWithMatch);
             }

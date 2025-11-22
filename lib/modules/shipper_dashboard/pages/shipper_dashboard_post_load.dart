@@ -41,6 +41,8 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
   File? _additionalDocument;
   final ImagePicker _picker = ImagePicker();
   String _weightUnit = 'kg'; // Default weight unit
+  String _selectedEquipment = ''; // Selected equipment from dropdown
+  final TextEditingController _equipmentOtherController = TextEditingController(); // For "Other" option
   
   // DateTime variables
   DateTime? _pickupDateTime;
@@ -104,6 +106,26 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
     'lbs',
     'tons',
     'tonnes',
+  ];
+  
+  // Equipment Needed Options
+  static const List<String> _equipmentOptions = [
+    'Dry Van',
+    'Refrigerated (Reefer)',
+    'Flatbed',
+    'Step Deck',
+    'Lowboy',
+    'Car Carrier',
+    'Tanker',
+    'Box Truck',
+    'Dump Truck',
+    'Grain Hopper',
+    'Livestock Trailer',
+    'Container Chassis',
+    'Heavy Haul',
+    'Auto Transport',
+    'Intermodal',
+    'Other',
   ];
 
   @override
@@ -194,7 +216,19 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       _deliveryWindowController.text = data['deliveryWindow']?.toString() ?? '';
     }
     _dimensionsController.text = data['dimensions']?.toString() ?? '';
-    _equipmentNeededController.text = data['equipmentNeeded']?.toString() ?? '';
+    // Handle equipment needed - check if it's in the options or custom
+    final equipmentValue = data['equipmentNeeded']?.toString() ?? '';
+    if (equipmentValue.isNotEmpty) {
+      if (_equipmentOptions.contains(equipmentValue)) {
+        _selectedEquipment = equipmentValue;
+        _equipmentNeededController.text = equipmentValue;
+      } else {
+        // It's a custom value, set to "Other" and populate the other field
+        _selectedEquipment = 'Other';
+        _equipmentNeededController.text = 'Other';
+        _equipmentOtherController.text = equipmentValue;
+      }
+    }
     _quoteBudgetController.text = data['quoteBudget']?.toString() ?? '';
     
     // Handle additional document if it exists
@@ -234,6 +268,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
     _deliveryWindowController.dispose();
     _dimensionsController.dispose();
     _equipmentNeededController.dispose();
+    _equipmentOtherController.dispose();
     _quoteBudgetController.dispose();
     super.dispose();
   }
@@ -435,7 +470,13 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
                       ],
                     ),
                     const SizedBox(height: 25),
-                    _buildInputField(context, "Equipment Needed (Optional)", _equipmentNeededController),
+                    // Equipment Needed Dropdown
+                    _buildEquipmentDropdown(context),
+                    // Show custom equipment field only if "Other" is selected
+                    if (_selectedEquipment == 'Other') ...[
+                      const SizedBox(height: 15),
+                      _buildInputField(context, "Specify Equipment (Required)", _equipmentOtherController),
+                    ],
                     const SizedBox(height: 25),
                     _buildNumericInputField(context, "Quote/Budget (CAD)", _quoteBudgetController),
                     const SizedBox(height: 25),
@@ -622,6 +663,124 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
                     style: TextStyle(
                       fontSize: 13,
                       color: controller.text.isEmpty ? const Color(0xFF959595) : Colors.black,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const Icon(
+                  Icons.arrow_drop_down,
+                  size: 20,
+                  color: Color(0xFF959595),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build Equipment Needed dropdown with "Other" option support
+  Widget _buildEquipmentDropdown(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.white,
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (BuildContext context) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (context, scrollController) {
+                return Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 12, bottom: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: _equipmentOptions.length,
+                        itemBuilder: (BuildContext context, int index) {
+                          final option = _equipmentOptions[index];
+                          final isSelected = _selectedEquipment == option;
+                          return ListTile(
+                            title: Text(
+                              option,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? const Color(0xFF43975A) : Colors.black,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check, color: Color(0xFF43975A))
+                                : null,
+                            onTap: () {
+                              setState(() {
+                                _selectedEquipment = option;
+                                _equipmentNeededController.text = option;
+                                // Clear "Other" field if switching away from "Other"
+                                if (option != 'Other') {
+                                  _equipmentOtherController.clear();
+                                }
+                              });
+                              Navigator.pop(context);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: const [
+            BoxShadow(
+              color: Color.fromRGBO(183, 123, 40, 0.44),
+              blurRadius: 2.8,
+              spreadRadius: 1,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _selectedEquipment.isEmpty 
+                        ? 'Equipment Needed (Optional)' 
+                        : _selectedEquipment,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: _selectedEquipment.isEmpty 
+                          ? const Color(0xFF959595) 
+                          : Colors.black,
                       fontWeight: FontWeight.w600,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -1379,6 +1538,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
         _deliveryWindowEnd != null ||
         _dimensionsController.text.trim().isNotEmpty ||
         _equipmentNeededController.text.trim().isNotEmpty ||
+        (_selectedEquipment == 'Other' && _equipmentOtherController.text.trim().isNotEmpty) ||
         _quoteBudgetController.text.trim().isNotEmpty ||
         _additionalDocument != null;
     
@@ -1488,6 +1648,14 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       }
     }
     
+    // Validate equipment "Other" field if "Other" is selected
+    if (_selectedEquipment == 'Other') {
+      if (_equipmentOtherController.text.trim().isEmpty) {
+        _showAlertDialog(context, 'Please specify the equipment type when "Other" is selected.');
+        return false;
+      }
+    }
+    
     if (_quoteBudgetController.text.trim().isEmpty) {
       _showAlertDialog(context, 'Please enter quote/budget.');
       return false;
@@ -1533,7 +1701,10 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       'deliveryWindowEnd': _deliveryWindowEnd?.toIso8601String(),
       'deliveryWindow': _deliveryWindowController.text.trim(), // Keep for backward compatibility
       'dimensions': _dimensionsController.text.trim(),
-      'equipmentNeeded': _equipmentNeededController.text.trim(),
+      // Save custom equipment if "Other" is selected, otherwise save the selected option
+      'equipmentNeeded': _selectedEquipment == 'Other' 
+          ? _equipmentOtherController.text.trim()
+          : _equipmentNeededController.text.trim(),
       'quoteBudget': _quoteBudgetController.text.trim(),
       'isDraft': isDraft,
       'status': status,
@@ -1555,6 +1726,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
     _deliveryWindowController.clear();
     _dimensionsController.clear();
     _equipmentNeededController.clear();
+    _equipmentOtherController.clear();
     _quoteBudgetController.clear();
     setState(() {
       _additionalDocument = null;
@@ -1562,6 +1734,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
       _deliveryWindowStart = null;
       _deliveryWindowEnd = null;
       _weightUnit = 'kg'; // Reset to default
+      _selectedEquipment = ''; // Reset equipment selection
     });
   }
 

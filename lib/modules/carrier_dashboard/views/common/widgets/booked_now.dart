@@ -365,8 +365,10 @@ class _BookedNowState extends State<BookedNow> {
               ),
             ],
 
-            // Show "View on Map" button only if load was booked by current user
-            if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && _isBookedByCurrentUser()) ...[
+           // Show "View on Map" button only if load was booked by current user
+            //if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && _isBookedByCurrentUser()) ...[
+            // Show "View on Map" button if load was booked by current user (any status except available)
+            if (_currentStatus != 'available' && _isBookedByCurrentUser()) ...[
               const SizedBox(height: 20),
 
               SizedBox(

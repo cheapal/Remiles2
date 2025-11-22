@@ -68,6 +68,9 @@ dependencies:
   
   # URL Launcher
   url_launcher: ^6.2.5
+  
+  # Signature Pad
+  signature: ^5.4.0
 
 dev_dependencies:
   flutter_test:

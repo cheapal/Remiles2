@@ -3502,26 +3502,54 @@ class FirebaseService {
   }
 
   /// Update load status for carriers
+  /// Loads are stored in shippers/{shipperUid}/loads/{loadId}
   static Future<bool> updateCarrierLoadStatus({
     required String loadId,
     required String status,
     String? carrierUid,
   }) async {
     try {
-      return await _firestore.runTransaction<bool>((transaction) async {
-        final loadRef = loads.doc(loadId);
-        final loadDoc = await transaction.get(loadRef);
+      // First, find the load in shipper subcollections (same pattern as bookLoad)
+      final shippersSnapshot = await _firestore.collection('shippers').get();
+      DocumentReference? loadRef;
+      Map<String, dynamic>? loadData;
+      String? shipperUid;
+
+      // Search for the load in all shipper subcollections
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final shipperId = shipperDoc.id;
+        final tempLoadRef = _firestore
+            .collection('shippers')
+            .doc(shipperId)
+            .collection('loads')
+            .doc(loadId);
         
-        if (!loadDoc.exists) {
-          throw Exception('Load not found');
+        final loadDoc = await tempLoadRef.get();
+        if (loadDoc.exists) {
+          loadRef = tempLoadRef;
+          loadData = loadDoc.data() as Map<String, dynamic>;
+          shipperUid = shipperId;
+          break;
         }
+      }
 
-        final loadData = loadDoc.data() as Map<String, dynamic>;
-        final currentCarrierId = loadData['bookedByCarrierId'] as String?;
+      if (loadRef == null || loadData == null || shipperUid == null) {
+        throw Exception('Load not found');
+      }
 
-        // Verify carrier has permission to update this load
-        if (carrierUid != null && currentCarrierId != carrierUid) {
-          throw Exception('Unauthorized to update this load');
+      final currentCarrierId = loadData['bookedByCarrierId'] as String?;
+
+      // Verify carrier has permission to update this load
+      if (carrierUid != null && currentCarrierId != carrierUid) {
+        throw Exception('Unauthorized to update this load');
+      }
+
+      // Now run the transaction with the found reference
+      return await _firestore.runTransaction<bool>((transaction) async {
+        // Re-check load within transaction
+        final loadDoc = await transaction.get(loadRef!);
+        if (!loadDoc.exists) {
+          throw Exception('Load no longer exists');
         }
 
         // Update load status
@@ -3560,7 +3588,9 @@ class FirebaseService {
       });
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to update load status');
-      return false;
+      // Re-throw to allow proper error handling in UI
+      // The exception will be caught by the calling code
+      rethrow;
     }
   }
 

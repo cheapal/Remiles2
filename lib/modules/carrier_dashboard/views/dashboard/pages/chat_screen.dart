@@ -1,6 +1,7 @@
-
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:Remiles/core/firebase_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:Remiles/core/theme/colors.dart';
 import 'package:Remiles/models/chat_model.dart';
 import 'package:Remiles/models/offer_model.dart';
@@ -17,26 +18,28 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_pro
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;
-  final String otherUserId;
-  final String otherUserName;
+  final String? otherUserId; // Optional for support chats
+  final String? otherUserName; // Optional for support chats
   final String? listingTitle;
   final String? listingImageUrl;
   final String? listingId;
   final String? loadId; // For load negotiations
   final double? loadPrice; // For load negotiations
   final String? preFilledMessage;
+  final bool isSupportChat; // Flag to indicate support chat
 
   const ChatScreen({
     super.key,
     required this.conversationId,
-    required this.otherUserId,
-    required this.otherUserName,
+    this.otherUserId,
+    this.otherUserName,
     this.listingTitle,
     this.listingImageUrl,
     this.listingId,
     this.loadId,
     this.loadPrice,
     this.preFilledMessage,
+    this.isSupportChat = false,
   });
 
   @override
@@ -58,6 +61,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isProcessingOffer = false; // Track if offer is being processed
   String? _loadShipperId; // Track shipper ID for the load
   String? _otherUserProfileImage; // Profile image of the other user
+  Set<String> _sendingMessageIds = {}; // Track messages that are being sent
+  StreamSubscription<QuerySnapshot>? _messagesSubscription; // Stream listener for real-time updates
 
   @override
   void initState() {
@@ -68,6 +73,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
     _loadConversation();
     _loadMessages();
+    _setupMessagesListener();
     
     // Check timer expiration periodically
     if (widget.loadId != null) {
@@ -79,6 +85,79 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _setupMessagesListener() {
+    _messagesSubscription = FirebaseService.messages
+        .where('conversationId', isEqualTo: widget.conversationId)
+        .orderBy('timestamp', descending: false)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            if (mounted) {
+              setState(() {
+                try {
+                  // Get real messages from Firestore
+                  final realMessages = snapshot.docs
+                      .map((doc) => ChatMessage.fromFirestore(doc))
+                      .toList();
+                  
+                  // Keep optimistic messages that are still sending
+                  final optimisticMessages = _messages
+                      .where((msg) => _sendingMessageIds.contains(msg.id))
+                      .toList();
+                  
+                  // Merge: real messages + optimistic messages
+                  // Remove optimistic messages that have been confirmed (same content and sender)
+                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  final currentUserId = authProvider.currentUser?.uid;
+                  
+                  final confirmedOptimisticIds = <String>{};
+                  for (final optimistic in optimisticMessages) {
+                    // Check if a real message with same content and sender exists (within 5 seconds)
+                    final matchingReal = realMessages.where(
+                      (real) => real.content == optimistic.content &&
+                                real.senderId == optimistic.senderId &&
+                                real.senderId == currentUserId &&
+                                (real.timestamp.difference(optimistic.timestamp).inSeconds.abs() < 5),
+                    ).firstOrNull;
+                    
+                    if (matchingReal != null) {
+                      confirmedOptimisticIds.add(optimistic.id);
+                    }
+                  }
+                  
+                  // Remove confirmed optimistic messages
+                  final remainingOptimistic = optimisticMessages
+                      .where((msg) => !confirmedOptimisticIds.contains(msg.id))
+                      .toList();
+                  
+                  // Combine and sort
+                  _messages = [...realMessages, ...remainingOptimistic];
+                  _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+                  
+                  // Remove confirmed optimistic IDs from sending set
+                  _sendingMessageIds.removeAll(confirmedOptimisticIds);
+                  
+                  _isLoading = false;
+                  _errorMessage = null;
+                } catch (e) {
+                  print('Error processing message stream: $e');
+                  // Keep existing messages on error
+                }
+              });
+              
+              // Scroll to bottom when new messages arrive
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                _scrollToBottom();
+              });
+            }
+          },
+          onError: (error) {
+            print('Error in message stream: $error');
+            // Don't update state on stream error, keep existing messages
+          },
+        );
+  }
+
   Future<void> _loadConversation() async {
     try {
       final convDoc = await FirebaseService.conversations.doc(widget.conversationId).get();
@@ -88,6 +167,13 @@ class _ChatScreenState extends State<ChatScreen> {
           _isNegotiationExpired = _conversation?.isNegotiationExpired ?? false;
           _updateCanSendMessages();
         });
+        
+        // For support chats, ensure we can always send messages
+        if (_conversation!.isSupport || widget.isSupportChat) {
+          setState(() {
+            _canSendMessages = true;
+          });
+        }
       }
       
       // Check if load is booked
@@ -95,17 +181,21 @@ class _ChatScreenState extends State<ChatScreen> {
         await _checkLoadStatus();
       }
       
-      // Load other user's profile image
-      await _loadOtherUserProfile();
+      // Load other user's profile image (skip for support chats)
+      if (!widget.isSupportChat && widget.otherUserId != null) {
+        await _loadOtherUserProfile();
+      }
     } catch (e) {
       print('Error loading conversation: $e');
     }
   }
 
   Future<void> _loadOtherUserProfile() async {
+    if (widget.otherUserId == null) return; // Skip for support chats
+    
     try {
       // Try to get user profile image
-      final shipper = await FirebaseService.getShipper(widget.otherUserId);
+      final shipper = await FirebaseService.getShipper(widget.otherUserId!);
       if (shipper != null && shipper.profileImageUrl != null) {
         if (mounted) {
           setState(() {
@@ -115,7 +205,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       
-      final carrier = await FirebaseService.getCarrier(widget.otherUserId);
+      final carrier = await FirebaseService.getCarrier(widget.otherUserId!);
       if (carrier != null && carrier.profileImageUrl != null && mounted) {
         setState(() {
           _otherUserProfileImage = carrier.profileImageUrl;
@@ -202,8 +292,19 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _messagesSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -281,7 +382,15 @@ class _ChatScreenState extends State<ChatScreen> {
       
       if (mounted) {
         setState(() {
-          _messages = messages;
+          // Merge with optimistic messages
+          final optimisticMessages = _messages
+              .where((msg) => _sendingMessageIds.contains(msg.id))
+              .toList();
+          
+          // Combine real messages with optimistic ones
+          _messages = [...messages, ...optimisticMessages];
+          _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+          
           _isLoading = false;
           _errorMessage = null;
         });
@@ -290,6 +399,11 @@ class _ChatScreenState extends State<ChatScreen> {
         if (widget.loadId != null) {
           _checkLoadStatus();
         }
+        
+        // Scroll to bottom
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
       }
     } catch (e) {
       print('Error loading messages: $e');
@@ -312,11 +426,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
       final carrierName = carrier?.companyName ?? user.displayName ?? 'Carrier';
       
+      if (widget.otherUserId == null) return; // Skip if no other user
+      
       await FirebaseService.sendOffer(
         conversationId: widget.conversationId,
         carrierId: user.uid,
         carrierName: carrierName,
-        shipperId: widget.otherUserId,
+        shipperId: widget.otherUserId!,
         loadId: widget.loadId!,
         offerAmount: offerAmount,
       );
@@ -427,12 +543,14 @@ class _ChatScreenState extends State<ChatScreen> {
             ? 'Offer accepted at \$${acceptedPrice.toStringAsFixed(2)} by carrier'
             : 'Offer accepted at \$${acceptedPrice.toStringAsFixed(2)} by shipper';
         
-        await FirebaseService.sendMessage(
-          conversationId: widget.conversationId,
-          senderId: user!.uid,
-          receiverId: widget.otherUserId,
-          content: messageText,
-        );
+        if (widget.otherUserId != null) {
+          await FirebaseService.sendMessage(
+            conversationId: widget.conversationId,
+            senderId: user!.uid,
+            receiverId: widget.otherUserId!,
+            content: messageText,
+          );
+        }
 
         // Reload everything
         await _checkLoadStatus();
@@ -618,12 +736,12 @@ class _ChatScreenState extends State<ChatScreen> {
         Navigator.of(context).pop();
       }
 
-      if (success) {
+      if (success && widget.otherUserId != null) {
         // Send acceptance message
         await FirebaseService.sendMessage(
           conversationId: widget.conversationId,
           senderId: user.uid,
-          receiverId: widget.otherUserId,
+          receiverId: widget.otherUserId!,
           content: 'Load booked at original price of \$${widget.loadPrice!.toStringAsFixed(2)} by carrier',
         );
 
@@ -731,39 +849,83 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+    
+    if (user == null) return;
+
+    final messageContent = _messageController.text.trim();
+    final tempMessageId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    
+    // Clear message field immediately
+    _messageController.clear();
+    
+    // Create optimistic message
+    final optimisticMessage = ChatMessage(
+      id: tempMessageId,
+      conversationId: widget.conversationId,
+      senderId: user.uid,
+      receiverId: widget.otherUserId ?? FirebaseService.supportUserId,
+      content: messageContent,
+      timestamp: DateTime.now(),
+    );
+    
+    // Add to local list immediately (optimistic update)
+    setState(() {
+      _messages.add(optimisticMessage);
+      _sendingMessageIds.add(tempMessageId);
+    });
+    
+    // Scroll to bottom immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+
+    // Send message in background
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final user = authProvider.currentUser;
-      
-      if (user != null) {
+      // Use support message function for support chats
+      if (widget.isSupportChat || (_conversation != null && _conversation!.isSupport)) {
+        await FirebaseService.sendSupportMessage(
+          conversationId: widget.conversationId,
+          senderId: user.uid,
+          content: messageContent,
+        );
+      } else {
         await FirebaseService.sendMessage(
           conversationId: widget.conversationId,
           senderId: user.uid,
-          receiverId: widget.otherUserId,
-          content: _messageController.text.trim(),
+          receiverId: widget.otherUserId ?? '',
+          content: messageContent,
         );
-        
-        _messageController.clear();
-        
-        // Reload messages to show the new one
-        await _loadMessages();
-        
-        // Scroll to bottom
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            _scrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
+      }
+      
+      // Remove from sending set - the real message will come from the stream
+      if (mounted) {
+        setState(() {
+          _sendingMessageIds.remove(tempMessageId);
+        });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to send message: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Remove optimistic message on error
+      if (mounted) {
+        setState(() {
+          _messages.removeWhere((msg) => msg.id == tempMessageId);
+          _sendingMessageIds.remove(tempMessageId);
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to send message: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -787,42 +949,75 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF2C5E4A),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.otherUserName,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+        title: widget.isSupportChat || (_conversation != null && _conversation!.isSupport)
+            ? Row(
+                children: [
+                  const Icon(
+                    Icons.support_agent,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Support Chat',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'We\'re here to help',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.otherUserName ?? 'User',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (widget.listingTitle != null)
+                    Text(
+                      widget.listingTitle!,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  // Sticky timer for load negotiations (hide if booked)
+                  if (!_isLoadBooked &&
+                      widget.loadId != null && 
+                      ((_conversation != null && 
+                        _conversation!.isNegotiationActive &&
+                        _conversation!.negotiationExpiresAt != null) ||
+                       (_activeOffer != null && _activeOffer!.isActive)))
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+                      child: NegotiationTimer(
+                        expiresAt: _conversation?.negotiationExpiresAt ?? _activeOffer!.expiresAt,
+                        isExpired: _isNegotiationExpired || 
+                                  (_activeOffer != null && _activeOffer!.expiresAt.isBefore(DateTime.now())),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            if (widget.listingTitle != null)
-              Text(
-                widget.listingTitle!,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
-                ),
-              ),
-            // Sticky timer for load negotiations (hide if booked)
-            if (!_isLoadBooked &&
-                widget.loadId != null && 
-                ((_conversation != null && 
-                  _conversation!.isNegotiationActive &&
-                  _conversation!.negotiationExpiresAt != null) ||
-                 (_activeOffer != null && _activeOffer!.isActive)))
-              Padding(
-                padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
-                child: NegotiationTimer(
-                  expiresAt: _conversation?.negotiationExpiresAt ?? _activeOffer!.expiresAt,
-                  isExpired: _isNegotiationExpired || 
-                            (_activeOffer != null && _activeOffer!.expiresAt.isBefore(DateTime.now())),
-                ),
-              ),
-          ],
-        ),
         leading: Container(
           constraints: const BoxConstraints(maxWidth: 100),
           child: Row(
@@ -839,42 +1034,62 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
         actions: [
-          // Report button
-          IconButton(
-            icon: const Icon(Icons.flag_outlined, color: Colors.white),
-            onPressed: () => _showReportDialog(),
-            tooltip: 'Report',
-          ),
+          // Report button (hide for support chats)
+          if (!widget.isSupportChat && (_conversation == null || !_conversation!.isSupport))
+            IconButton(
+              icon: const Icon(Icons.flag_outlined, color: Colors.white),
+              onPressed: () => _showReportDialog(),
+              tooltip: 'Report',
+            ),
       
-             GestureDetector(
-                onTap: _showProfileDialog,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 4.0,right: 14),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    backgroundImage: _otherUserProfileImage != null
-                        ? NetworkImage(_otherUserProfileImage!)
-                        : null,
-                    child: _otherUserProfileImage == null
-                        ? const Icon(
-                            Icons.person,
-                            color: Colors.white,
-                            size: 18,
-                          )
-                        : null,
-                  ),
+          // Profile avatar (show support icon for support chats)
+          if (widget.isSupportChat || (_conversation != null && _conversation!.isSupport))
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.white.withOpacity(0.2),
+                child: const Icon(
+                  Icons.support_agent,
+                  color: Colors.white,
+                  size: 18,
                 ),
               ),
+            )
+          else
+            GestureDetector(
+              onTap: _showProfileDialog,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4.0, right: 14),
+                child: CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Colors.white.withOpacity(0.2),
+                  backgroundImage: _otherUserProfileImage != null
+                      ? NetworkImage(_otherUserProfileImage!)
+                      : null,
+                  child: _otherUserProfileImage == null
+                      ? const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 18,
+                        )
+                      : null,
+                ),
+              ),
+            ),
         ],
       ),
       body: Column(
         children: [
-          // Sticky action buttons bar (for load negotiations)
-          if (widget.loadId != null && widget.loadPrice != null)
+          // Sticky action buttons bar (for load negotiations) - hide for support chats
+          if (!widget.isSupportChat && 
+              (_conversation == null || !_conversation!.isSupport) &&
+              widget.loadId != null && widget.loadPrice != null)
             _buildStickyActionBar(),
-          // Listing info card (for product listings)
-          if (widget.listingTitle != null)
+          // Listing info card (for product listings) - hide for support chats
+          if (!widget.isSupportChat && 
+              (_conversation == null || !_conversation!.isSupport) &&
+              widget.listingTitle != null)
             GestureDetector(
               onTap: _viewListingDetails,
               child: Container(
@@ -1058,11 +1273,13 @@ class _ChatScreenState extends State<ChatScreen> {
           );
         }
         
+        final isSupportChat = widget.isSupportChat || (_conversation != null && _conversation!.isSupport);
+        final isSending = _sendingMessageIds.contains(message.id);
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: isMe 
-              ? _SentMessage(text: message.content)
-              : _ReceivedMessage(text: message.content),
+              ? _SentMessage(text: message.content, isSending: isSending)
+              : _ReceivedMessage(text: message.content, isSupportChat: isSupportChat),
         );
       },
     );
@@ -1358,9 +1575,13 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget _buildOfferMessage(ChatMessage message, OfferModel? offer, bool isMe) {
     if (offer == null) {
       // Fallback if offer not loaded
+      final isSending = _sendingMessageIds.contains(message.id);
       return isMe 
-          ? _SentMessage(text: message.content)
-          : _ReceivedMessage(text: message.content);
+          ? _SentMessage(text: message.content, isSending: isSending)
+          : _ReceivedMessage(
+              text: message.content,
+              isSupportChat: widget.isSupportChat || (_conversation != null && _conversation!.isSupport),
+            );
     }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -1521,11 +1742,13 @@ class _ChatScreenState extends State<ChatScreen> {
       userRole = UserRole.shipper;
     }
 
+    if (widget.otherUserId == null || widget.otherUserName == null) return; // Skip for support chats
+    
     showDialog(
       context: context,
       builder: (context) => UserProfileDialog(
-        userId: widget.otherUserId,
-        userName: widget.otherUserName,
+        userId: widget.otherUserId!,
+        userName: widget.otherUserName!,
         userRole: userRole,
         onReport: () => _showReportDialog(),
       ),
@@ -1544,13 +1767,13 @@ class _ChatScreenState extends State<ChatScreen> {
     if (widget.loadId != null) {
       // Reporting in load negotiation context
       if (isCarrier) {
-        reportedEntityName = widget.otherUserName;
+        reportedEntityName = widget.otherUserName ?? 'User';
       } else {
-        reportedEntityName = _activeOffer?.carrierName ?? widget.otherUserName;
+        reportedEntityName = _activeOffer?.carrierName ?? widget.otherUserName ?? 'User';
       }
     } else {
       // Reporting in general conversation
-      reportedEntityName = widget.otherUserName;
+      reportedEntityName = widget.otherUserName ?? 'User';
     }
 
     final reasonController = TextEditingController();
@@ -1616,9 +1839,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 return;
               }
 
+              if (widget.otherUserId == null) return;
+              
               final success = await FirebaseService.submitReport(
                 reporterId: reporter.uid,
-                reportedUserId: widget.otherUserId,
+                reportedUserId: widget.otherUserId!,
                 reportedUserName: reportedEntityName,
                 reason: reasonController.text.trim(),
                 loadId: widget.loadId,
@@ -1653,7 +1878,8 @@ class _ChatScreenState extends State<ChatScreen> {
 // Widget for a sent message bubble (right side)
 class _SentMessage extends StatelessWidget {
   final String text;
-  const _SentMessage({required this.text});
+  final bool isSending;
+  const _SentMessage({required this.text, this.isSending = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1669,11 +1895,29 @@ class _SentMessage extends StatelessWidget {
             color: const Color(0xFF2C5E4A), // Dark green
             borderRadius: BorderRadius.circular(20.0),
           ),
-          child: Text(
-            text,
-            style: const TextStyle(color: Colors.white, fontSize: 16),
-            softWrap: true,
-            overflow: TextOverflow.visible,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  text,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  softWrap: true,
+                  overflow: TextOverflow.visible,
+                ),
+              ),
+              if (isSending) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -1684,34 +1928,39 @@ class _SentMessage extends StatelessWidget {
 // Widget for a received message bubble (left side)
 class _ReceivedMessage extends StatelessWidget {
   final String text;
-  const _ReceivedMessage({required this.text});
+  final bool isSupportChat;
+  const _ReceivedMessage({required this.text, this.isSupportChat = false});
 
   @override
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Avatar with online indicator
+        // Avatar with online indicator (support agent icon for support chats)
         Stack(
           children: [
              CircleAvatar(
               radius: 20,
-              backgroundColor: Colors.grey.shade200,
-              child: Icon(Icons.person_outline, color: Colors.black),
-            ),
-            Positioned(
-              right: 1,
-              bottom: 1,
-              child: Container(
-                width: 12,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.black, width: 2),
-                ),
+              backgroundColor: isSupportChat ? const Color(0xFF2C5E4A) : Colors.grey.shade200,
+              child: Icon(
+                isSupportChat ? Icons.support_agent : Icons.person_outline,
+                color: isSupportChat ? Colors.white : Colors.black,
               ),
             ),
+            if (!isSupportChat)
+              Positioned(
+                right: 1,
+                bottom: 1,
+                child: Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.green,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.black, width: 2),
+                  ),
+                ),
+              ),
           ],
         ),
         const SizedBox(width: 8),

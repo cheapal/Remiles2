@@ -18,6 +18,8 @@ import 'providers/user_provider.dart';
 import 'providers/app_state_provider.dart';
 import 'providers/payment_methods_provider.dart';
 import 'providers/carrier_payments_provider.dart';
+import 'providers/notification_provider.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   // Ensure that plugin services are initialized
@@ -77,6 +79,18 @@ void main() async {
       }
     }
     
+    // Initialize Notification Service
+    try {
+      await NotificationService().initialize();
+      if (AppConfig.enableDebugLogging) {
+        print('Notification service initialized successfully');
+      }
+    } catch (e) {
+      if (AppConfig.enableDebugLogging) {
+        print('Notification service initialization error: $e');
+      }
+    }
+    
     // Test analytics and crashlytics only in debug mode
     if (AppConfig.enableTestEvents) {
       print('${AppConfig.versionInfo} - Running analytics test...');
@@ -133,6 +147,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AppStateProvider()),
         ChangeNotifierProvider(create: (_) => PaymentMethodsProvider()),
         ChangeNotifierProvider(create: (_) => CarrierPaymentsProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

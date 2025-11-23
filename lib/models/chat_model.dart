@@ -94,6 +94,7 @@ class ChatConversation {
   final DateTime? negotiationExpiresAt; // 30 minutes from negotiationStartTime
   final bool isNegotiationActive; // Whether negotiation is active
   final String? activeOfferId; // ID of the current active offer
+  final bool isSupport; // Whether this is a support conversation
 
   ChatConversation({
     required this.id,
@@ -110,6 +111,7 @@ class ChatConversation {
     this.negotiationExpiresAt,
     this.isNegotiationActive = false,
     this.activeOfferId,
+    this.isSupport = false,
   });
 
   factory ChatConversation.fromFirestore(DocumentSnapshot doc) {
@@ -135,6 +137,7 @@ class ChatConversation {
           : null,
       isNegotiationActive: data['isNegotiationActive'] ?? false,
       activeOfferId: data['activeOfferId'],
+      isSupport: data['isSupport'] ?? false,
     );
   }
 
@@ -157,6 +160,7 @@ class ChatConversation {
           : null,
       'isNegotiationActive': isNegotiationActive,
       'activeOfferId': activeOfferId,
+      'isSupport': isSupport,
     };
   }
 

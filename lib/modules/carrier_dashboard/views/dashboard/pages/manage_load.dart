@@ -47,6 +47,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
   Future<void> _loadLoads({bool reset = false}) async {
     if (_isLoading || !_hasMore) return;
     
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = null;
@@ -55,6 +56,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
     try {
       final user = FirebaseService.currentUser;
       if (user == null) {
+        if (!mounted) return;
         setState(() {
           _error = 'User not authenticated';
           _isLoading = false;
@@ -93,17 +95,19 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
         );
       }
 
-      setState(() {
-        if (reset) {
-          _loads = List<LoadModel>.from(result['loads']);
-          _lastDocument = result['lastDocument'];
-        } else {
-          _loads.addAll(List<LoadModel>.from(result['loads']));
-          _lastDocument = result['lastDocument'];
-        }
-        _hasMore = result['hasMore'] as bool;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          if (reset) {
+            _loads = List<LoadModel>.from(result['loads']);
+            _lastDocument = result['lastDocument'];
+          } else {
+            _loads.addAll(List<LoadModel>.from(result['loads']));
+            _lastDocument = result['lastDocument'];
+          }
+          _hasMore = result['hasMore'] as bool;
+          _isLoading = false;
+        });
+      }
       
       // Debug print
       print('Loaded ${_loads.length} loads for filter: $_selectedFilter');
@@ -134,13 +138,13 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
         errorMessage = 'Failed to load loads: ${e.toString()}';
       }
       
-      setState(() {
-        _error = errorMessage;
-        _isLoading = false;
-      });
-      
-      // Show user-friendly error message
       if (mounted) {
+        setState(() {
+          _error = errorMessage;
+          _isLoading = false;
+        });
+        
+        // Show user-friendly error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(errorMessage),
@@ -158,6 +162,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
 
   Future<void> _refreshLoads() async {
     // Clear current data and reset pagination
+    if (!mounted) return;
     setState(() {
       _loads = [];
       _lastDocument = null;
@@ -171,6 +176,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
 
   void _onFilterChanged(String filter) {
     if (filter != _selectedFilter) {
+      if (!mounted) return;
       setState(() {
         _selectedFilter = filter;
         _loads = [];
@@ -183,6 +189,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
 
   void _onSearchChanged(String query, {bool immediate = false}) {
     if (query != _searchQuery) {
+      if (!mounted) return;
       setState(() {
         _searchQuery = query;
       });
@@ -193,6 +200,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
       // If immediate is true (e.g., when clearing), reload right away
       // Otherwise, use debounce timer
       if (immediate) {
+        if (!mounted) return;
         setState(() {
           _loads = [];
           _lastDocument = null;
@@ -331,6 +339,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
                       _searchController.clear();
                       // Always reload when clearing - reset state and reload immediately
                       _searchDebounce?.cancel();
+                      if (!mounted) return;
                       setState(() {
                         _searchQuery = '';
                         _loads = [];

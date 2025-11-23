@@ -5,6 +5,8 @@ import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/notifica
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/support.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:provider/provider.dart';
+import 'package:Remiles/providers/notification_provider.dart';
 
 
 Widget TopNavigationBar(BuildContext context) {
@@ -94,7 +96,7 @@ Widget TopNavigationBar(BuildContext context) {
                     ),
                     SizedBox(width: isVerySmallScreen ? 4 : isSmallScreen ? 6 : 8),
                     Flexible(
-                      child: _navItem(
+                      child: _notificationNavItem(
                         context,
                         icon: SvgPicture.asset(
                           "assets/notification_top_nav.svg",
@@ -145,5 +147,61 @@ Widget _navItem(BuildContext context,
         ),
       ],
     ),
+  );
+}
+
+Widget _notificationNavItem(BuildContext context,
+    {required SvgPicture icon, required String label, required Widget page, double fontSize = 12}) {
+  return Consumer<NotificationProvider>(
+    builder: (context, notificationProvider, child) {
+      final hasUnread = notificationProvider.hasUnreadNotifications;
+      final unreadCount = notificationProvider.unreadCount;
+      
+      return InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => page),
+          );
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                icon,
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: fontSize,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (hasUnread)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF4949),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
+    },
   );
 }

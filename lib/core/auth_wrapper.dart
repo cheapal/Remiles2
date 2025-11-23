@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
+import '../providers/notification_provider.dart';
 import '../modules/auth/pages/login_screen.dart';
 import '../modules/auth/pages/welcome.dart';
 import '../modules/auth/pages/joiningoption.dart';
@@ -77,6 +78,16 @@ class _AuthWrapperState extends State<AuthWrapper> {
         // Firebase user exists but no Firestore data - could be new user
         print('AuthWrapper: Firebase user exists but no Firestore data - likely new user');
         // Don't navigate away - let the current flow (e.g., role selection) continue
+      }
+
+      // Initialize notification provider when user logs in
+      if (_authProvider.firebaseUser != null) {
+        try {
+          final notificationProvider = context.read<NotificationProvider>();
+          notificationProvider.initialize(_authProvider.firebaseUser!.uid);
+        } catch (e) {
+          debugPrint('Error initializing notification provider: $e');
+        }
       }
 
       // Navigate based on role

@@ -49,6 +49,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   String _shipperPhone = "";
   String _pickupAddress = "";
   String _deliveryAddress = "";
+  bool _isLoadingShipperInfo = false;
+  bool _isLoadingPickupAddress = false;
+  bool _isLoadingDeliveryAddress = false;
   
   // Coordinates
   LatLng? _shipperLocation;
@@ -197,6 +200,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       _shipperPhone = ""; // Reset phone while fetching
       _pickupConfirmationData = null; // Reset pickup confirmation
       _deliveryConfirmationData = null; // Reset delivery confirmation
+      
+      // Set loading states
+      _isLoadingShipperInfo = true;
+      // Addresses come directly from load data, so they're immediately available (not loading)
+      _isLoadingPickupAddress = false;
+      _isLoadingDeliveryAddress = false;
     });
     
     // Load pickup and delivery confirmation data
@@ -213,6 +222,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           } else {
             _shipperPhone = "";
           }
+          _isLoadingShipperInfo = false; // Mark as loaded
         });
       }
     } catch (e) {
@@ -220,6 +230,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       if (mounted) {
         setState(() {
           _shipperPhone = "";
+          _isLoadingShipperInfo = false; // Mark as loaded even on error
         });
       }
     }
@@ -1421,44 +1432,38 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         return;
       }
 
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+
       // Create or get support conversation
-      // You may need to adjust this based on your chat implementation
-      // For now, we'll navigate to chat screen with a support conversation ID
-      // This assumes you have a support conversation ID or can create one
+      final conversationId = await FirebaseService.createOrGetSupportConversation(user.uid);
       
-      // Option 1: Navigate to a general support chat
-      // Option 2: Create a support conversation and navigate to it
-      
-      // For now, show a message that chat support is coming soon
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Chat support is coming soon. Please use Call Support or Report Issue.'),
-            backgroundColor: Colors.orange,
-            duration: Duration(seconds: 3),
+        Navigator.of(context).pop(); // Close loading dialog
+        
+        // Navigate to support chat screen
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversationId,
+              isSupportChat: true,
+            ),
           ),
         );
       }
-      
-      // TODO: Implement support chat navigation when ready
-      // await Navigator.push(
-      //   context,
-      //   MaterialPageRoute(
-      //     builder: (context) => ChatScreen(
-      //       conversationId: supportConversationId,
-      //       otherUserId: supportUserId,
-      //       otherUserName: 'Support Team',
-      //       listingId: null,
-      //       loadId: null,
-      //       loadPrice: null,
-      //     ),
-      //   ),
-      // );
     } catch (e) {
       if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog if still open
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to open chat: ${e.toString()}'),
+            content: Text('Failed to open support chat: ${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -1495,8 +1500,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     children: [
                       // Load ID Dropdown and Support Button
                       Padding(
-                        padding: const EdgeInsets.only(left: 1.0, bottom: 20),
+                        padding: const EdgeInsets.only( bottom: 20),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const Text(
                               "Load ID: ",
@@ -1538,6 +1544,26 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                             color: Colors.black,
                             height: 1.2,
                           ),
+                                          selectedItemBuilder: (BuildContext context) {
+                                            return _bookedLoads.map<Widget>((load) {
+                                              final shortId = load.id.length > 8 
+                                                  ? load.id.substring(0, 8) 
+                                                  : load.id;
+                                              return Padding(
+                                                padding: const EdgeInsets.only(top: 8.0),
+                                                child: Text(
+                                                  "#$shortId",
+                                                  style: const TextStyle(
+                                                    fontSize: 28,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Colors.black,
+                                                  ),
+                                                  overflow: TextOverflow.ellipsis,
+                                                  maxLines: 1,
+                                                ),
+                                              );
+                                            }).toList();
+                                          },
                                           items: _bookedLoads.map((load) {
                                             final shortId = load.id.length > 8 
                                                 ? load.id.substring(0, 8) 
@@ -1551,6 +1577,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                                   fontWeight: FontWeight.bold,
                                                   color: Colors.black,
                                                 ),
+                                                overflow: TextOverflow.ellipsis,
+                                                maxLines: 1,
                                               ),
                                             );
                                           }).toList(),
@@ -1823,14 +1851,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                         ),
                                       ),
                                         const SizedBox(height: 8),
-                                      _shipperName.isNotEmpty 
-                                          ? Text(
-                                              _shipperPhone.isNotEmpty
-                                                  ? "$_shipperName\n$_shipperPhone"
-                                                  : _shipperName,
-                                              style: const TextStyle(fontSize: 16),
-                                            )
-                                          : Row(
+                                      _isLoadingShipperInfo
+                                          ? Row(
                                               children: [
                                                 SizedBox(
                                                   width: 16,
@@ -1850,7 +1872,22 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                                   ),
                                                 ),
                                               ],
-                                            ),
+                                            )
+                                          : _shipperName.isNotEmpty 
+                                              ? Text(
+                                                  _shipperPhone.isNotEmpty
+                                                      ? "$_shipperName\n$_shipperPhone"
+                                                      : _shipperName,
+                                                  style: const TextStyle(fontSize: 16),
+                                                )
+                                              : Text(
+                                                  'No shipper info available',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey.shade600,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
                                       ],
                                     ),
                                   ),
@@ -1934,39 +1971,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                         ],
                                       ),
                                         const SizedBox(height: 8),
-                                      _pickupAddress.isNotEmpty 
-                                          ? Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  _pickupAddress,
-                                                  style: const TextStyle(fontSize: 16),
-                                                ),
-                                                // Show confirmation timestamp if confirmed
-                                                if (_pickupConfirmationData != null) ...[
-                                                  const SizedBox(height: 8),
-                                                  Row(
-                                                    children: [
-                                                      Icon(
-                                                        Icons.access_time,
-                                                        size: 14,
-                                                        color: Colors.grey.shade600,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        _getConfirmationTimeText(),
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors.grey.shade600,
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ],
-                                            )
-                                          : Row(
+                                      _isLoadingPickupAddress
+                                          ? Row(
                                               children: [
                                                 SizedBox(
                                                   width: 16,
@@ -1986,7 +1992,47 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                                   ),
                                                 ),
                                               ],
-                                            ),
+                                            )
+                                          : _pickupAddress.isNotEmpty 
+                                              ? Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      _pickupAddress,
+                                                      style: const TextStyle(fontSize: 16),
+                                                    ),
+                                                    // Show confirmation timestamp if confirmed
+                                                    if (_pickupConfirmationData != null) ...[
+                                                      const SizedBox(height: 8),
+                                                      Row(
+                                                        children: [
+                                                          Icon(
+                                                            Icons.access_time,
+                                                            size: 14,
+                                                            color: Colors.grey.shade600,
+                                                          ),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            _getConfirmationTimeText(),
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: Colors.grey.shade600,
+                                                              fontWeight: FontWeight.w500,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ],
+                                                )
+                                              : Text(
+                                                  'No pickup address available',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey.shade600,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
                                       ],
                                     ),
                                   ),
@@ -2070,39 +2116,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                           ],
                                         ),
                                         const SizedBox(height: 8),
-                                      _deliveryAddress.isNotEmpty 
-                                          ? Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  _deliveryAddress,
-                                                  style: const TextStyle(fontSize: 16),
-                                                ),
-                                                // Show confirmation timestamp if confirmed
-                                                if (_deliveryConfirmationData != null) ...[
-                                                  const SizedBox(height: 8),
-                                                  Row(
-                                                    children: [
-                                                      Icon(
-                                                        Icons.access_time,
-                                                        size: 14,
-                                                        color: Colors.grey.shade600,
-                                                      ),
-                                                      const SizedBox(width: 4),
-                                                      Text(
-                                                        _getDeliveryConfirmationTimeText(),
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors.grey.shade600,
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ],
-                                            )
-                                          : Row(
+                                      _isLoadingDeliveryAddress
+                                          ? Row(
                                               children: [
                                                 SizedBox(
                                                   width: 16,
@@ -2122,7 +2137,47 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                                   ),
                                                 ),
                                               ],
-                                            ),
+                                            )
+                                          : _deliveryAddress.isNotEmpty 
+                                              ? Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      _deliveryAddress,
+                                                      style: const TextStyle(fontSize: 16),
+                                                    ),
+                                                    // Show confirmation timestamp if confirmed
+                                                    if (_deliveryConfirmationData != null) ...[
+                                                      const SizedBox(height: 8),
+                                                      Row(
+                                                        children: [
+                                                          Icon(
+                                                            Icons.access_time,
+                                                            size: 14,
+                                                            color: Colors.grey.shade600,
+                                                          ),
+                                                          const SizedBox(width: 4),
+                                                          Text(
+                                                            _getDeliveryConfirmationTimeText(),
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color: Colors.grey.shade600,
+                                                              fontWeight: FontWeight.w500,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ],
+                                                )
+                                              : Text(
+                                                  'No delivery address available',
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.grey.shade600,
+                                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                                ),
                                       ],
                                     ),
                                   ),

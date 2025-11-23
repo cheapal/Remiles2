@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'package:Remiles/providers/notification_provider.dart';
+import 'package:Remiles/providers/auth_provider.dart';
+import 'package:Remiles/models/notification_model.dart';
+import 'package:intl/intl.dart';
 
 void main() {
   runApp(const MaterialApp(
@@ -18,6 +23,19 @@ class ShipperNotifications extends StatefulWidget {
 class _ShipperNotificationsState extends State<ShipperNotifications>
     with TickerProviderStateMixin {
   int _selectedTab = 4; // More tab
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final firebaseUser = authProvider.firebaseUser;
+      if (firebaseUser != null) {
+        final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
+        notificationProvider.initialize(firebaseUser.uid);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,27 +93,29 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
               ),
 
               // Main content
-              Padding(
-                padding: EdgeInsets.symmetric(
-                    horizontal: isTabletOrDesktop ? 100.0 : 20.0),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Notifications',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 32,
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
-                        color: Colors.black,
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                      horizontal: isTabletOrDesktop ? 100.0 : 20.0),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Notifications',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                          color: Colors.black,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 100),
-
-                    // No Notifications Card
-                    _buildNoNotificationsCard(),
-                  ],
+                      const SizedBox(height: 20),
+                      Expanded(
+                        child: _buildNotificationsList(),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -187,52 +207,191 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
   }
 
   Widget _buildNotificationIconWithBadge(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 5.0),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Column(
+    return Consumer<NotificationProvider>(
+      builder: (context, notificationProvider, child) {
+        final hasUnread = notificationProvider.hasUnreadNotifications;
+        
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 5.0),
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Image.asset(
-                'assets/notifications.png',
-                height: 25,
-                color: Colors.white,
+              Column(
+                children: [
+                  Image.asset(
+                    'assets/notifications.png',
+                    height: 25,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Notifications',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              const Text(
-                'Notifications',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
+              if (hasUnread)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFF4949),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
                 ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildNotificationsList() {
+    return Consumer<NotificationProvider>(
+      builder: (context, notificationProvider, child) {
+        if (notificationProvider.isLoading) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        if (notificationProvider.notifications.isEmpty) {
+          return Center(
+            child: _buildNoNotificationsCard(),
+          );
+        }
+
+        return Column(
+          children: [
+            if (notificationProvider.hasUnreadNotifications)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${notificationProvider.unreadCount} unread notification${notificationProvider.unreadCount == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        notificationProvider.markAllAsRead();
+                      },
+                      child: const Text('Mark all as read'),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: ListView.builder(
+                itemCount: notificationProvider.notifications.length,
+                itemBuilder: (context, index) {
+                  final notification = notificationProvider.notifications[index];
+                  return _buildNotificationCard(context, notification, notificationProvider);
+                },
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildNotificationCard(
+    BuildContext context,
+    NotificationModel notification,
+    NotificationProvider provider,
+  ) {
+    final dateFormat = DateFormat('MMM d, y • h:mm a');
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      elevation: notification.isRead ? 1 : 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: notification.isRead ? Colors.transparent : Colors.blue.shade200,
+          width: notification.isRead ? 0 : 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          if (!notification.isRead) {
+            provider.markAsRead(notification.id);
+          }
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                margin: const EdgeInsets.only(top: 6, right: 12),
+                decoration: BoxDecoration(
+                  color: notification.isRead ? Colors.transparent : Colors.blue,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      notification.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.bold,
+                        color: notification.isRead ? Colors.grey.shade800 : Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      notification.body,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      dateFormat.format(notification.createdAt),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                color: Colors.grey.shade400,
+                onPressed: () {
+                  provider.deleteNotification(notification.id);
+                },
               ),
             ],
           ),
-          Positioned(
-            right: 0,
-            top: 0,
-            child: Container(
-              width: 20,
-              height: 20,
-              decoration: const BoxDecoration(
-                color: Color(0xFFFF4949),
-                shape: BoxShape.circle,
-              ),
-              child: const Center(
-                child: Text(
-                  '1',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

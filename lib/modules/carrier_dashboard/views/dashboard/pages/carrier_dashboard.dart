@@ -6,6 +6,7 @@ import '../../../../../providers/auth_provider.dart';
 import '../../common/widgets/top_navigation_bar.dart';
 import '../../common/widgets/recommended_load.dart';
 import 'manage_load.dart';
+import 'carrier_payment_page.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/load_model.dart';
 import 'package:Remiles/models/carrier_model.dart';
@@ -192,7 +193,14 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
                           borderRadius: BorderRadius.circular(24),
                         ),
                       ),
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const CarrierPaymentPage(),
+                          ),
+                        );
+                      },
                       child: const Text(
                         "\$ Payment",
                         style: TextStyle(color: Colors.white, fontSize: 16),

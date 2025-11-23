@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 import 'app_config.dart';
 import 'dart:io';
 import 'dart:async';
@@ -16,6 +17,8 @@ import '../models/product_listing.dart';
 import '../models/chat_model.dart';
 import '../models/load_model.dart';
 import '../models/offer_model.dart';
+import '../services/notification_service.dart';
+import '../models/notification_model.dart';
 // import 'utils/distance_service.dart'; // Temporarily disabled until Distance Matrix API is activated
 
 /// Firebase service class to handle all Firebase operations
@@ -2058,10 +2061,127 @@ class FirebaseService {
         'unreadCount.$receiverId': true,
       });
       print('Conversation updated with last message');
+      
+      // Send notification for support messages
+      final convDoc = await conversations.doc(conversationId).get();
+      if (convDoc.exists) {
+        final convData = convDoc.data() as Map<String, dynamic>;
+        final isSupportConversation = convData['isSupport'] == true;
+        if (isSupportConversation) {
+          // Send notification for support messages
+          await NotificationService.createNotification(
+            userId: receiverId,
+            type: NotificationType.message,
+            title: "New Support Message",
+            body: content.length > 50 ? '${content.substring(0, 50)}...' : content,
+            data: {
+              'conversationId': conversationId,
+              'senderId': senderId,
+            },
+            relatedId: conversationId,
+          );
+        }
+      }
     } catch (e) {
       print('Error sending message: $e');
       await recordError(e, StackTrace.current, reason: 'Failed to send message');
       rethrow;
+    }
+  }
+  
+  // Support Chat functionality
+  static const String supportUserId = 'support_system'; // System support user ID
+  
+  /// Create or get support conversation for a user
+  static Future<String> createOrGetSupportConversation(String userId) async {
+    try {
+      print('Creating/getting support conversation for user: $userId');
+      
+      // Check if support conversation already exists
+      final existingConversation = await conversations
+          .where('participants', arrayContains: userId)
+          .where('isSupport', isEqualTo: true)
+          .get();
+
+      if (existingConversation.docs.isNotEmpty) {
+        print('Found existing support conversation: ${existingConversation.docs.first.id}');
+        return existingConversation.docs.first.id;
+      }
+
+      // Create new support conversation
+      final conversationId = conversations.doc().id;
+      print('Creating new support conversation: $conversationId');
+      
+      final conversation = ChatConversation(
+        id: conversationId,
+        participants: [userId, supportUserId],
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        isSupport: true, // Mark as support conversation
+      );
+
+      final conversationData = conversation.toFirestore();
+      conversationData['supportTitle'] = 'Support Chat';
+      
+      await conversations.doc(conversationId).set(conversationData);
+      print('Support conversation created successfully');
+      return conversationId;
+    } catch (e) {
+      print('Error creating support conversation: $e');
+      await recordError(e, StackTrace.current, reason: 'Failed to create support conversation');
+      rethrow;
+    }
+  }
+  
+  /// Send support message
+  static Future<void> sendSupportMessage({
+    required String conversationId,
+    required String senderId,
+    required String content,
+  }) async {
+    try {
+      // Determine receiver (if sender is user, receiver is support, and vice versa)
+      final convDoc = await conversations.doc(conversationId).get();
+      if (!convDoc.exists) {
+        throw Exception('Support conversation not found');
+      }
+      
+      final convData = convDoc.data() as Map<String, dynamic>;
+      final participants = List<String>.from(convData['participants'] ?? []);
+      final receiverId = participants.firstWhere(
+        (id) => id != senderId,
+        orElse: () => supportUserId,
+      );
+      
+      await sendMessage(
+        conversationId: conversationId,
+        senderId: senderId,
+        receiverId: receiverId,
+        content: content,
+      );
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to send support message');
+      rethrow;
+    }
+  }
+  
+  /// Get support conversation for a user
+  static Future<ChatConversation?> getSupportConversation(String userId) async {
+    try {
+      final snapshot = await conversations
+          .where('participants', arrayContains: userId)
+          .where('isSupport', isEqualTo: true)
+          .limit(1)
+          .get();
+      
+      if (snapshot.docs.isEmpty) {
+        return null;
+      }
+      
+      return ChatConversation.fromFirestore(snapshot.docs.first);
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get support conversation');
+      return null;
     }
   }
 
@@ -2371,13 +2491,14 @@ class FirebaseService {
     required String loadId,
   }) async {
     try {
-      // Get offer data first to extract carrierId
+      // Get offer data first to extract carrierId and shipperId
       final offerDoc = await offers.doc(offerId).get();
       if (!offerDoc.exists) {
         throw Exception('Offer not found');
       }
       final offerData = offerDoc.data() as Map<String, dynamic>;
       final carrierId = offerData['carrierId'] as String;
+      final shipperId = offerData['shipperId'] as String;
 
       return await _firestore.runTransaction<bool>((transaction) async {
         // Get offer
@@ -2397,7 +2518,6 @@ class FirebaseService {
 
         final carrierName = offerData['carrierName'] as String;
         final conversationId = offerData['conversationId'] as String;
-        final shipperId = offerData['shipperId'] as String;
         final acceptedAmount = offerData['counterOfferAmount'] as double? ?? 
                                (offerData['offerAmount'] as num).toDouble();
 
@@ -2418,8 +2538,6 @@ class FirebaseService {
         if (loadData['status'] != 'available') {
           throw Exception('Load is no longer available');
         }
-
-        final shipperUid = shipperId;
 
         final now = DateTime.now();
 
@@ -2473,7 +2591,7 @@ class FirebaseService {
           'loadId': loadId,
           'carrierId': carrierId,
           'carrierName': carrierName,
-          'shipperId': shipperUid,
+          'shipperId': shipperId,
           'status': 'booked',
           'bookedAt': Timestamp.fromDate(now),
           'createdAt': Timestamp.fromDate(now),
@@ -2494,6 +2612,38 @@ class FirebaseService {
         if (success) {
           // Close all other active negotiations for this load after transaction
           await closeNegotiationsForLoad(loadId, carrierId);
+          
+          // Send notifications to both shipper and carrier
+          try {
+            await NotificationService.createNotification(
+              userId: shipperId,
+              type: NotificationType.orderStatus,
+              title: "Order Booked",
+              body: "A carrier has accepted your order!",
+              data: {
+                'loadId': loadId,
+                'oldStatus': 'available',
+                'newStatus': 'booked',
+              },
+              relatedId: loadId,
+            );
+            
+            await NotificationService.createNotification(
+              userId: carrierId,
+              type: NotificationType.orderStatus,
+              title: "Load Booked Successfully",
+              body: "You have successfully booked this load!",
+              data: {
+                'loadId': loadId,
+                'oldStatus': 'available',
+                'newStatus': 'booked',
+              },
+              relatedId: loadId,
+            );
+          } catch (e) {
+            debugPrint('Error sending booking notifications: $e');
+            // Don't fail the booking if notification fails
+          }
         }
         return success;
       });
@@ -3418,7 +3568,7 @@ class FirebaseService {
         }
       }
 
-      if (loadRef == null || loadData == null) {
+      if (loadRef == null || loadData == null || shipperUid == null) {
         print('DEBUG bookLoad: Load not found');
         throw Exception('Load not found');
       }
@@ -3493,6 +3643,41 @@ class FirebaseService {
 
         print('DEBUG bookLoad: Transaction completed successfully');
         return true;
+      }).then((success) async {
+        if (success && shipperUid != null) {
+          // Send notifications to both shipper and carrier
+          try {
+            await NotificationService.createNotification(
+              userId: shipperUid,
+              type: NotificationType.orderStatus,
+              title: "Order Booked",
+              body: "A carrier has accepted your order!",
+              data: {
+                'loadId': loadId,
+                'oldStatus': 'available',
+                'newStatus': 'booked',
+              },
+              relatedId: loadId,
+            );
+            
+            await NotificationService.createNotification(
+              userId: carrierUid,
+              type: NotificationType.orderStatus,
+              title: "Load Booked Successfully",
+              body: "You have successfully booked this load!",
+              data: {
+                'loadId': loadId,
+                'oldStatus': 'available',
+                'newStatus': 'booked',
+              },
+              relatedId: loadId,
+            );
+          } catch (e) {
+            debugPrint('Error sending booking notifications: $e');
+            // Don't fail the booking if notification fails
+          }
+        }
+        return success;
       });
     } catch (e) {
       print('DEBUG bookLoad: Error occurred: $e');
@@ -3544,6 +3729,9 @@ class FirebaseService {
         throw Exception('Unauthorized to update this load');
       }
 
+      // Store old status before update
+      final oldStatus = loadData['status'] as String? ?? 'booked';
+      
       // Now run the transaction with the found reference
       return await _firestore.runTransaction<bool>((transaction) async {
         // Re-check load within transaction
@@ -3585,6 +3773,45 @@ class FirebaseService {
         }
 
         return true;
+      }).then((success) async {
+        if (success && shipperUid != null && oldStatus != status) {
+          // Send notification to shipper about status change
+          try {
+            String title;
+            String body;
+            
+            if (status == 'in-transit' && oldStatus == 'booked') {
+              // Pickup completed - load is now in transit
+              title = "Pickup Completed";
+              body = "Your order has been picked up and is now in transit!";
+            } else if (status == 'completed' && oldStatus == 'in-transit') {
+              // Delivery completed
+              title = "Delivery Completed";
+              body = "Your order has been delivered successfully!";
+            } else {
+              // Generic status update
+              title = "Order Status Updated";
+              body = "Your order status has been updated to ${status.replaceAll('-', ' ')}.";
+            }
+            
+            await NotificationService.createNotification(
+              userId: shipperUid,
+              type: NotificationType.orderStatus,
+              title: title,
+              body: body,
+              data: {
+                'loadId': loadId,
+                'oldStatus': oldStatus,
+                'newStatus': status,
+              },
+              relatedId: loadId,
+            );
+          } catch (e) {
+            debugPrint('Error sending status update notification: $e');
+            // Don't fail the status update if notification fails
+          }
+        }
+        return success;
       });
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to update load status');

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../../../providers/auth_provider.dart';
 import '../../../../../core/firebase_service.dart';
+import 'chat_screen.dart';
 
 class SupportScreen extends StatefulWidget {
   const SupportScreen({super.key});
@@ -77,6 +78,46 @@ class _SupportScreenState extends State<SupportScreen> {
                             ),
                           ),
                           const SizedBox(height: 30),
+                          
+                          // Chat with Support button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _openSupportChat,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2C5E4A),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 15,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                elevation: 2,
+                              ),
+                              icon: const Icon(Icons.chat, color: Colors.white),
+                              label: const Text(
+                                'Chat with Support',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const Divider(),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'Or submit a support ticket:',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
 
                           // Title field
                           const Text(
@@ -298,5 +339,62 @@ class _SupportScreenState extends State<SupportScreen> {
         );
       },
     );
+  }
+  
+  Future<void> _openSupportChat() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final user = authProvider.currentUser;
+      
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to chat with support'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+      
+      // Create or get support conversation
+      final conversationId = await FirebaseService.createOrGetSupportConversation(user.uid);
+      
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        
+        // Navigate to support chat screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversationId,
+              isSupportChat: true,
+              preFilledMessage: _descriptionController.text.trim().isNotEmpty
+                  ? '${_titleController.text.trim()}\n\n${_descriptionController.text.trim()}'
+                  : null,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog if still open
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open support chat: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }

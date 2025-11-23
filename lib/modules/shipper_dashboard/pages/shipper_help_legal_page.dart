@@ -1,5 +1,9 @@
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:Remiles/providers/auth_provider.dart';
+import 'package:Remiles/core/firebase_service.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 
 class ShipperHelpLegalPage extends StatelessWidget {
   const ShipperHelpLegalPage({super.key});
@@ -579,6 +583,7 @@ class ShipperContactSupportPage extends StatelessWidget {
               ),
               const SizedBox(height: 30),
               _buildContactCard(
+                context,
                 Icons.email,
                 'Email Support',
                 'support@remiles.com',
@@ -589,6 +594,7 @@ class ShipperContactSupportPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _buildContactCard(
+                context,
                 Icons.phone,
                 'Phone Support',
                 '+1 (555) 123-4567',
@@ -599,12 +605,13 @@ class ShipperContactSupportPage extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _buildContactCard(
+                context,
                 Icons.chat_bubble_outline,
                 'Live Chat',
                 'Available in-app',
                 'Chat with our support team in real-time',
                 () {
-                  // Handle chat tap
+                  _openSupportChat(context);
                 },
               ),
               const SizedBox(height: 30),
@@ -639,6 +646,7 @@ class ShipperContactSupportPage extends StatelessWidget {
   }
 
   Widget _buildContactCard(
+    BuildContext context,
     IconData icon,
     String title,
     String contact,
@@ -737,6 +745,60 @@ class ShipperContactSupportPage extends StatelessWidget {
         ],
       ),
     );
+  }
+  
+  static void _openSupportChat(BuildContext context) async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.currentUser;
+      
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to chat with support'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      
+      // Show loading indicator
+      // showDialog(
+      //   context: context,
+      //   barrierDismissible: false,
+      //   builder: (context) => const Center(
+      //     child: CircularProgressIndicator(),
+      //   ),
+      // );
+      
+      // Create or get support conversation
+      final conversationId = await FirebaseService.createOrGetSupportConversation(user.uid);
+      
+      if (context.mounted) {
+        //Navigator.of(context).pop(); // Close loading dialog
+        
+        // Navigate to support chat screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversationId,
+              isSupportChat: true,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        Navigator.of(context).pop(); // Close loading dialog if still open
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open support chat: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

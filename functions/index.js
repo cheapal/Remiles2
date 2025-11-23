@@ -28,6 +28,90 @@ function getStripe() {
 }
 
 /**
+ * Helper function to send notifications
+ * Creates a notification document in Firestore and sends push notification via FCM
+ */
+async function sendNotification({
+  userId,
+  type,
+  title,
+  body,
+  data = {},
+  relatedId = null,
+}) {
+  try {
+    // Create notification document in Firestore
+    const notificationRef = admin.firestore().collection("notifications").doc();
+    await notificationRef.set({
+      userId: userId,
+      type: type,
+      title: title,
+      body: body,
+      data: data,
+      isRead: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      relatedId: relatedId,
+    });
+
+    // Get user's FCM token - check both users collection and role-specific collections
+    let fcmToken = null;
+    
+    // First check users collection
+    const userDoc = await admin.firestore().collection("users").doc(userId).get();
+    if (userDoc.exists) {
+      fcmToken = userDoc.data()?.fcmToken;
+    }
+    
+    // If not found, check shippers collection
+    if (!fcmToken) {
+      const shipperDoc = await admin.firestore().collection("shippers").doc(userId).get();
+      if (shipperDoc.exists) {
+        fcmToken = shipperDoc.data()?.fcmToken;
+      }
+    }
+    
+    // If still not found, check carriers collection
+    if (!fcmToken) {
+      const carrierDoc = await admin.firestore().collection("carriers").doc(userId).get();
+      if (carrierDoc.exists) {
+        fcmToken = carrierDoc.data()?.fcmToken;
+      }
+    }
+
+    if (fcmToken) {
+      // Send push notification via FCM
+      const message = {
+        notification: {
+          title: title,
+          body: body,
+        },
+        data: {
+          type: type,
+          notificationId: notificationRef.id,
+          ...Object.keys(data).reduce((acc, key) => {
+            acc[key] = String(data[key]);
+            return acc;
+          }, {}),
+        },
+        token: fcmToken,
+      };
+
+      try {
+        await admin.messaging().send(message);
+        console.log(`Push notification sent to user ${userId}`);
+      } catch (fcmError) {
+        console.error(`Failed to send push notification:`, fcmError);
+        // Continue even if FCM fails - notification is still saved in Firestore
+      }
+    }
+
+    console.log(`Notification created for user ${userId}: ${title}`);
+  } catch (error) {
+    console.error("Error sending notification:", error);
+  }
+}
+
+/**
  * Create a Stripe Payment Intent
  *
  * This function securely creates a payment intent on the server side
@@ -251,6 +335,19 @@ exports.handleStripeWebhook = functions
                         succeededAt: admin.firestore.FieldValue
                             .serverTimestamp(),
                       });
+                      
+                      // Send notification
+                      await sendNotification({
+                        userId: userId,
+                        type: "paymentReceived",
+                        title: "Payment Received",
+                        body: `Your payment of $${(paymentIntent.amount / 100).toFixed(2)} has been received successfully.`,
+                        data: {
+                          paymentIntentId: paymentIntent.id,
+                          amount: paymentIntent.amount,
+                        },
+                        relatedId: paymentIntent.id,
+                      });
                     }
                   });
             }
@@ -282,6 +379,19 @@ exports.handleStripeWebhook = functions
                         failedAt: admin.firestore.FieldValue.serverTimestamp(),
                         failureReason: errorMessage,
                       });
+                      
+                      // Send notification
+                      await sendNotification({
+                        userId: userId,
+                        type: "paymentFailed",
+                        title: "Payment Failed",
+                        body: `Your payment failed: ${errorMessage}`,
+                        data: {
+                          paymentIntentId: failedPayment.id,
+                          error: errorMessage,
+                        },
+                        relatedId: failedPayment.id,
+                      });
                     }
                   });
             }
@@ -297,6 +407,193 @@ exports.handleStripeWebhook = functions
 
       // Return a response to acknowledge receipt of the event
       res.json({received: true});
+    });
+
+/**
+ * Firestore trigger: Send notification when load status changes
+ */
+exports.onLoadStatusChange = functions
+    .region("northamerica-northeast1")
+    .firestore.document("loads/{loadId}")
+    .onUpdate(async (change, context) => {
+      const before = change.before.data();
+      const after = change.after.data();
+      const loadId = context.params.loadId;
+
+      // Only trigger if status actually changed
+      if (before.status === after.status) {
+        return null;
+      }
+
+      const newStatus = after.status;
+      const oldStatus = before.status;
+
+      try {
+        // Notify shipper about status change
+        if (after.shipperId) {
+          let title = "Order Status Updated";
+          let body = `Your order status has been updated to ${newStatus}.`;
+
+          if (newStatus === "booked") {
+            title = "Order Booked";
+            body = "A carrier has accepted your order!";
+          } else if (newStatus === "in-transit") {
+            title = "Order In Transit";
+            body = "Your order is now in transit.";
+          } else if (newStatus === "completed") {
+            title = "Order Completed";
+            body = "Your order has been completed successfully!";
+          }
+
+          await sendNotification({
+            userId: after.shipperId,
+            type: "orderStatus",
+            title: title,
+            body: body,
+            data: {
+              loadId: loadId,
+              oldStatus: oldStatus,
+              newStatus: newStatus,
+            },
+            relatedId: loadId,
+          });
+        }
+
+        // Notify carrier about status change
+        if (after.bookedByCarrierId) {
+          let title = "Order Status Updated";
+          let body = `The order status has been updated to ${newStatus}.`;
+
+          if (newStatus === "in-transit") {
+            title = "Order In Transit";
+            body = "You've marked the order as in transit.";
+          } else if (newStatus === "completed") {
+            title = "Order Completed";
+            body = "You've completed the order successfully!";
+          }
+
+          await sendNotification({
+            userId: after.bookedByCarrierId,
+            type: "orderStatus",
+            title: title,
+            body: body,
+            data: {
+              loadId: loadId,
+              oldStatus: oldStatus,
+              newStatus: newStatus,
+            },
+            relatedId: loadId,
+          });
+        }
+      } catch (error) {
+        console.error("Error sending load status notification:", error);
+      }
+
+      return null;
+    });
+
+/**
+ * Firestore trigger: Send notification when offer is accepted
+ */
+exports.onOfferAccepted = functions
+    .region("northamerica-northeast1")
+    .firestore.document("offers/{offerId}")
+    .onUpdate(async (change, context) => {
+      const before = change.before.data();
+      const after = change.after.data();
+
+      // Check if offer was just accepted
+      if (before.status !== "accepted" && after.status === "accepted") {
+        try {
+          // Notify carrier
+          if (after.carrierId) {
+            await sendNotification({
+              userId: after.carrierId,
+              type: "offerAccepted",
+              title: "Offer Accepted!",
+              body: `Your offer of $${after.amount?.toFixed(2) || "N/A"} has been accepted!`,
+              data: {
+                offerId: context.params.offerId,
+                loadId: after.loadId,
+                amount: after.amount,
+              },
+              relatedId: context.params.offerId,
+            });
+          }
+
+          // Notify shipper
+          const loadDoc = await admin.firestore().collection("loads").doc(after.loadId).get();
+          if (loadDoc.exists && loadDoc.data()?.shipperId) {
+            await sendNotification({
+              userId: loadDoc.data().shipperId,
+              type: "offerAccepted",
+              title: "Offer Accepted",
+              body: `You've accepted an offer of $${after.amount?.toFixed(2) || "N/A"}.`,
+              data: {
+                offerId: context.params.offerId,
+                loadId: after.loadId,
+                amount: after.amount,
+              },
+              relatedId: context.params.offerId,
+            });
+          }
+        } catch (error) {
+          console.error("Error sending offer accepted notification:", error);
+        }
+      }
+
+      return null;
+    });
+
+/**
+ * Firestore trigger: Send notification when a message is sent in a support conversation
+ */
+exports.onSupportMessage = functions
+    .region("northamerica-northeast1")
+    .firestore.document("messages/{messageId}")
+    .onCreate(async (snap, context) => {
+      const messageData = snap.data();
+      const conversationId = messageData.conversationId;
+      const senderId = messageData.senderId;
+      const receiverId = messageData.receiverId;
+      const content = messageData.content || "";
+
+      try {
+        // Check if this is a support conversation
+        const convDoc = await admin.firestore()
+            .collection("conversations")
+            .doc(conversationId)
+            .get();
+
+        if (!convDoc.exists) {
+          return null;
+        }
+
+        const convData = convDoc.data();
+        const isSupportConversation = convData?.isSupport === true;
+
+        if (isSupportConversation) {
+          // Send notification to the receiver
+          await sendNotification({
+            userId: receiverId,
+            type: "message",
+            title: senderId === "support_system" 
+                ? "Support Team Replied" 
+                : "New Support Message",
+            body: content.length > 50 ? content.substring(0, 50) + "..." : content,
+            data: {
+              conversationId: conversationId,
+              senderId: senderId,
+              messageId: context.params.messageId,
+            },
+            relatedId: conversationId,
+          });
+        }
+      } catch (error) {
+        console.error("Error sending support message notification:", error);
+      }
+
+      return null;
     });
 
 /**

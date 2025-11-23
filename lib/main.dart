@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 import 'modules/auth/pages/choose_role.dart';
 import 'firebase_options.dart';
 import 'core/auth_wrapper.dart';
+import 'core/app_check_wrapper.dart';
 import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/app_state_provider.dart';
@@ -151,7 +152,7 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
-        home: const AuthWrapper(),
+        home: const AppCheckWrapper(),
         routes: {
           '/login': (context) => const LoginScreen(),
           '/signup/carrier': (context) => const CarrierSignUpScreen(),

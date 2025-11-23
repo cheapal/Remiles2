@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -13,6 +14,7 @@ import 'settings_page.dart';
 import 'help_legal_page.dart';
 import 'carrier_boost_my_profile.dart';
 import 'carrier_payment_page.dart';
+import 'app_settings_page.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -551,6 +553,18 @@ class _ProfileState extends State<Profile> {
                     ),
                   );
                 }),
+                // App Settings - only visible in debug mode
+                if (kDebugMode) ...[
+                  const SizedBox(height: 16),
+                  _buildProfileOption('App Settings', Icons.admin_panel_settings, () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AppSettingsPage(),
+                      ),
+                    );
+                  }),
+                ],
                 const SizedBox(height: 16),
                 _buildProfileOption('Help & Legal', Icons.help_outline, () {
                   Navigator.push(

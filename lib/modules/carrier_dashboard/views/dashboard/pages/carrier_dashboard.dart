@@ -8,6 +8,7 @@ import '../../common/widgets/recommended_load.dart';
 import 'manage_load.dart';
 import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/load_model.dart';
+import 'package:Remiles/models/carrier_model.dart';
 import 'dart:io';
 
 class CarrierDashboardScreen extends StatefulWidget {
@@ -84,56 +85,73 @@ class _CarrierDashboardScreenState extends State<CarrierDashboardScreen> {
                            user?.displayName ?? 
                            'User';
         
-        return _buildDashboard(context, displayName);
+        return _buildDashboard(context, displayName, carrier);
       },
     );
   }
   
-  Widget _buildDashboard(BuildContext context, String displayName) {
+  Widget _buildDashboard(BuildContext context, String displayName, CarrierModel? carrier) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Column(
-        children: [
-          /// Fixed Header Section (Top Nav, Welcome, Action Buttons)
-          Column(
+          backgroundColor: Colors.white,
+          body: Column(
             children: [
-              /// Top Navigation Bar
-              TopNavigationBar(context),
+              /// Fixed Header Section (Top Nav, Welcome, Action Buttons)
+              Column(
+                children: [
+                  /// Top Navigation Bar
+                  TopNavigationBar(context),
 
-              const SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
-              /// Welcome Row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        "Welcome\n$displayName",
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                          height: 1.2,
+                  /// Welcome Row
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            "Welcome\n$displayName",
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                              height: 1.2,
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children:  [
-                        SvgPicture.asset('assets/eco.svg',
-                            width: 50, height: 50,),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children:  [
+                            SvgPicture.asset('assets/eco.svg',
+                                width: 50, height: 50,),
 
-                        SizedBox(width: 20),
-                        SvgPicture.asset('assets/person.svg',
-                            width: 75, height: 65,),
-                        SizedBox(width: 20),
+                            SizedBox(width: 20),
+                            SizedBox(
+                              width: 75,
+                              height: 65,
+                              child: carrier?.profileImageUrl != null && carrier!.profileImageUrl!.isNotEmpty
+                                  ? ClipOval(
+                                      child: Image.network(
+                                        carrier.profileImageUrl!,
+                                        width: 75,
+                                        height: 65,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (context, error, stackTrace) {
+                                          return SvgPicture.asset('assets/person.svg',
+                                              width: 75, height: 65,);
+                                        },
+                                      ),
+                                    )
+                                  : SvgPicture.asset('assets/person.svg',
+                                      width: 75, height: 65,),
+                            ),
+                            SizedBox(width: 20),
+                          ],
+                        ),
                       ],
                     ),
-                  ],
-                ),
-              ),
+                  ),
 
               const SizedBox(height: 16),
 

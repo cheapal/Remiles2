@@ -146,6 +146,127 @@ class _ShipperProfileState extends State<ShipperProfile>
     }
   }
 
+  Future<void> _deleteProfilePicture() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final appStateProvider = context.read<AppStateProvider>();
+      final shipper = authProvider.shipperUser;
+
+      if (shipper == null) {
+        throw Exception('Shipper not found');
+      }
+
+      if (shipper.profileImageUrl == null || shipper.profileImageUrl!.isEmpty) {
+        return; // No image to delete
+      }
+
+      // Show confirmation dialog
+      final shouldDelete = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text(
+              'Delete Profile Picture',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF186230),
+              ),
+            ),
+            content: const Text(
+              'Are you sure you want to delete your profile picture?',
+              style: TextStyle(
+                fontSize: 16,
+                color: Color(0xFF666666),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF666666),
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (shouldDelete != true) {
+        return;
+      }
+
+      setState(() {
+        _isUploadingImage = true;
+      });
+
+      appStateProvider.showLoadingWithMessage('Deleting profile picture...');
+
+      // Try to delete the file from Firebase Storage
+      try {
+        await FirebaseService.deleteFileFromURL(shipper.profileImageUrl!);
+      } catch (e) {
+        // Log error but continue - the file might not exist or already be deleted
+        print('Error deleting file from storage: $e');
+      }
+
+      // Update shipper profile to remove image URL
+      await FirebaseService.updateShipper(shipper.uid, {
+        'profileImageUrl': null,
+      });
+
+      // Refresh user data
+      await authProvider.refreshUser();
+
+      appStateProvider.showSuccess();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Profile picture deleted successfully'),
+            backgroundColor: Color(0xFF4B744F),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      final appStateProvider = context.read<AppStateProvider>();
+      appStateProvider.showError('Failed to delete profile picture. Please try again.');
+      print('Error deleting profile picture: $e');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploadingImage = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isTabletOrDesktop = MediaQuery.of(context).size.width > 600;
@@ -314,15 +435,40 @@ class _ShipperProfileState extends State<ShipperProfile>
                                   Positioned(
                                     bottom: 0,
                                     right: 0,
-                                    child: Container(
-                                      width: 28,
-                                      height: 28,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: const Color(0xFF43975A),
-                                        border: Border.all(color: Colors.white, width: 2),
-                                      ),
-                                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        GestureDetector(
+                                          onTap: _changeProfilePicture,
+                                          child: Container(
+                                            width: 28,
+                                            height: 28,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: const Color(0xFF43975A),
+                                              border: Border.all(color: Colors.white, width: 2),
+                                            ),
+                                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                                          ),
+                                        ),
+                                        if (shipper?.profileImageUrl != null && shipper!.profileImageUrl!.isNotEmpty) ...[
+                                          const SizedBox(width: 4),
+                                          GestureDetector(
+                                            onTap: _deleteProfilePicture,
+                                            child: Container(
+                                              width: 28,
+                                              height: 28,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.red,
+                                                border: Border.all(color: Colors.white, width: 2),
+                                              ),
+                                              child: const Icon(Icons.delete, color: Colors.white, size: 16),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                   ),
                               ],

@@ -1240,8 +1240,30 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                         ),
                         SizedBox(width: 20),
                       ],
-                      SvgPicture.asset('assets/person.svg',
-                          width: 75, height: 65,),
+                      Consumer<AuthProvider>(
+                        builder: (context, authProvider, child) {
+                          final shipper = authProvider.shipperUser;
+                          return SizedBox(
+                            width: 75,
+                            height: 65,
+                            child: shipper?.profileImageUrl != null && shipper!.profileImageUrl!.isNotEmpty
+                                ? ClipOval(
+                                    child: Image.network(
+                                      shipper.profileImageUrl!,
+                                      width: 75,
+                                      height: 65,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return SvgPicture.asset('assets/person.svg',
+                                            width: 75, height: 65,);
+                                      },
+                                    ),
+                                  )
+                                : SvgPicture.asset('assets/person.svg',
+                                    width: 75, height: 65,),
+                          );
+                        },
+                      ),
                       SizedBox(width: 20),
                     ],
                   ),

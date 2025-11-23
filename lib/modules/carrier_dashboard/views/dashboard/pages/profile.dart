@@ -11,6 +11,7 @@ import 'carrier_preferences.dart';
 import 'account_details_page.dart';
 import 'settings_page.dart';
 import 'help_legal_page.dart';
+import 'carrier_boost_my_profile.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -379,7 +380,14 @@ class _ProfileState extends State<Profile> {
                 const SizedBox(height: 16),
                 _buildProfileOption('Documents', Icons.description, () {}),
                 const SizedBox(height: 16),
-                _buildProfileOption('Boost My Load', Icons.rocket_launch, () {}),
+                _buildProfileOption('Boost My Load', Icons.rocket_launch, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CarrierBoostMyProfile(),
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
                 _buildProfileOption('Settings', Icons.settings, () {
                   Navigator.push(

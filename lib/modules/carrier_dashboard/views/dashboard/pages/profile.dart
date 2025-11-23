@@ -12,6 +12,7 @@ import 'account_details_page.dart';
 import 'settings_page.dart';
 import 'help_legal_page.dart';
 import 'carrier_boost_my_profile.dart';
+import 'carrier_payment_page.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -513,7 +514,14 @@ class _ProfileState extends State<Profile> {
                   _loadCarrierStats();
                 }),
                 const SizedBox(height: 16),
-                _buildProfileOption('Payment Method', Icons.credit_card, () {}),
+                _buildProfileOption('Payment Method', Icons.credit_card, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CarrierPaymentPage(),
+                    ),
+                  );
+                }),
                 const SizedBox(height: 16),
                 _buildProfileOption('Load Preferences', Icons.tune, () {
                   Navigator.push(

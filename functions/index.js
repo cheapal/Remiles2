@@ -354,12 +354,26 @@ exports.createSetupIntent = functions
       try {
         const stripe = getStripe();
 
-        // Get or create Stripe customer
+        // Get or create Stripe customer - support both shippers and carriers
         let customerId;
-        const userDoc = await admin.firestore()
+        let userCollection = "shippers"; // default
+
+        // Check if user is a shipper
+        let userDoc = await admin.firestore()
             .collection("shippers")
             .doc(decodedToken.uid)
             .get();
+
+        // If not a shipper, check if user is a carrier
+        if (!userDoc.exists) {
+          userDoc = await admin.firestore()
+              .collection("carriers")
+              .doc(decodedToken.uid)
+              .get();
+          if (userDoc.exists) {
+            userCollection = "carriers";
+          }
+        }
 
         if (userDoc.exists && userDoc.data().stripeCustomerId) {
           customerId = userDoc.data().stripeCustomerId;
@@ -373,13 +387,24 @@ exports.createSetupIntent = functions
           });
           customerId = customer.id;
 
-          // Save customer ID to Firestore
-          await admin.firestore()
-              .collection("shippers")
-              .doc(decodedToken.uid)
-              .update({
-                stripeCustomerId: customerId,
-              });
+          // Save customer ID to Firestore in the correct collection
+          if (userDoc.exists) {
+            await admin.firestore()
+                .collection(userCollection)
+                .doc(decodedToken.uid)
+                .update({
+                  stripeCustomerId: customerId,
+                });
+          } else {
+            // If user doesn't exist in either collection,
+            // create in shippers (fallback)
+            await admin.firestore()
+                .collection("shippers")
+                .doc(decodedToken.uid)
+                .set({
+                  stripeCustomerId: customerId,
+                }, {merge: true});
+          }
         }
 
         // Create setup intent
@@ -457,11 +482,19 @@ exports.listPaymentMethods = functions
       try {
         const stripe = getStripe();
 
-        // Get Stripe customer ID
-        const userDoc = await admin.firestore()
+        // Get Stripe customer ID - support both shippers and carriers
+        let userDoc = await admin.firestore()
             .collection("shippers")
             .doc(decodedToken.uid)
             .get();
+
+        // If not a shipper, check if user is a carrier
+        if (!userDoc.exists) {
+          userDoc = await admin.firestore()
+              .collection("carriers")
+              .doc(decodedToken.uid)
+              .get();
+        }
 
         if (!userDoc.exists || !userDoc.data().stripeCustomerId) {
           res.status(200).json({
@@ -579,11 +612,19 @@ exports.setDefaultPaymentMethod = functions
 
         const stripe = getStripe();
 
-        // Get Stripe customer ID
-        const userDoc = await admin.firestore()
+        // Get Stripe customer ID - support both shippers and carriers
+        let userDoc = await admin.firestore()
             .collection("shippers")
             .doc(decodedToken.uid)
             .get();
+
+        // If not a shipper, check if user is a carrier
+        if (!userDoc.exists) {
+          userDoc = await admin.firestore()
+              .collection("carriers")
+              .doc(decodedToken.uid)
+              .get();
+        }
 
         if (!userDoc.exists || !userDoc.data().stripeCustomerId) {
           res.status(404).json({
@@ -685,11 +726,19 @@ exports.deletePaymentMethod = functions
 
         const stripe = getStripe();
 
-        // Get Stripe customer ID
-        const userDoc = await admin.firestore()
+        // Get Stripe customer ID - support both shippers and carriers
+        let userDoc = await admin.firestore()
             .collection("shippers")
             .doc(decodedToken.uid)
             .get();
+
+        // If not a shipper, check if user is a carrier
+        if (!userDoc.exists) {
+          userDoc = await admin.firestore()
+              .collection("carriers")
+              .doc(decodedToken.uid)
+              .get();
+        }
 
         if (!userDoc.exists || !userDoc.data().stripeCustomerId) {
           res.status(404).json({

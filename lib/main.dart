@@ -17,6 +17,7 @@ import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/app_state_provider.dart';
 import 'providers/payment_methods_provider.dart';
+import 'providers/carrier_payments_provider.dart';
 
 void main() async {
   // Ensure that plugin services are initialized
@@ -131,6 +132,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => AppStateProvider()),
         ChangeNotifierProvider(create: (_) => PaymentMethodsProvider()),
+        ChangeNotifierProvider(create: (_) => CarrierPaymentsProvider()),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

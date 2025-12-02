@@ -2,11 +2,14 @@ import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/notification_model.dart';
 import '../models/user_model.dart';
 import '../core/firebase_service.dart';
 import '../firebase_options.dart';
+import 'conversation_tracker.dart';
 
 /// Top-level function for handling background messages
 /// Must be a top-level function, not a class method
@@ -34,10 +37,12 @@ class NotificationService {
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
   
   String? _fcmToken;
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<RemoteMessage>? _messageSubscription;
+  bool _localNotificationsInitialized = false;
 
   String? get fcmToken => _fcmToken;
   bool get isInitialized => _fcmToken != null;
@@ -45,6 +50,9 @@ class NotificationService {
   /// Initialize notification service
   Future<void> initialize() async {
     try {
+      // Initialize local notifications first
+      await _initializeLocalNotifications();
+
       // Request permission for iOS
       final settings = await _messaging.requestPermission(
         alert: true,
@@ -89,6 +97,50 @@ class NotificationService {
       debugPrint('Notification service initialized successfully');
     } catch (e) {
       debugPrint('Error initializing notification service: $e');
+    }
+  }
+
+  /// Initialize local notifications plugin
+  Future<void> _initializeLocalNotifications() async {
+    try {
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const iosSettings = DarwinInitializationSettings(
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
+      
+      const initSettings = InitializationSettings(
+        android: androidSettings,
+        iOS: iosSettings,
+      );
+
+      await _localNotifications.initialize(
+        initSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          // Handle notification tap if needed
+          debugPrint('Notification tapped: ${response.payload}');
+        },
+      );
+
+      // Create notification channel for Android 8.0+
+      const androidChannel = AndroidNotificationChannel(
+        'remiles_channel',
+        'Remiles Notifications',
+        description: 'Notifications for Remiles app',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      );
+      
+      await _localNotifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(androidChannel);
+
+      _localNotificationsInitialized = true;
+      debugPrint('Local notifications initialized');
+    } catch (e) {
+      debugPrint('Error initializing local notifications: $e');
     }
   }
 
@@ -141,7 +193,74 @@ class NotificationService {
   /// Handle foreground messages
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('Received foreground message: ${message.messageId}');
+    
+    // Check if this is a message notification for the currently open conversation
+    final messageType = message.data['type'] as String?;
+    final conversationId = message.data['conversationId'] as String?;
+    
+    // Skip showing notification if it's a message for the currently open conversation
+    if (messageType == 'message' && 
+        conversationId != null && 
+        ConversationTracker.isConversationOpen(conversationId)) {
+      debugPrint('Skipping notification for open conversation: $conversationId');
+      return;
+    }
+    
+    // Show local notification for foreground messages
+    _showLocalNotification(message);
+    
     _handleMessage(message);
+  }
+
+  /// Show local notification
+  Future<void> _showLocalNotification(RemoteMessage message) async {
+    if (!_localNotificationsInitialized) {
+      debugPrint('Local notifications not initialized, skipping');
+      return;
+    }
+
+    try {
+      final notification = message.notification;
+      
+      // Use notification title/body if available, otherwise use data
+      final title = notification?.title ?? message.data['title'] ?? 'New Notification';
+      final body = notification?.body ?? message.data['body'] ?? '';
+
+      const androidDetails = AndroidNotificationDetails(
+        'remiles_channel',
+        'Remiles Notifications',
+        channelDescription: 'Notifications for Remiles app',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      // Generate a unique notification ID based on message ID or timestamp
+      final notificationId = message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch.hashCode;
+      
+      await _localNotifications.show(
+        notificationId.abs(),
+        title,
+        body,
+        details,
+        payload: message.data.toString(),
+      );
+
+      debugPrint('Local notification shown: $title - $body');
+    } catch (e) {
+      debugPrint('Error showing local notification: $e');
+    }
   }
 
   /// Handle incoming messages

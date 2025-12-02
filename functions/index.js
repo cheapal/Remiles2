@@ -2358,3 +2358,505 @@ exports.transferPaymentToCarrier = functions
       }
     });
 
+/**
+ * Create Escrow Payment Intent
+ *
+ * Creates a Stripe Payment Intent with manual capture to hold funds
+ * in escrow until POD verification and payment release.
+ *
+ * @param {Object} data - Escrow payment data
+ * @param {number} data.amount - Amount in cents
+ * @param {string} data.loadId - Associated load ID
+ * @param {string} data.carrierId - Carrier receiving payment
+ * @param {string} data.shipperId - Shipper making payment
+ * @param {string} data.currency - Currency code (default: 'cad')
+ * @returns {Object} Payment intent with client secret
+ */
+exports.createEscrowPaymentIntent = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const requestData = req.body.data || req.body;
+        const {
+          amount,
+          loadId,
+          carrierId,
+          shipperId,
+          currency = "cad",
+        } = requestData;
+
+        if (!amount || amount <= 0) {
+          res.status(400).json({
+            error: {
+              status: "INVALID_ARGUMENT",
+              message: "Amount must be greater than 0",
+            },
+          });
+          return;
+        }
+
+        if (!loadId || !carrierId || !shipperId) {
+          res.status(400).json({
+            error: {
+              status: "INVALID_ARGUMENT",
+              message: "loadId, carrierId, and shipperId are required",
+            },
+          });
+          return;
+        }
+
+        // Verify shipper matches authenticated user
+        if (decodedToken.uid !== shipperId) {
+          res.status(403).json({
+            error: {
+              status: "PERMISSION_DENIED",
+              message: "Shipper ID must match authenticated user",
+            },
+          });
+          return;
+        }
+
+        // Verify carrier has Stripe Connect account
+        const carrierDoc = await admin.firestore()
+            .collection("carriers")
+            .doc(carrierId)
+            .get();
+        if (!carrierDoc.exists) {
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Carrier not found",
+            },
+          });
+          return;
+        }
+
+        const carrierData = carrierDoc.data();
+        const carrierStripeAccountId = carrierData &&
+            carrierData.stripeAccountId;
+        if (!carrierStripeAccountId) {
+          res.status(400).json({
+            error: {
+              status: "FAILED_PRECONDITION",
+              message: "Carrier does not have a Stripe account set up",
+            },
+          });
+          return;
+        }
+
+        // Get or create shipper Stripe customer
+        const shipperDoc = await admin.firestore()
+            .collection("shippers")
+            .doc(shipperId)
+            .get();
+        const shipperData = shipperDoc.data();
+        let shipperStripeCustomerId = shipperData &&
+            shipperData.stripeCustomerId;
+
+        if (!shipperStripeCustomerId) {
+          const stripe = getStripe();
+          const customer = await stripe.customers.create({
+            email: decodedToken.email,
+            metadata: {
+              userId: shipperId,
+            },
+          });
+          shipperStripeCustomerId = customer.id;
+          await admin.firestore()
+              .collection("shippers")
+              .doc(shipperId)
+              .update({
+                stripeCustomerId: shipperStripeCustomerId,
+              });
+        }
+
+        // Create payment intent with manual capture
+        const stripe = getStripe();
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: currency.toLowerCase(),
+          capture_method: "manual",
+          customer: shipperStripeCustomerId,
+          metadata: {
+            loadId: loadId,
+            carrierId: carrierId,
+            shipperId: shipperId,
+            type: "escrow",
+            createdAt: new Date().toISOString(),
+          },
+          automatic_payment_methods: {
+            enabled: true,
+          },
+        });
+
+        // Store escrow payment record in Firestore
+        await admin.firestore().collection("escrow_payments").add({
+          loadId: loadId,
+          carrierId: carrierId,
+          shipperId: shipperId,
+          paymentIntentId: paymentIntent.id,
+          amount: amount,
+          amountInDollars: amount / 100,
+          currency: currency,
+          status: "pending",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Log payment intent
+        try {
+          await admin.firestore().collection("payment_intents").add({
+            userId: shipperId,
+            paymentIntentId: paymentIntent.id,
+            amount: amount,
+            currency: currency,
+            status: paymentIntent.status,
+            loadId: loadId,
+            carrierId: carrierId,
+            type: "escrow",
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            metadata: {
+              loadId: loadId,
+              carrierId: carrierId,
+              shipperId: shipperId,
+              type: "escrow",
+            },
+          });
+        } catch (logError) {
+          console.error("Failed to log escrow payment intent:", logError);
+        }
+
+        res.status(200).json({
+          result: {
+            clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id,
+          },
+        });
+      } catch (error) {
+        console.error("Error creating escrow payment intent:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message ||
+                "Failed to create escrow payment intent",
+          },
+        });
+      }
+    });
+
+/**
+ * Capture Escrow Payment
+ *
+ * Captures a held escrow payment and transfers funds to carrier
+ * after POD verification.
+ *
+ * @param {Object} data - Capture data
+ * @param {string} data.paymentIntentId - Stripe payment intent ID
+ * @param {string} data.loadId - Associated load ID
+ * @param {string} data.carrierId - Carrier receiving payment
+ * @param {string} data.shipperId - Shipper releasing payment
+ * @param {number} data.amount - Amount to release in cents
+ * @param {string} data.completionStatus - Delivery completion status
+ * @param {string} data.currency - Currency code (default: 'cad')
+ * @returns {Object} Capture result with transfer ID
+ */
+exports.captureEscrowPayment = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const requestData = req.body.data || req.body;
+        const {
+          paymentIntentId,
+          loadId,
+          carrierId,
+          shipperId,
+          amount,
+          completionStatus = "complete",
+        } = requestData;
+
+        if (!paymentIntentId || !loadId || !carrierId || !shipperId) {
+          res.status(400).json({
+            error: {
+              status: "INVALID_ARGUMENT",
+              message: "paymentIntentId, loadId, carrierId, " +
+                  "and shipperId are required",
+            },
+          });
+          return;
+        }
+
+        // Verify shipper matches authenticated user
+        if (decodedToken.uid !== shipperId) {
+          res.status(403).json({
+            error: {
+              status: "PERMISSION_DENIED",
+              message: "Shipper ID must match authenticated user",
+            },
+          });
+          return;
+        }
+
+        // Get escrow payment record
+        const escrowQuery = await admin.firestore()
+            .collection("escrow_payments")
+            .where("paymentIntentId", "==", paymentIntentId)
+            .where("loadId", "==", loadId)
+            .limit(1)
+            .get();
+
+        if (escrowQuery.empty) {
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Escrow payment not found",
+            },
+          });
+          return;
+        }
+
+        const escrowData = escrowQuery.docs[0].data();
+        if (escrowData.status !== "deposited") {
+          res.status(400).json({
+            error: {
+              status: "FAILED_PRECONDITION",
+              message: `Escrow payment status is ${escrowData.status}, ` +
+                  "expected 'deposited'",
+            },
+          });
+          return;
+        }
+
+        // Get carrier Stripe account
+        const carrierDoc = await admin.firestore()
+            .collection("carriers")
+            .doc(carrierId)
+            .get();
+        if (!carrierDoc.exists) {
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Carrier not found",
+            },
+          });
+          return;
+        }
+
+        const carrierData = carrierDoc.data();
+        const carrierStripeAccountId = carrierData &&
+            carrierData.stripeAccountId;
+        if (!carrierStripeAccountId) {
+          res.status(400).json({
+            error: {
+              status: "FAILED_PRECONDITION",
+              message: "Carrier does not have a Stripe account set up",
+            },
+          });
+          return;
+        }
+
+        const stripe = getStripe();
+
+        // Retrieve payment intent to get actual amount
+        const paymentIntent = await stripe.paymentIntents.retrieve(
+            paymentIntentId);
+        const actualAmount = amount || paymentIntent.amount;
+
+        // Capture the payment intent
+        const capturedIntent = await stripe.paymentIntents.capture(
+            paymentIntentId,
+            {
+              amount_to_capture: actualAmount,
+            });
+
+        if (capturedIntent.status !== "succeeded") {
+          res.status(400).json({
+            error: {
+              status: "PAYMENT_FAILED",
+              message: `Payment capture status: ${capturedIntent.status}`,
+            },
+          });
+          return;
+        }
+
+        // Transfer funds to carrier's Connect account
+        let transferId = null;
+        try {
+          const transfer = await stripe.transfers.create({
+            amount: actualAmount,
+            currency: paymentIntent.currency,
+            destination: carrierStripeAccountId,
+            description: `Escrow release for load ${loadId}`,
+            metadata: {
+              loadId: loadId,
+              shipperId: shipperId,
+              paymentIntentId: paymentIntentId,
+              completionStatus: completionStatus,
+              type: "escrow_release",
+            },
+          });
+          transferId = transfer.id;
+        } catch (transferError) {
+          console.error("Transfer failed:", transferError);
+          // Refund the captured payment
+          try {
+            await stripe.refunds.create({
+              payment_intent: paymentIntentId,
+            });
+            console.log("Payment refunded due to transfer failure");
+          } catch (refundError) {
+            console.error("Error refunding payment:", refundError);
+          }
+          res.status(400).json({
+            error: {
+              status: "TRANSFER_FAILED",
+              message: "Failed to transfer funds to carrier. " +
+                  "Payment has been refunded.",
+            },
+          });
+          return;
+        }
+
+        // Update escrow payment status
+        await escrowQuery.docs[0].ref.update({
+          status: "released",
+          releasedAt: admin.firestore.FieldValue.serverTimestamp(),
+          transferId: transferId,
+          completionStatus: completionStatus,
+        });
+
+        // Store transfer record
+        await admin.firestore().collection("transfers").add({
+          carrierId: carrierId,
+          shipperId: shipperId,
+          loadId: loadId,
+          amount: actualAmount / 100,
+          amountInCents: actualAmount,
+          currency: paymentIntent.currency,
+          completionStatus: completionStatus,
+          stripePaymentIntentId: paymentIntentId,
+          stripeTransferId: transferId,
+          status: "completed",
+          type: "escrow_release",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        // Update delivery confirmation
+        try {
+          const confirmationQuery = await admin.firestore()
+              .collection("delivery_confirmations")
+              .where("loadId", "==", loadId)
+              .limit(1)
+              .get();
+
+          if (!confirmationQuery.empty) {
+            await confirmationQuery.docs[0].ref.update({
+              paymentReleased: true,
+              paymentReleasedAt:
+                  admin.firestore.FieldValue.serverTimestamp(),
+              paymentAmount: actualAmount / 100,
+              stripePaymentIntentId: paymentIntentId,
+              stripeTransferId: transferId,
+            });
+          }
+        } catch (updateError) {
+          console.error("Error updating delivery confirmation:", updateError);
+        }
+
+        res.status(200).json({
+          result: {
+            success: true,
+            transferId: transferId,
+            paymentIntentId: paymentIntentId,
+            amount: actualAmount / 100,
+            currency: paymentIntent.currency,
+          },
+        });
+      } catch (error) {
+        console.error("Error capturing escrow payment:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to capture escrow payment",
+          },
+        });
+      }
+    });
+

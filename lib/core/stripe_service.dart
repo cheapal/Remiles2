@@ -943,5 +943,298 @@ class StripeService {
       rethrow;
     }
   }
+
+  /// Create an escrow payment intent for holding funds
+  /// 
+  /// This creates a Stripe Payment Intent with manual capture mode
+  /// to hold funds in escrow until POD verification.
+  /// 
+  /// Returns the client secret for the Payment Sheet
+  static Future<String> createEscrowPaymentIntent({
+    required int amountInCents,
+    required String loadId,
+    required String carrierId,
+    required String shipperId,
+    String currency = 'cad',
+  }) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl = 
+          'https://$region-$projectId.cloudfunctions.net/createEscrowPaymentIntent';
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken',
+        },
+        body: jsonEncode({
+          'data': {
+            'amount': amountInCents,
+            'loadId': loadId,
+            'carrierId': carrierId,
+            'shipperId': shipperId,
+            'currency': currency,
+          },
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Escrow payment intent creation timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = response.body;
+        try {
+          final errorJson = jsonDecode(errorBody);
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          final errorMessage = error?['message'] as String?;
+          throw Exception(errorMessage ?? 'Failed to create escrow payment intent');
+        } catch (parseError) {
+          throw Exception('Failed to create escrow payment intent: ${response.statusCode}');
+        }
+      }
+
+      final responseData = jsonDecode(response.body);
+      final result = responseData['result'] as Map<String, dynamic>?;
+      final clientSecret = result?['clientSecret'] as String?;
+
+      if (clientSecret == null || clientSecret.isEmpty) {
+        throw Exception('Failed to get client secret from Firebase Function');
+      }
+
+      await FirebaseService.log('Escrow Payment Intent Created - Load: $loadId');
+      await FirebaseService.logEvent(
+        'escrow_payment_intent_created',
+        parameters: FirebaseService.convertParameters({
+          'load_id': loadId,
+          'amount': amountInCents,
+          'currency': currency,
+        }),
+      );
+
+      return clientSecret;
+    } catch (e, stackTrace) {
+      debugPrint('Error creating escrow payment intent: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in createEscrowPaymentIntent',
+      );
+      rethrow;
+    }
+  }
+
+  /// Process escrow payment using Stripe Payment Sheet
+  /// 
+  /// This method:
+  /// 1. Creates an escrow payment intent (via backend)
+  /// 2. Initializes the Stripe Payment Sheet
+  /// 3. Presents the payment sheet to the user
+  /// 4. Returns the payment result
+  static Future<bool> processEscrowPayment({
+    required int amountInCents,
+    required String loadId,
+    required String carrierId,
+    required String shipperId,
+    String currency = 'cad',
+  }) async {
+    try {
+      // Step 1: Create escrow payment intent via Firebase Functions
+      final clientSecret = await createEscrowPaymentIntent(
+        amountInCents: amountInCents,
+        loadId: loadId,
+        carrierId: carrierId,
+        shipperId: shipperId,
+        currency: currency,
+      );
+
+      if (clientSecret.isEmpty) {
+        throw Exception('Escrow payment intent client secret is missing');
+      }
+
+      // Step 2: Initialize payment sheet parameters
+      await Stripe.instance.initPaymentSheet(
+        paymentSheetParameters: SetupPaymentSheetParameters(
+          paymentIntentClientSecret: clientSecret,
+          merchantDisplayName: 'Remiles',
+        ),
+      );
+
+      // Step 3: Present payment sheet
+      await Stripe.instance.presentPaymentSheet();
+
+      // Step 4: Payment successful
+      await FirebaseService.log(
+        'Escrow Payment Processed - Amount: \$${(amountInCents / 100).toStringAsFixed(2)} - Load: $loadId'
+      );
+      await FirebaseService.logEvent(
+        'escrow_payment_processed',
+        parameters: FirebaseService.convertParameters({
+          'load_id': loadId,
+          'amount': amountInCents,
+          'currency': currency,
+          'value': amountInCents / 100.0,
+        }),
+      );
+
+      return true;
+    } on StripeException catch (e, stackTrace) {
+      debugPrint('Stripe Error: ${e.error.message}');
+
+      if (e.error.code == FailureCode.Canceled) {
+        await FirebaseService.log('Escrow payment canceled by user');
+        await FirebaseService.logEvent(
+          'escrow_payment_canceled',
+          parameters: FirebaseService.convertParameters({
+            'load_id': loadId,
+            'amount': amountInCents,
+            'currency': currency,
+          }),
+        );
+        return false;
+      } else {
+        await FirebaseService.recordError(
+          e,
+          stackTrace,
+          reason: 'Stripe escrow payment error: ${e.error.code}',
+        );
+        await FirebaseService.logEvent(
+          'escrow_payment_failed',
+          parameters: FirebaseService.convertParameters({
+            'error_type': 'stripe_error',
+            'error_code': e.error.code.toString(),
+            'load_id': loadId,
+            'amount': amountInCents,
+            'currency': currency,
+          }),
+        );
+        rethrow;
+      }
+    } catch (e, stackTrace) {
+      debugPrint('Escrow payment processing error: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Unexpected error in escrow payment processing',
+      );
+      await FirebaseService.logEvent(
+        'escrow_payment_failed',
+        parameters: FirebaseService.convertParameters({
+          'error_type': 'processing_error',
+          'load_id': loadId,
+          'amount': amountInCents,
+          'currency': currency,
+        }),
+      );
+      rethrow;
+    }
+  }
+
+  /// Capture escrow payment and transfer to carrier
+  /// 
+  /// This captures a held escrow payment and transfers funds to the carrier
+  /// after POD verification.
+  static Future<bool> captureEscrowPayment({
+    required String paymentIntentId,
+    required String loadId,
+    required String carrierId,
+    required String shipperId,
+    int? amountInCents,
+    String completionStatus = 'complete',
+  }) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl = 
+          'https://$region-$projectId.cloudfunctions.net/captureEscrowPayment';
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken',
+        },
+        body: jsonEncode({
+          'data': {
+            'paymentIntentId': paymentIntentId,
+            'loadId': loadId,
+            'carrierId': carrierId,
+            'shipperId': shipperId,
+            if (amountInCents != null) 'amount': amountInCents,
+            'completionStatus': completionStatus,
+          },
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Escrow payment capture timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = response.body;
+        try {
+          final errorJson = jsonDecode(errorBody);
+          final error = errorJson['error'] as Map<String, dynamic>?;
+          final errorMessage = error?['message'] as String?;
+          throw Exception(errorMessage ?? 'Failed to capture escrow payment');
+        } catch (parseError) {
+          throw Exception('Failed to capture escrow payment: ${response.statusCode}');
+        }
+      }
+
+      final responseData = jsonDecode(response.body);
+      final result = responseData['result'] as Map<String, dynamic>?;
+      final success = result?['success'] as bool? ?? false;
+
+      if (success) {
+        await FirebaseService.log(
+          'Escrow Payment Captured - Load: $loadId - Transfer: ${result?['transferId']}'
+        );
+        await FirebaseService.logEvent(
+          'escrow_payment_captured',
+          parameters: FirebaseService.convertParameters({
+            'load_id': loadId,
+            'payment_intent_id': paymentIntentId,
+            'transfer_id': result?['transferId'] ?? '',
+            'amount': result?['amount'] ?? 0,
+          }),
+        );
+      }
+
+      return success;
+    } catch (e, stackTrace) {
+      debugPrint('Error capturing escrow payment: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in captureEscrowPayment',
+      );
+      rethrow;
+    }
+  }
 }
 

@@ -16,6 +16,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'delivery_details_page.dart';
+import 'package:Remiles/core/stripe_service.dart';
+import 'package:Remiles/modules/shipper_dashboard/widgets/escrow_payment_dialog.dart';
+import 'package:Remiles/modules/shipper_dashboard/widgets/escrow_payment_status.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
+import 'package:Remiles/models/user_model.dart';
 
 class ShipperLoadDetailsPage extends StatefulWidget {
   final Map<String, dynamic> load;
@@ -39,6 +44,9 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
   bool _isLoadingCarrier = false;
   String? _carrierPhone;
   
+  // Description read more state
+  bool _isDescriptionExpanded = false;
+  
   // Map controller
   GoogleMapController? _mapController;
   
@@ -52,12 +60,18 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
   
   // Firestore reference
   DocumentReference? _loadDocumentRef;
+  String? _shipperUidFromPath; // Store shipper UID from document path
   
   // Expandable state
   bool _isLoadInfoExpanded = false;
   
   // Delivery confirmation data
   Map<String, dynamic>? _deliveryConfirmationData;
+  
+  // Escrow payment data
+  Map<String, dynamic>? _escrowPaymentData;
+  bool _isLoadingEscrow = false;
+  String? _lastEscrowLoadId; // Track which load ID we last loaded escrow data for
   
   @override
   void initState() {
@@ -66,6 +80,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     _loadCarrierInfo();
     _loadMapLocations();
     _loadDeliveryConfirmationData(widget.load['id']?.toString());
+    _loadEscrowPaymentData();
   }
   
   @override
@@ -76,7 +91,18 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
   
   void _initializeLoadDocument() {
     final loadId = widget.load['id']?.toString();
-    final shipperUid = widget.load['shipperUid']?.toString();
+    String? shipperUid = widget.load['shipperUid']?.toString();
+    
+    // If shipperUid is not in load data, try to get it from current user
+    if (shipperUid == null || shipperUid.isEmpty) {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        shipperUid = currentUser.uid;
+      }
+    }
+    
+    // Store shipperUid for later use
+    _shipperUidFromPath = shipperUid;
     
     if (loadId != null && shipperUid != null) {
       _loadDocumentRef = FirebaseFirestore.instance
@@ -294,12 +320,32 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     }
     
     final loadId = widget.load['id']?.toString();
-    final shipperUid = widget.load['shipperUid']?.toString();
+    // Get shipper UID from multiple sources (priority: path > load data > current user)
+    String? shipperUid = _shipperUidFromPath ?? 
+                         widget.load['shipperUid']?.toString();
     
-    if (loadId == null || shipperUid == null) {
+    // If shipperUid is still not available, get it from current user
+    if (shipperUid == null || shipperUid.isEmpty) {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        shipperUid = currentUser.uid;
+      }
+    }
+    
+    if (loadId == null || loadId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Load information not available'),
+          content: Text('Load ID not available'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    
+    if (shipperUid == null || shipperUid.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Shipper information not available. Please log in again.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -308,13 +354,17 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     
     try {
       // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      // if (mounted) {
+      //   showDialog(
+      //     context: context,
+      //     barrierDismissible: false,
+      //     builder: (context) => const Center(
+      //       child: CircularProgressIndicator(),
+      //     ),
+      //   );
+      // }
+      
+      print('Navigating to chat - LoadId: $loadId, CarrierUid: ${_carrier!.uid}, ShipperUid: $shipperUid');
       
       // Create or get conversation for load
       final conversationId = await FirebaseService.createLoadConversation(
@@ -323,6 +373,8 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
         shipperUid: shipperUid,
       );
       
+      print('Conversation created/found: $conversationId');
+      
       // Close loading dialog
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
@@ -330,6 +382,16 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
       
       // Navigate to chat screen
       if (mounted) {
+        final loadPrice = widget.load['quoteBudget'] != null 
+            ? (widget.load['quoteBudget'] is num 
+                ? (widget.load['quoteBudget'] as num).toDouble() 
+                : double.tryParse(widget.load['quoteBudget'].toString()) ?? 0.0)
+            : (widget.load['price'] != null
+                ? (widget.load['price'] is num
+                    ? (widget.load['price'] as num).toDouble()
+                    : double.tryParse(widget.load['price'].toString()) ?? 0.0)
+                : null);
+        
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -338,16 +400,15 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
               otherUserId: _carrier!.uid,
               otherUserName: _carrier!.displayName ?? _carrier!.companyName ?? 'Carrier',
               loadId: loadId,
-              loadPrice: widget.load['quoteBudget'] != null 
-                  ? (widget.load['quoteBudget'] is num 
-                      ? (widget.load['quoteBudget'] as num).toDouble() 
-                      : double.tryParse(widget.load['quoteBudget'].toString()) ?? 0.0)
-                  : null,
+              loadPrice: loadPrice,
             ),
           ),
         );
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      print('Error navigating to chat: $e');
+      print('Stack trace: $stackTrace');
+      
       // Close loading dialog if still open
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
@@ -358,9 +419,13 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
           SnackBar(
             content: Text('Failed to open chat: ${e.toString()}'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
+      
+      // Log error to Crashlytics
+      await FirebaseService.recordError(e, stackTrace, reason: 'Failed to navigate to chat from shipper load details');
     }
   }
   
@@ -399,6 +464,11 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
               if (currentLoadId != null) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   _loadDeliveryConfirmationData(currentLoadId);
+                  // Only reload escrow data if load ID actually changed or we haven't loaded it yet
+                  final previousLoadId = widget.load['id']?.toString();
+                  if (currentLoadId != previousLoadId || _lastEscrowLoadId != currentLoadId) {
+                    _loadEscrowPaymentData(forceReload: currentLoadId != previousLoadId);
+                  }
                 });
               }
               
@@ -464,6 +534,10 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
                     ],
                   ),
                   const SizedBox(height: 25),
+                
+                // Escrow Payment Section (at top)
+                _buildEscrowPaymentSection(load),
+                const SizedBox(height: 20),
                 
                 // Load ID Header
                 Text(
@@ -541,7 +615,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
                           _buildDetailRow('Destination', load['destinationAddress'] ?? 'N/A'),
                           _buildDetailRow('Load Type', load['loadType'] ?? 'N/A'),
                           _buildDetailRow('Load Sensitivity', load['loadSensitivity'] ?? 'N/A'),
-                          _buildDetailRow('Description', load['loadDescription'] ?? 'N/A'),
+                          _buildDescriptionRow(load['loadDescription'] ?? 'N/A'),
                           _buildDetailRow('Weight', '${load['weight'] ?? 'N/A'} ${load['weightUnit'] ?? 'kg'}'),
                           _buildDetailRow('Dimensions', load['dimensions'] ?? 'N/A'),
                           _buildDetailRow('Equipment Needed', load['equipmentNeeded'] ?? 'N/A'),
@@ -790,11 +864,25 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  carrierName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black,
+                GestureDetector(
+                  onTap: _carrier != null ? _viewCarrierProfile : null,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        carrierName,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: _carrier != null ? green : Colors.black,
+                          decoration: _carrier != null ? TextDecoration.underline : null,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (_carrier != null) ...[
+                        const SizedBox(width: 4),
+                        Icon(Icons.person, size: 16, color: green),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -848,6 +936,213 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     );
   }
   
+  Widget _buildEscrowPaymentSection(Map<String, dynamic> load) {
+    final status = load['status']?.toString().toLowerCase() ?? '';
+    final isBooked = status == 'booked';
+    
+    // Check if escrow payment is needed
+    final escrowStatus = _escrowPaymentData?['status'] as String?;
+    final escrowAmountValue = _escrowPaymentData?['amountInDollars'];
+    final escrowAmount = escrowAmountValue is num 
+        ? escrowAmountValue.toDouble() 
+        : (escrowAmountValue is String 
+            ? double.tryParse(escrowAmountValue) 
+            : null);
+    final paymentIntentId = _escrowPaymentData?['paymentIntentId'] as String?;
+    
+    // Show deposit button if:
+    // - Load is booked
+    // - Escrow payment doesn't exist OR status is 'pending' OR status is not 'deposited'
+    final needsDeposit = isBooked && 
+        (escrowStatus == null || 
+         escrowStatus == 'pending' || 
+         escrowStatus != 'deposited');
+    
+    // Don't show section if load is not booked
+    if (!isBooked) {
+      return const SizedBox.shrink();
+    }
+    
+    // If payment is deposited, show status widget directly (it has its own container)
+    if (_escrowPaymentData != null && escrowStatus == 'deposited') {
+      // Parse dates from escrow payment data
+      DateTime? depositedAt;
+      DateTime? createdAt;
+      
+      final depositedAtTimestamp = _escrowPaymentData?['depositedAt'];
+      final createdAtTimestamp = _escrowPaymentData?['createdAt'];
+      
+      if (depositedAtTimestamp != null) {
+        if (depositedAtTimestamp is Timestamp) {
+          depositedAt = depositedAtTimestamp.toDate();
+        } else if (depositedAtTimestamp is DateTime) {
+          depositedAt = depositedAtTimestamp;
+        }
+      }
+      
+      if (createdAtTimestamp != null) {
+        if (createdAtTimestamp is Timestamp) {
+          createdAt = createdAtTimestamp.toDate();
+        } else if (createdAtTimestamp is DateTime) {
+          createdAt = createdAtTimestamp;
+        }
+      }
+      
+      return EscrowPaymentStatus(
+        status: escrowStatus!,
+        amount: escrowAmount,
+        paymentIntentId: paymentIntentId,
+        depositedAt: depositedAt,
+        createdAt: createdAt,
+      );
+    }
+    
+    // If loading, show loading indicator
+    if (_isLoadingEscrow) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
+    // If deposit is needed, show the deposit section with container
+    if (needsDeposit) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.orange,
+            width: 2,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.orange.shade700,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Escrow Payment Required',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange.shade900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Please deposit payment to escrow to allow the carrier to proceed with pickup. Your payment will be securely held until delivery is confirmed.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _showEscrowPaymentDialog(load),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 4,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.payment, size: 24),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Deposit Payment',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return const SizedBox.shrink();
+  }
+
+  Future<void> _showEscrowPaymentDialog(Map<String, dynamic> load) async {
+    final loadId = load['id']?.toString();
+    final carrierId = load['bookedByCarrierId']?.toString();
+    
+    if (loadId == null || carrierId == null || carrierId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Missing load or carrier information'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    // Try to get price from multiple possible fields
+    // Priority: price (set when offer accepted) > quoteBudget (original price) > 0
+    final priceValue = load['price'] ?? load['quoteBudget'];
+    final amount = priceValue is num ? priceValue.toDouble() : 
+                   (priceValue is String ? double.tryParse(priceValue) : null) ?? 0.0;
+    
+    if (amount <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid payment amount. Please ensure the load has a valid price.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+    
+    final paymentResult = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => EscrowPaymentDialog(
+        loadId: loadId,
+        carrierId: carrierId,
+        amount: amount,
+        loadNumber: loadId.length >= 8 ? loadId.substring(0, 8) : loadId,
+      ),
+    );
+    
+    if (paymentResult == true && mounted) {
+      // Reload escrow payment data after successful deposit
+      await _loadEscrowPaymentData(forceReload: true);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment deposited successfully! Carrier can now proceed with pickup.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
   Widget _buildPODSection(Map<String, dynamic> load) {
     // Check POD from both load document and delivery confirmation document
     final podUrlFromLoad = load['podUrl'] as String?;
@@ -1307,6 +1602,85 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     );
   }
 
+  Widget _buildDescriptionRow(String description) {
+    final descriptionText = description.isNotEmpty ? description : 'N/A';
+    final needsTruncation = descriptionText.length > 150 && descriptionText != 'N/A';
+    
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              'Description',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[700],
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Expanded(
+            child: needsTruncation
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        descriptionText,
+                        maxLines: _isDescriptionExpanded ? null : 3,
+                        overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isDescriptionExpanded = !_isDescriptionExpanded;
+                          });
+                        },
+                        child: Text(
+                          _isDescriptionExpanded ? 'Read less' : 'Read more',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: green,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(
+                    descriptionText,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _viewCarrierProfile() {
+    if (_carrier == null) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => UserProfileDialog(
+        userId: _carrier!.uid,
+        userName: _carrier!.displayName ?? _carrier!.companyName ?? 'Carrier',
+        userRole: UserRole.carrier,
+      ),
+    );
+  }
+
   Future<void> _releasePaymentToCarrier({
     required String carrierId,
     required String loadId,
@@ -1319,6 +1693,38 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
         throw Exception('User must be logged in');
       }
       
+      // Check if escrow payment exists for this load
+      final escrowPayment = await FirebaseService.getEscrowPayment(loadId);
+      if (escrowPayment != null && 
+          escrowPayment['status'] == 'deposited' &&
+          escrowPayment['paymentIntentId'] != null) {
+        // Use escrow payment - capture it instead of creating new charge
+        final paymentIntentId = escrowPayment['paymentIntentId'] as String;
+        final success = await StripeService.captureEscrowPayment(
+          paymentIntentId: paymentIntentId,
+          loadId: loadId,
+          carrierId: carrierId,
+          shipperId: currentUser.uid,
+          amountInCents: (amount * 100).toInt(),
+          completionStatus: completionStatus,
+        );
+        
+        if (success) {
+          // Update escrow payment status
+          await FirebaseService.updateEscrowPaymentStatus(
+            paymentIntentId: paymentIntentId,
+            status: 'released',
+            loadId: loadId,
+            releasedAt: DateTime.now(),
+          );
+          print('Escrow payment of \$${amount.toStringAsFixed(2)} captured and released to carrier');
+          return; // Success - exit early
+        } else {
+          throw Exception('Failed to capture escrow payment');
+        }
+      }
+      
+      // No escrow payment found - use original payment transfer method
       // Get carrier's Stripe account ID from Firebase
       final carrierDoc = await FirebaseFirestore.instance
           .collection('carriers')
@@ -1415,7 +1821,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
             'shipperPaymentMethodId': shipperPaymentMethodId,
             'loadId': loadId,
             'amount': (amount * 100).toInt(), // Convert to cents
-            'currency': 'usd',
+            'currency': 'cad',
             'completionStatus': completionStatus,
           },
         }),
@@ -1446,7 +1852,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
           'loadId': loadId,
           'amount': amount,
           'amountInCents': (amount * 100).toInt(),
-          'currency': 'usd',
+          'currency': 'cad',
           'completionStatus': completionStatus,
           'stripeTransferId': transferId,
           'status': 'completed',
@@ -1476,6 +1882,56 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     } catch (e) {
       print('Error in payment transfer: $e');
       rethrow;
+    }
+  }
+
+  Future<void> _loadEscrowPaymentData({bool forceReload = false}) async {
+    final loadId = widget.load['id']?.toString();
+    if (loadId == null) {
+      if (mounted) {
+        setState(() {
+          _escrowPaymentData = null;
+          _isLoadingEscrow = false;
+          _lastEscrowLoadId = null;
+        });
+      }
+      return;
+    }
+
+    // Don't reload if already loading (unless forced)
+    if (_isLoadingEscrow && !forceReload) {
+      return;
+    }
+
+    // Don't reload if we already loaded data for this exact load ID (unless forced)
+    if (_lastEscrowLoadId == loadId && !forceReload) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingEscrow = true;
+      });
+    }
+
+    try {
+      final escrowPayment = await FirebaseService.getEscrowPayment(loadId);
+      if (mounted) {
+        setState(() {
+          _escrowPaymentData = escrowPayment;
+          _isLoadingEscrow = false;
+          _lastEscrowLoadId = loadId; // Remember we loaded for this load ID
+        });
+      }
+    } catch (e) {
+      print('Error loading escrow payment: $e');
+      if (mounted) {
+        setState(() {
+          _escrowPaymentData = null;
+          _isLoadingEscrow = false;
+          _lastEscrowLoadId = loadId; // Still remember even on error to prevent retry loops
+        });
+      }
     }
   }
   

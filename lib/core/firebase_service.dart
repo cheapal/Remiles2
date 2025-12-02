@@ -2710,11 +2710,12 @@ class FirebaseService {
               userId: shipperId,
               type: NotificationType.orderStatus,
               title: "Order Booked",
-              body: "A carrier has accepted your order!",
+              body: "A carrier has accepted your order! Please deposit payment to escrow to proceed.",
               data: {
                 'loadId': loadId,
                 'oldStatus': 'available',
                 'newStatus': 'booked',
+                'requiresEscrowPayment': true,
               },
               relatedId: loadId,
             );
@@ -3794,11 +3795,12 @@ class FirebaseService {
               userId: shipperUid,
               type: NotificationType.orderStatus,
               title: "Order Booked",
-              body: "A carrier has accepted your order!",
+              body: "A carrier has accepted your order! Please deposit payment to escrow to proceed.",
               data: {
                 'loadId': loadId,
                 'oldStatus': 'available',
                 'newStatus': 'booked',
+                'requiresEscrowPayment': true,
               },
               relatedId: loadId,
             );
@@ -3996,5 +3998,166 @@ class FirebaseService {
       await recordError(e, StackTrace.current, reason: 'Failed to update carrier preferences');
       return false;
     }
+  }
+
+  /// Create escrow payment record in Firestore
+  static Future<bool> createEscrowPayment({
+    required String loadId,
+    required String carrierId,
+    required String shipperId,
+    required String paymentIntentId,
+    required int amountInCents,
+    String currency = 'usd',
+  }) async {
+    try {
+      await _firestore.collection('escrow_payments').add({
+        'loadId': loadId,
+        'carrierId': carrierId,
+        'shipperId': shipperId,
+        'paymentIntentId': paymentIntentId,
+        'amount': amountInCents,
+        'amountInDollars': amountInCents / 100,
+        'currency': currency,
+        'status': 'pending',
+        'createdAt': Timestamp.now(),
+      });
+
+      // Update load document with escrow payment info
+      final shippersSnapshot = await _firestore.collection('shippers').get();
+      for (final shipperDoc in shippersSnapshot.docs) {
+        final loadDoc = await _firestore
+            .collection('shippers')
+            .doc(shipperDoc.id)
+            .collection('loads')
+            .doc(loadId)
+            .get();
+        
+        if (loadDoc.exists) {
+          await _firestore
+              .collection('shippers')
+              .doc(shipperDoc.id)
+              .collection('loads')
+              .doc(loadId)
+              .update({
+            'escrowPaymentIntentId': paymentIntentId,
+            'escrowPaymentStatus': 'pending',
+            'escrowAmount': amountInCents / 100,
+            'updatedAt': Timestamp.now(),
+          });
+          break;
+        }
+      }
+
+      return true;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to create escrow payment');
+      return false;
+    }
+  }
+
+  /// Get escrow payment for a load
+  static Future<Map<String, dynamic>?> getEscrowPayment(String loadId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('escrow_payments')
+          .where('loadId', isEqualTo: loadId)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        return null;
+      }
+
+      final doc = querySnapshot.docs.first;
+      final data = doc.data();
+      return {
+        ...data,
+        'id': doc.id,
+      };
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get escrow payment');
+      return null;
+    }
+  }
+
+  /// Update escrow payment status
+  static Future<bool> updateEscrowPaymentStatus({
+    required String paymentIntentId,
+    required String status,
+    String? loadId,
+    String? transferId,
+    DateTime? releasedAt,
+  }) async {
+    try {
+      // Find escrow payment by paymentIntentId
+      final querySnapshot = await _firestore
+          .collection('escrow_payments')
+          .where('paymentIntentId', isEqualTo: paymentIntentId)
+          .limit(1)
+          .get();
+
+      if (querySnapshot.docs.isEmpty) {
+        throw Exception('Escrow payment not found');
+      }
+
+      final updateData = <String, dynamic>{
+        'status': status,
+        'updatedAt': Timestamp.now(),
+      };
+
+      if (transferId != null) {
+        updateData['transferId'] = transferId;
+      }
+
+      if (releasedAt != null) {
+        updateData['releasedAt'] = Timestamp.fromDate(releasedAt);
+      }
+
+      await querySnapshot.docs.first.reference.update(updateData);
+
+      // Update load document if loadId provided
+      if (loadId != null) {
+        final shippersSnapshot = await _firestore.collection('shippers').get();
+        for (final shipperDoc in shippersSnapshot.docs) {
+          final loadDoc = await _firestore
+              .collection('shippers')
+              .doc(shipperDoc.id)
+              .collection('loads')
+              .doc(loadId)
+              .get();
+          
+          if (loadDoc.exists) {
+            await _firestore
+                .collection('shippers')
+                .doc(shipperDoc.id)
+                .collection('loads')
+                .doc(loadId)
+                .update({
+              'escrowPaymentStatus': status,
+              'updatedAt': Timestamp.now(),
+              if (releasedAt != null) 'escrowReleasedAt': Timestamp.fromDate(releasedAt),
+            });
+            break;
+          }
+        }
+      }
+
+      return true;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to update escrow payment status');
+      return false;
+    }
+  }
+
+  /// Mark escrow payment as deposited (after successful payment)
+  static Future<bool> markEscrowPaymentDeposited({
+    required String paymentIntentId,
+    required String loadId,
+  }) async {
+    return await updateEscrowPaymentStatus(
+      paymentIntentId: paymentIntentId,
+      status: 'deposited',
+      loadId: loadId,
+    );
   }
 }

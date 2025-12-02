@@ -16,6 +16,8 @@ import 'package:Remiles/models/load_model.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/support.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
+import 'package:Remiles/models/user_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -79,6 +81,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   
   // Delivery confirmation data
   Map<String, dynamic>? _deliveryConfirmationData;
+
+  // Escrow payment data
+  Map<String, dynamic>? _escrowPaymentData;
+  
+  // Description read more state
+  bool _isDescriptionExpanded = false;
 
   @override
   void initState() {
@@ -200,6 +208,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       _shipperPhone = ""; // Reset phone while fetching
       _pickupConfirmationData = null; // Reset pickup confirmation
       _deliveryConfirmationData = null; // Reset delivery confirmation
+      _escrowPaymentData = null; // Reset escrow payment
       
       // Set loading states
       _isLoadingShipperInfo = true;
@@ -211,6 +220,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     // Load pickup and delivery confirmation data
     _loadPickupConfirmationData();
     _loadDeliveryConfirmationData();
+    // Load escrow payment data
+    _loadEscrowPaymentData(load.id);
     
     // Fetch shipper phone number
     try {
@@ -292,6 +303,24 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       if (mounted) {
         setState(() {
           _deliveryConfirmationData = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadEscrowPaymentData(String loadId) async {
+    try {
+      final escrowPayment = await FirebaseService.getEscrowPayment(loadId);
+      if (mounted) {
+        setState(() {
+          _escrowPaymentData = escrowPayment;
+        });
+      }
+    } catch (e) {
+      print('Error loading escrow payment: $e');
+      if (mounted) {
+        setState(() {
+          _escrowPaymentData = null;
         });
       }
     }
@@ -665,10 +694,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     
     final status = _selectedLoad!.status.toLowerCase();
     
-    // Map status to progress percentage
+    // Map status to progress percentage (aligned with shipper view)
     switch (status) {
       case 'booked':
-        _progress = 0.1; // Just booked, 10% complete
+        _progress = 0.5; // Booked, 50% complete (aligned with shipper view)
         break;
       case 'in-transit':
         // If we have route points, calculate based on current location
@@ -1070,6 +1099,301 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     );
   }
 
+  Widget _buildEscrowWaitingMessage() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.amber.shade50,
+            Colors.orange.shade50,
+            Colors.deepOrange.shade50,
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.orange.shade200,
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.shade200.withOpacity(0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+            spreadRadius: 0,
+          ),
+          BoxShadow(
+            color: Colors.orange.shade100.withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 2),
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          // Animated background shimmer effect
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(20),
+                gradient: LinearGradient(
+                  begin: Alignment(-1.0, -1.0),
+                  end: Alignment(1.0, 1.0),
+                  colors: [
+                    Colors.white.withOpacity(0.1),
+                    Colors.transparent,
+                    Colors.white.withOpacity(0.1),
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
+              ),
+            ),
+          ),
+          // Main content
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Icon container with gradient and glow
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.orange.shade400,
+                        Colors.deepOrange.shade500,
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.shade400.withOpacity(0.5),
+                        blurRadius: 12,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.account_balance_wallet_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Waiting for Escrow Payment',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.deepOrange.shade900,
+                                letterSpacing: 0.2,
+                                height: 1.2,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.orange.shade300,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 8,
+                                  height: 8,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade600,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  'Pending',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.deepOrange.shade800,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'The shipper needs to deposit the payment into escrow before you can proceed to the pickup location. You will be notified once the payment is deposited.',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: Colors.deepOrange.shade700,
+                          height: 1.5,
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Progress indicator bar
+                      Container(
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade100,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              decoration: BoxDecoration(
+                                color: Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            FractionallySizedBox(
+                              widthFactor: 0.35,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.orange.shade400,
+                                      Colors.deepOrange.shade400,
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(2),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.orange.shade400.withOpacity(0.6),
+                                      blurRadius: 4,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDescriptionRow() {
+    if (_selectedLoad == null) return const SizedBox.shrink();
+    
+    final description = _selectedLoad!.description.isNotEmpty 
+        ? _selectedLoad!.description 
+        : 'No description provided';
+    final needsTruncation = description.length > 150 && description != 'No description provided';
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 80,
+              child: Text(
+                'Description',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+            ),
+            Expanded(
+              child: needsTruncation
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          description,
+                          maxLines: _isDescriptionExpanded ? null : 3,
+                          overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _isDescriptionExpanded = !_isDescriptionExpanded;
+                            });
+                          },
+                          child: Text(
+                            _isDescriptionExpanded ? 'Read less' : 'Read more',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: green,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    )
+                  : Text(
+                      description,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  void _viewShipperProfile() {
+    if (_selectedLoad == null) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => UserProfileDialog(
+        userId: _selectedLoad!.shipperUid,
+        userName: _selectedLoad!.shipperName.isNotEmpty ? _selectedLoad!.shipperName : 'Shipper',
+        userRole: UserRole.shipper,
+      ),
+    );
+  }
+
   String _getConfirmationTimeText() {
     if (_pickupConfirmationData == null) return '';
     
@@ -1244,8 +1568,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     
     final locationType = _activeLocation ?? 'delivery';
     
-    // Pickup confirmation is always allowed
+    // Pickup confirmation requires escrow payment to be deposited
     if (locationType == 'pickup') {
+      // Check if escrow payment is deposited
+      final escrowStatus = _escrowPaymentData?['status'] as String?;
+      if (escrowStatus != 'deposited') {
+        return false; // Disable pickup if escrow is not deposited
+      }
       return true;
     }
     
@@ -1267,6 +1596,23 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     
     final locationType = _activeLocation ?? 'delivery';
     final isPickup = locationType == 'pickup';
+    
+    // Prevent pickup if escrow payment is not deposited
+    if (isPickup) {
+      final escrowStatus = _escrowPaymentData?['status'] as String?;
+      if (escrowStatus != 'deposited') {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot proceed with pickup. Shipper must deposit escrow payment first.'),
+              duration: Duration(seconds: 4),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+    }
     
     // Prevent confirming delivery if pickup is not confirmed
     // Allow viewing already confirmed delivery even if pickup data is missing
@@ -1678,6 +2024,15 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                               const SizedBox(height: 12),
                               _buildDetailRow('Load ID', '#${_selectedLoad!.id}'),
                               const SizedBox(height: 8),
+                              // Price
+                              _buildDetailRow(
+                                'Price',
+                                '\$${_selectedLoad!.price.toStringAsFixed(2)} CAD',
+                              ),
+                              const SizedBox(height: 8),
+                              // Description with read more
+                              _buildDescriptionRow(),
+                              const SizedBox(height: 8),
                               _buildDetailRow(
                                 'Pickup',
                                 '${_selectedLoad!.originAddress}, ${_selectedLoad!.originCity}, ${_selectedLoad!.originState}',
@@ -1739,6 +2094,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       _buildStatusPills(),
 
                       const SizedBox(height: 20),
+
+                      // Escrow payment waiting message (only show if booked/in-transit and escrow not deposited)
+                      if (_selectedLoad != null && 
+                          (_selectedLoad!.status == 'booked' || _selectedLoad!.status == 'in-transit') &&
+                          _escrowPaymentData?['status'] != 'deposited') ...[
+                        _buildEscrowWaitingMessage(),
+                        const SizedBox(height: 20),
+                      ],
 
                       // --- Google Map with route ---
                       Container(
@@ -1912,11 +2275,38 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                               ],
                                             )
                                           : _shipperName.isNotEmpty 
-                                              ? Text(
-                                                  _shipperPhone.isNotEmpty
-                                                      ? "$_shipperName\n$_shipperPhone"
-                                                      : _shipperName,
-                                                  style: const TextStyle(fontSize: 16),
+                                              ? Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                  children: [
+                                                    GestureDetector(
+                                                      onTap: _selectedLoad != null ? _viewShipperProfile : null,
+                                                      child: Row(
+                                                        mainAxisSize: MainAxisSize.min,
+                                                        children: [
+                                                          Text(
+                                                            _shipperName,
+                                                            style: TextStyle(
+                                                              fontSize: 16,
+                                                              fontWeight: FontWeight.w600,
+                                                              color: _selectedLoad != null ? green : Colors.black,
+                                                              decoration: _selectedLoad != null ? TextDecoration.underline : null,
+                                                            ),
+                                                          ),
+                                                          if (_selectedLoad != null) ...[
+                                                            const SizedBox(width: 4),
+                                                            Icon(Icons.person, size: 16, color: green),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    if (_shipperPhone.isNotEmpty) ...[
+                                                      const SizedBox(height: 4),
+                                                      Text(
+                                                        _shipperPhone,
+                                                        style: const TextStyle(fontSize: 16),
+                                                      ),
+                                                    ],
+                                                  ],
                                                 )
                                               : Text(
                                                   'No shipper info available',

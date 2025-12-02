@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:Remiles/providers/auth_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:Remiles/services/conversation_tracker.dart';
 
 class SupportChatScreen extends StatefulWidget {
   final String conversationId;
@@ -32,6 +33,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
   @override
   void initState() {
     super.initState();
+    // Register this conversation as currently open
+    ConversationTracker.setCurrentConversation(widget.conversationId);
+    
     if (widget.initialMessage != null && widget.initialMessage!.isNotEmpty) {
       _messageController.text = widget.initialMessage!;
       // Auto-send initial message after a short delay
@@ -49,6 +53,9 @@ class _SupportChatScreenState extends State<SupportChatScreen> {
 
   @override
   void dispose() {
+    // Unregister this conversation when chat screen is closed
+    ConversationTracker.clearCurrentConversation();
+    
     _messageController.dispose();
     _scrollController.dispose();
     _messagesSubscription?.cancel();

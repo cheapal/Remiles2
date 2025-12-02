@@ -3,6 +3,8 @@ import 'package:Remiles/core/firebase_service.dart';
 import 'package:Remiles/models/load_model.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/marketplace_screen.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
+import 'package:Remiles/models/user_model.dart';
 import 'package:flutter/material.dart';
 
 class BookedNow extends StatefulWidget {
@@ -20,6 +22,9 @@ class _BookedNowState extends State<BookedNow> {
   String _currentStatus = '';
   String? _bookedByCarrierId; // Store bookedByCarrierId in state
   bool _isDescriptionExpanded = false;
+  String? _bookedByCarrierName; // Store carrier name who booked the load (for shipper view)
+  Map<String, dynamic>? _escrowPaymentData; // Store escrow payment status
+  bool _isLoadingEscrow = false;
 
   @override
   void initState() {
@@ -27,6 +32,13 @@ class _BookedNowState extends State<BookedNow> {
     _currentStatus = widget.load.status;
     _bookedByCarrierId = widget.load.bookedByCarrierId;
     _refreshLoadStatus();
+    if (_bookedByCarrierId != null) {
+      _loadCarrierName(_bookedByCarrierId!);
+    }
+    // Load escrow payment data if load is booked
+    if (_currentStatus == 'booked' || _currentStatus == 'in-transit') {
+      _loadEscrowPaymentData();
+    }
   }
 
   @override
@@ -71,6 +83,14 @@ class _BookedNowState extends State<BookedNow> {
               }
               _bookedByCarrierId = bookedByCarrierId;
             });
+            // Load carrier name if bookedByCarrierId changed
+            if (bookedByCarrierId != null && bookedByCarrierId != _bookedByCarrierId) {
+              _loadCarrierName(bookedByCarrierId);
+            }
+            // Load escrow payment data if status changed to booked/in-transit
+            if (status == 'booked' || status == 'in-transit') {
+              _loadEscrowPaymentData();
+            }
           }
           break;
         }
@@ -79,6 +99,80 @@ class _BookedNowState extends State<BookedNow> {
       print('Error refreshing load status: $e');
     }
   }
+
+  Future<void> _loadCarrierName(String carrierId) async {
+    try {
+      final carrier = await FirebaseService.getCarrier(carrierId);
+      if (carrier != null && mounted) {
+        setState(() {
+          _bookedByCarrierName = (carrier.companyName?.isNotEmpty ?? false)
+              ? carrier.companyName!
+              : (carrier.displayName ?? 'Carrier');
+        });
+      }
+    } catch (e) {
+      print('Error loading carrier name: $e');
+      if (mounted) {
+        setState(() {
+          _bookedByCarrierName = 'Unknown Carrier';
+        });
+      }
+    }
+  }
+
+  void _viewCarrierProfile() {
+    if (_bookedByCarrierId == null) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => UserProfileDialog(
+        userId: _bookedByCarrierId!,
+        userName: _bookedByCarrierName ?? 'Carrier',
+        userRole: UserRole.carrier,
+      ),
+    );
+  }
+
+  void _viewShipperProfile() {
+    showDialog(
+      context: context,
+      builder: (context) => UserProfileDialog(
+        userId: widget.load.shipperUid,
+        userName: widget.load.shipperName.isNotEmpty ? widget.load.shipperName : 'Shipper',
+        userRole: UserRole.shipper,
+      ),
+    );
+  }
+
+  Future<void> _loadEscrowPaymentData() async {
+    final loadId = widget.load.id;
+    if (loadId.isEmpty) return;
+
+    if (mounted) {
+      setState(() {
+        _isLoadingEscrow = true;
+      });
+    }
+
+    try {
+      final escrowPayment = await FirebaseService.getEscrowPayment(loadId);
+      if (mounted) {
+        setState(() {
+          _escrowPaymentData = escrowPayment;
+          _isLoadingEscrow = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading escrow payment: $e');
+      if (mounted) {
+        setState(() {
+          _escrowPaymentData = null;
+          _isLoadingEscrow = false;
+        });
+      }
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -192,12 +286,25 @@ class _BookedNowState extends State<BookedNow> {
                     color: primaryColor,
                   ),
                 ),
-                Text(
-                  widget.load.shipperName.isNotEmpty ? widget.load.shipperName : "No shipper name provided",
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.black,
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _viewShipperProfile,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.load.shipperName.isNotEmpty ? widget.load.shipperName : "No shipper name provided",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: primaryColor,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(Icons.person, size: 16, color: primaryColor),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -283,6 +390,14 @@ class _BookedNowState extends State<BookedNow> {
                 ),
               ],
             ),
+            
+            // Escrow payment message (only show if booked and escrow not deposited)
+            if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && 
+                _escrowPaymentData?['status'] != 'deposited') ...[
+              const SizedBox(height: 20),
+              _buildEscrowWaitingMessage(),
+            ],
+            
             const SizedBox(height: 20),
 
             /// Accept Button
@@ -630,6 +745,37 @@ class _BookedNowState extends State<BookedNow> {
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
+  }
+
+  Widget _buildEscrowWaitingMessage() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade300, width: 1.5),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.info_outline,
+            color: Colors.orange.shade700,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Waiting for escrow payment deposit. You will be able to proceed with pickup once the shipper deposits the payment.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.orange.shade800,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   bool _isBookedByCurrentUser() {

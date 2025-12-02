@@ -659,35 +659,43 @@ class _ConversationTile extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          if (conversation.lastMessage != null)
-            Text(
-              _formatTime(conversation.lastMessage!.timestamp),
-              style: const TextStyle(
-                color: hintColor,
-                fontSize: 12,
-              ),
-            ),
-          const SizedBox(height: 4),
-          if (conversation.unreadCount[currentUserId] == true)
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: iconColor,
-                shape: BoxShape.circle,
-              ),
-              child: const Text(
-                '!',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
+      trailing: SizedBox(
+        width: 60,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            if (conversation.lastMessage != null)
+              Text(
+                _formatTime(conversation.lastMessage!.timestamp),
+                style: const TextStyle(
+                  color: hintColor,
+                  fontSize: 12,
                 ),
               ),
-            ),
-        ],
+            if (conversation.unreadCount[currentUserId] == true) ...[
+              const SizedBox(height: 4),
+              Container(
+                width: 18,
+                height: 18,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: iconColor,
+                  shape: BoxShape.circle,
+                ),
+                child: const Text(
+                  '!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

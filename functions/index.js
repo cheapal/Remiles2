@@ -838,6 +838,60 @@ exports.onMessageCreated = functions
     });
 
 /**
+ * Firestore trigger: Send notification when escrow payment
+ * status changes to deposited
+ */
+exports.onEscrowPaymentStatusChange = functions
+    .region("northamerica-northeast1")
+    .firestore.document("escrow_payments/{escrowPaymentId}")
+    .onUpdate(async (change, context) => {
+      const before = change.before.data();
+      const after = change.after.data();
+
+      try {
+        // Check if payment status changed from pending to deposited
+        if (before.status === "pending" && after.status === "deposited") {
+          const carrierId = after.carrierId;
+          const loadId = after.loadId;
+          // Calculate amount - amountInDollars preferred,
+          // otherwise convert from cents
+          const amount = after.amountInDollars != null ?
+              after.amountInDollars :
+              (after.amount != null ? after.amount / 100 : 0);
+
+          if (carrierId && loadId) {
+            // Send notification to carrier
+            const bodyMessage = `Payment of $${amount.toFixed(2)} ` +
+                "has been deposited to escrow. " +
+                "You can now proceed to the pickup location.";
+            await sendNotification({
+              userId: carrierId,
+              type: "paymentReceived",
+              title: "Payment Deposited - Ready for Pickup!",
+              body: bodyMessage,
+              data: {
+                loadId: loadId,
+                amount: amount,
+                escrowPaymentId: context.params.escrowPaymentId,
+                paymentIntentId: after.paymentIntentId,
+              },
+              relatedId: loadId,
+            });
+
+            console.log(
+                `Escrow payment notification sent to carrier ` +
+                `${carrierId} for load ${loadId}`,
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error sending escrow payment notification:", error);
+      }
+
+      return null;
+    });
+
+/**
  * Create a Setup Intent for saving payment methods
  * This allows users to save payment methods without making a payment
  */

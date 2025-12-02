@@ -7,6 +7,8 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_post_l
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_payment_page.dart';
+import 'package:Remiles/providers/payment_methods_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
@@ -1329,7 +1331,7 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                       context,
                       MaterialPageRoute(
                           builder: (context) =>
-                          const ShipperAddPaymentMethod()),
+                           const PaymentMethodsPage()),
                     );
                   },
                   child: Container(

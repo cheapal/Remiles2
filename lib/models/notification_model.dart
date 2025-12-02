@@ -6,6 +6,8 @@ enum NotificationType {
   paymentFailed,
   offerAccepted,
   offerRejected,
+  offerReceived,
+  counterOfferReceived,
   message,
   system,
 }
@@ -97,6 +99,10 @@ class NotificationModel {
         return NotificationType.offerAccepted;
       case 'offerRejected':
         return NotificationType.offerRejected;
+      case 'offerReceived':
+        return NotificationType.offerReceived;
+      case 'counterOfferReceived':
+        return NotificationType.counterOfferReceived;
       case 'message':
         return NotificationType.message;
       default:

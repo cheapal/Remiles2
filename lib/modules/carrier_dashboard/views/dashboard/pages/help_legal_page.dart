@@ -1,5 +1,10 @@
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../../providers/auth_provider.dart';
+import '../../../../../core/firebase_service.dart';
+import 'chat_screen.dart';
 
 class CarrierHelpLegalPage extends StatelessWidget {
   const CarrierHelpLegalPage({super.key});
@@ -541,7 +546,9 @@ class CarrierContactSupportPage extends StatelessWidget {
                 'Email Support',
                 'support@remiles.com',
                 'Send us an email and we\'ll get back to you within 24 hours',
-                () {},
+                () {
+                  _openEmailSupport(context);
+                },
               ),
               const SizedBox(height: 16),
               _buildContactCard(
@@ -549,7 +556,9 @@ class CarrierContactSupportPage extends StatelessWidget {
                 'Phone Support',
                 '+1 (555) 123-4567',
                 'Call us Monday-Friday, 9 AM - 5 PM EST',
-                () {},
+                () {
+                  _openPhoneSupport(context);
+                },
               ),
               const SizedBox(height: 16),
               _buildContactCard(
@@ -557,7 +566,9 @@ class CarrierContactSupportPage extends StatelessWidget {
                 'Live Chat',
                 'Available in-app',
                 'Chat with our support team in real-time',
-                () {},
+                () {
+                  _openSupportChat(context);
+                },
               ),
             ],
           ),
@@ -633,6 +644,124 @@ class CarrierContactSupportPage extends StatelessWidget {
         ),
       ),
     );
+  }
+  
+  static void _openSupportChat(BuildContext context) async {
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final user = authProvider.currentUser;
+      
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please log in to chat with support'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+      
+      // Create or get support conversation
+      final conversationId = await FirebaseService.createOrGetSupportConversation(user.uid);
+      
+      if (context.mounted) {
+        // Navigate to support chat screen
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversationId,
+              isSupportChat: true,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open support chat: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  static Future<void> _openEmailSupport(BuildContext context) async {
+    const email = 'support@remiles.com';
+    try {
+      final Uri emailUri = Uri(
+        scheme: 'mailto',
+        path: email,
+      );
+      
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot open email. Please check if you have an email app installed.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to open email: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  static Future<void> _openPhoneSupport(BuildContext context) async {
+    const phoneNumber = '+1 (555) 123-4567';
+    try {
+      // Remove any non-digit characters except + for international numbers
+      final cleanedPhone = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+      
+      if (cleanedPhone.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Invalid phone number'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+      
+      final Uri phoneUri = Uri(scheme: 'tel', path: cleanedPhone);
+      
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cannot make phone call. Please check if your device supports phone calls.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to make call: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
 

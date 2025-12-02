@@ -13,6 +13,8 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/app_state_provider.dart';
+import '../../../providers/payment_methods_provider.dart';
+import '../../../providers/carrier_payments_provider.dart';
 import '../../../core/auth_wrapper.dart';
 import '../../../core/firebase_service.dart';
 
@@ -852,9 +854,15 @@ class _ShipperProfileState extends State<ShipperProfile>
   void _handleLogout(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
     final appStateProvider = context.read<AppStateProvider>();
+    final paymentMethodsProvider = context.read<PaymentMethodsProvider>();
+    final carrierPaymentsProvider = context.read<CarrierPaymentsProvider>();
 
     try {
       appStateProvider.showLoadingWithMessage('Logging out...');
+      
+      // Clear payment-related providers before logout
+      paymentMethodsProvider.clear();
+      carrierPaymentsProvider.clear();
       
       await authProvider.signOut();
       

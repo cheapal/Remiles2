@@ -1,18 +1,30 @@
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/notification_model.dart';
 import '../models/user_model.dart';
 import '../core/firebase_service.dart';
+import '../firebase_options.dart';
 
 /// Top-level function for handling background messages
 /// Must be a top-level function, not a class method
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Ensure Firebase is initialized in background isolate
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   debugPrint('Handling background message: ${message.messageId}');
+  debugPrint('Message title: ${message.notification?.title}');
+  debugPrint('Message body: ${message.notification?.body}');
+  debugPrint('Message data: ${message.data}');
+  
   // Background messages are handled here
-  // You can perform tasks like updating local database, etc.
+  // The notification is already sent by Cloud Functions
+  // Here we can perform additional tasks like updating local database, etc.
 }
 
 class NotificationService {

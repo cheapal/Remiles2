@@ -17,7 +17,7 @@ import 'firebase_service.dart';
 class StripeService {
   // TODO: Replace with your Stripe publishable key
   // Get it from: https://dashboard.stripe.com/apikeys
-  static const String _publishableKey = 'pk_test_51RkhVRR1kSahGVhD3aSTz1c8p8TOJRKNYkITYLD7zmsTfY4TYX823mwMxfmaRjU1aGjEYLYG2u3lrMZOYKgHFNaC00RpxM6fkF';
+  static const String _publishableKey = 'pk_test_51RqCWCCEmM4LMAn7QdeqDoEmBstjnp01McbGYajDk9EWU5F7m0Izvm84F9DpxaecQFFo81dD5DZrtiThSMiP9QdI004pe9wGBG';
   
   // TODO: Replace with your backend endpoint for creating payment intents
   // This should be a secure endpoint that uses your Stripe secret key
@@ -25,7 +25,7 @@ class StripeService {
   
   /// Initialize Stripe with publishable key
   static Future<void> initialize() async {
-    Stripe.publishableKey = 'pk_test_51RkhVRR1kSahGVhD3aSTz1c8p8TOJRKNYkITYLD7zmsTfY4TYX823mwMxfmaRjU1aGjEYLYG2u3lrMZOYKgHFNaC00RpxM6fkF';
+    Stripe.publishableKey = 'pk_test_51RqCWCCEmM4LMAn7QdeqDoEmBstjnp01McbGYajDk9EWU5F7m0Izvm84F9DpxaecQFFo81dD5DZrtiThSMiP9QdI004pe9wGBG';
     await Stripe.instance.applySettings();
   }
   
@@ -738,6 +738,207 @@ class StripeService {
         e,
         stackTrace,
         reason: 'Error in deletePaymentMethod',
+      );
+      rethrow;
+    }
+  }
+
+  /// Create a Stripe Connect account for carrier
+  /// Returns the account ID and status
+  ///
+  /// NOTE: Only carriers need Connect accounts to receive money.
+  /// Shippers only need Stripe Customer accounts (for payment methods).
+  static Future<Map<String, dynamic>> createConnectAccount() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl =
+          'https://$region-$projectId.cloudfunctions.net/createConnectAccount';
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken',
+        },
+        body: jsonEncode({'data': {}}),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Create Connect account timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = jsonDecode(response.body);
+        throw Exception(
+            errorBody['error']?['message'] ?? 'Failed to create Connect account');
+      }
+
+      final responseData = jsonDecode(response.body);
+      final result = responseData['result'] as Map<String, dynamic>?;
+
+      if (result == null) {
+        throw Exception('Invalid response from createConnectAccount');
+      }
+
+      await FirebaseService.log('Stripe Connect account created successfully');
+      await FirebaseService.logEvent(
+        'connect_account_created',
+        parameters: FirebaseService.convertParameters({
+          'account_id': result['accountId'] as String? ?? '',
+          'already_exists': result['alreadyExists'] == true ? 1 : 0,
+        }),
+      );
+
+      return result;
+    } catch (e, stackTrace) {
+      debugPrint('Error creating Connect account: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in createConnectAccount',
+      );
+      rethrow;
+    }
+  }
+
+  /// Create Account Link for Stripe Connect onboarding
+  /// Returns the onboarding URL
+  ///
+  /// NOTE: Only carriers need this. Shippers don't need Connect accounts.
+  static Future<String> createAccountLink({String? returnUrl}) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl =
+          'https://$region-$projectId.cloudfunctions.net/createAccountLink';
+
+      final response = await http.post(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken',
+        },
+        body: jsonEncode({
+          'data': {
+            if (returnUrl != null) 'returnUrl': returnUrl,
+          },
+        }),
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Create Account Link timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = jsonDecode(response.body);
+        throw Exception(
+            errorBody['error']?['message'] ?? 'Failed to create Account Link');
+      }
+
+      final responseData = jsonDecode(response.body);
+      final result = responseData['result'] as Map<String, dynamic>?;
+      final url = result?['url'] as String?;
+
+      if (url == null || url.isEmpty) {
+        throw Exception('Invalid response: missing onboarding URL');
+      }
+
+      await FirebaseService.log('Account Link created successfully');
+      await FirebaseService.logEvent(
+        'account_link_created',
+        parameters: FirebaseService.convertParameters({}),
+      );
+
+      return url;
+    } catch (e, stackTrace) {
+      debugPrint('Error creating Account Link: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in createAccountLink',
+      );
+      rethrow;
+    }
+  }
+
+  /// Get Stripe Connect account status
+  /// Returns account activation status and onboarding requirements
+  ///
+  /// NOTE: Only carriers need Connect accounts to receive money.
+  static Future<Map<String, dynamic>> getConnectAccountStatus() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User must be logged in');
+      }
+
+      final freshToken = await currentUser.getIdToken(true);
+      if (freshToken == null) {
+        throw Exception('Failed to obtain authentication token');
+      }
+
+      const projectId = 're-miles-dfm';
+      const region = 'northamerica-northeast1';
+      final functionUrl =
+          'https://$region-$projectId.cloudfunctions.net/getConnectAccountStatus';
+
+      final response = await http.get(
+        Uri.parse(functionUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $freshToken',
+        },
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Get Connect account status timed out');
+        },
+      );
+
+      if (response.statusCode != 200) {
+        final errorBody = jsonDecode(response.body);
+        throw Exception(
+            errorBody['error']?['message'] ??
+                'Failed to get Connect account status');
+      }
+
+      final responseData = jsonDecode(response.body);
+      final result = responseData['result'] as Map<String, dynamic>?;
+
+      if (result == null) {
+        throw Exception('Invalid response from getConnectAccountStatus');
+      }
+
+      return result;
+    } catch (e, stackTrace) {
+      debugPrint('Error getting Connect account status: $e');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Error in getConnectAccountStatus',
       );
       rethrow;
     }

@@ -357,13 +357,13 @@ class _SupportScreenState extends State<SupportScreen> {
       }
       
       // Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+      // showDialog(
+      //   context: context,
+      //   barrierDismissible: false,
+      //   builder: (context) => const Center(
+      //     child: CircularProgressIndicator(),
+      //   ),
+      // );
       
       // Create or get support conversation
       final conversationId = await FirebaseService.createOrGetSupportConversation(user.uid);

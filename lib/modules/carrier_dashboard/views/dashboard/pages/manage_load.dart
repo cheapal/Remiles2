@@ -17,7 +17,7 @@ class ManageLoadScreen extends StatefulWidget {
   State<ManageLoadScreen> createState() => _ManageLoadScreenState();
 }
 
-class _ManageLoadScreenState extends State<ManageLoadScreen> {
+class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerProviderStateMixin {
   String _searchQuery = '';
   String _selectedFilter = 'All';
   final TextEditingController _searchController = TextEditingController();
@@ -29,15 +29,42 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
   DocumentSnapshot? _lastDocument;
   String? _error;
   Timer? _searchDebounce;
+  late final AnimationController _sortController;
+  late final Animation<double> _sortAnimation;
+  late final Animation<double> _sortRotation;
+
+  static const double _searchBarHeight = 50;
+  static const double _sortHeaderHeight = 48;
+  static const double _searchAndSortSpacing = 12;
+  static const double _sortExpandedExtraHeight = 116; // 12 spacing + two 40px rows + 8 gap + 16 bottom padding
+  static const double _stickyHeaderTopPadding = 8;
+
+  double get _collapsedHeaderHeight =>
+      _stickyHeaderTopPadding + _searchBarHeight + _searchAndSortSpacing + _sortHeaderHeight;
 
   @override
   void initState() {
     super.initState();
+    _sortController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _sortAnimation = CurvedAnimation(
+      parent: _sortController,
+      curve: Curves.easeInOut,
+    );
+    _sortRotation = Tween<double>(begin: 0.0, end: 0.5).animate(_sortAnimation);
+    _sortController.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     _loadLoads();
   }
 
   @override
   void dispose() {
+    _sortController.dispose();
     _searchController.dispose();
     _searchDebounce?.cancel();
     super.dispose();
@@ -227,69 +254,92 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final headerHeight = _collapsedHeaderHeight + (_sortExpandedExtraHeight * _sortAnimation.value);
+
     return Scaffold(
       backgroundColor: Colors.white,
-      body: RefreshIndicator(
-        onRefresh: _refreshLoads,
-        child: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            /// Top Navigation Bar
-            TopNavigationBar(context),
-
-                  /// Top Card without Shadow
-                  Container(
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
+      body: Column(
+        children: [
+          /// Top Navigation Bar - Fixed at top
+          TopNavigationBar(context),
+          
+          /// RefreshIndicator starts from here (above Manage Loads text)
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _refreshLoads,
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Manage Loads",
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                    height: 1.2,
-                  ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Track and manage your loads efficiently",
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: Colors.grey.shade600,
+                        /// Top Card without Shadow
+                        Container(
+                          margin: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Manage Loads",
+                                style: TextStyle(
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Track and manage your loads efficiently",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
 
-                  /// Search and Filter Section
-                  _buildSearchAndFilterSection(),
+                  /// Sticky Search and Filter Section
+                  SliverPersistentHeader(
+                    pinned: true,
+                    floating: false,
+                    delegate: _StickySearchBarDelegate(
+                      child: _buildSearchAndFilterSection(),
+                      minHeight: headerHeight,
+                      maxHeight: headerHeight,
+                      topPadding: _stickyHeaderTopPadding,
+                    ),
+                  ),
 
-            const SizedBox(height: 16),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        /// Recommended Load (only show matched loads with matchPercentage for Available Loads and All)
+                        if ((_selectedFilter == 'Available Loads' || _selectedFilter == 'All')) ...[
+                          ..._buildRecommendedLoads(),
+                          const SizedBox(height: 20),
+                        ],
+                      ],
+                    ),
+                  ),
 
-                  /// Recommended Load (only show matched loads with matchPercentage for Available Loads and All)
-                  if ((_selectedFilter == 'Available Loads' || _selectedFilter == 'All')) ...[
-                    ..._buildRecommendedLoads(),
-            const SizedBox(height: 20),
-                  ],
+                  /// Load Cards
+                  _buildLoadCardsSliver(),
                 ],
               ),
             ),
-
-            /// Load Cards
-            _buildLoadCardsSliver(),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -298,10 +348,11 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           // Search bar
           Container(
-            height: 50,
+            height: _searchBarHeight,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
@@ -351,14 +402,104 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
                     },
                     icon: Icon(Icons.clear, color: Colors.grey.shade600),
                   ),
+                IconButton(
+                  onPressed: () {
+                    // Filter button action - could scroll to filters or show filter dialog
+                    // For now, we'll just add a visual indicator
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Filter: $_selectedFilter'),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  icon: Icon(Icons.filter_list, color: Colors.black.withOpacity(0.6)),
+                  tooltip: 'Filter',
+                ),
+                const SizedBox(width: 8),
               ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: _searchAndSortSpacing),
 
-          // Filter buttons
-          _buildFilterButtons(),
+          _buildSortSection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSortSection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(25, 85, 41, 0.24),
+            blurRadius: 3,
+            spreadRadius: 0.5,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              if (_sortController.isAnimating) return;
+              if (_sortController.status == AnimationStatus.completed) {
+                _sortController.reverse();
+              } else {
+                _sortController.forward();
+              }
+            },
+            child: Container(
+              height: _sortHeaderHeight,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Text(
+                    'Sort',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black.withOpacity(0.85),
+                    ),
+                  ),
+                  const Spacer(),
+                  RotationTransition(
+                    turns: _sortRotation,
+                    child: Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 24,
+                      color: Colors.black.withOpacity(0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          ClipRect(
+            child: SizeTransition(
+              sizeFactor: _sortAnimation,
+              axisAlignment: -1.0,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(height: 12),
+                    _buildFilterButtons(),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -368,6 +509,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
     final filters = ['All', 'Available Loads', 'My Bookings', 'In-Transit', 'Cancelled Loads', 'Completed Loads'];
     
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         // First row
         Row(
@@ -819,5 +961,56 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> {
         ],
       ),
     );
+  }
+}
+
+/// Delegate for sticky search bar header
+class _StickySearchBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double minHeight;
+  final double maxHeight;
+  final double topPadding;
+
+  _StickySearchBarDelegate({
+    required this.child,
+    required this.minHeight,
+    required this.maxHeight,
+    required this.topPadding,
+  });
+
+  @override
+  double get minExtent => minHeight;
+
+  @override
+  double get maxExtent => maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: overlapsContent
+            ? [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : null,
+      ),
+      child: Padding(
+        padding: EdgeInsets.only(top: topPadding),
+        child: child,
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_StickySearchBarDelegate oldDelegate) {
+    return child != oldDelegate.child ||
+        minHeight != oldDelegate.minHeight ||
+        maxHeight != oldDelegate.maxHeight ||
+        topPadding != oldDelegate.topPadding;
   }
 }

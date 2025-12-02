@@ -6,9 +6,13 @@ import 'package:printing/printing.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../../../../../providers/carrier_payments_provider.dart';
 import '../../../../../../providers/auth_provider.dart';
 import '../../../../../../providers/payment_methods_provider.dart';
+import '../../../../../../core/stripe_service.dart';
 import 'carrier_add_payment_method.dart';
 
 class CarrierPaymentPage extends StatefulWidget {
@@ -23,6 +27,10 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
   DateTime? _toDate;
   final TextEditingController _searchController = TextEditingController();
   String? _statusFilter; // null means all statuses
+  bool _hasStripeAccount = false;
+  bool _isCheckingAccount = true;
+  bool _isSettingUp = false;
+  bool _needsOnboarding = false;
 
   @override
   void initState() {
@@ -31,7 +39,226 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<CarrierPaymentsProvider>();
       provider.loadPayments();
+      _checkStripeAccountStatus();
     });
+  }
+
+  Future<void> _checkStripeAccountStatus() async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        setState(() {
+          _hasStripeAccount = false;
+          _needsOnboarding = false;
+          _isCheckingAccount = false;
+        });
+        return;
+      }
+
+      // Check account status from Stripe
+      try {
+        final status = await StripeService.getConnectAccountStatus();
+        final hasAccount = status['hasAccount'] as bool? ?? false;
+        final needsOnboarding = status['needsOnboarding'] as bool? ?? false;
+
+        if (mounted) {
+          setState(() {
+            _hasStripeAccount = hasAccount;
+            _needsOnboarding = needsOnboarding;
+            _isCheckingAccount = false;
+          });
+        }
+
+        // If account exists but needs onboarding, automatically create Account Link
+        if (hasAccount && needsOnboarding) {
+          await _createOnboardingLink();
+        }
+      } catch (e) {
+        debugPrint('Error getting Connect account status: $e');
+        // Fallback to Firebase check
+        final carrierDoc = await FirebaseFirestore.instance
+            .collection('carriers')
+            .doc(currentUser.uid)
+            .get();
+
+        if (mounted) {
+          setState(() {
+            _hasStripeAccount =
+                carrierDoc.data()?['stripeAccountId'] != null &&
+                    (carrierDoc.data()?['stripeAccountId'] as String)
+                        .isNotEmpty;
+            _needsOnboarding = _hasStripeAccount; // Assume needs onboarding if we can't check
+            _isCheckingAccount = false;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error checking Stripe account status: $e');
+      if (mounted) {
+        setState(() {
+          _hasStripeAccount = false;
+          _needsOnboarding = false;
+          _isCheckingAccount = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _createOnboardingLink() async {
+    try {
+      final onboardingUrl = await StripeService.createAccountLink();
+      debugPrint('Onboarding URL: $onboardingUrl');
+      
+      if (mounted) {
+        // Automatically open the onboarding URL
+        final uri = Uri.parse(onboardingUrl);
+        try {
+          if (await canLaunchUrl(uri)) {
+            final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+            
+            if (!launched) {
+              throw Exception('Failed to launch URL');
+            }
+            
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'Your account needs activation. Please complete the onboarding process.'),
+                  backgroundColor: Colors.orange,
+                  duration: Duration(seconds: 5),
+                ),
+              );
+            }
+          } else {
+            throw Exception('URL cannot be launched: $onboardingUrl');
+          }
+        } catch (e) {
+          debugPrint('Error launching onboarding URL: $e');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Could not open onboarding page: ${e.toString()}'),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 5),
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error creating onboarding link: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to create onboarding link: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _setupStripeConnectAccount() async {
+    if (_isSettingUp) return;
+
+    setState(() {
+      _isSettingUp = true;
+    });
+
+    try {
+      // Step 1: Create Connect account if it doesn't exist
+      try {
+        await StripeService.createConnectAccount();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Failed to create account: ${StripeService.getErrorMessage(e)}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Step 2: Create Account Link for onboarding
+      String onboardingUrl;
+      try {
+        onboardingUrl = await StripeService.createAccountLink();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  'Failed to create onboarding link: ${StripeService.getErrorMessage(e)}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Step 3: Open onboarding URL in browser
+      debugPrint('Onboarding URL: $onboardingUrl');
+      final uri = Uri.parse(onboardingUrl);
+      
+      try {
+        if (await canLaunchUrl(uri)) {
+          final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+          
+          if (!launched) {
+            throw Exception('Failed to launch URL');
+          }
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Please complete the onboarding process. Return to the app when done.'),
+                backgroundColor: Colors.blue,
+                duration: Duration(seconds: 5),
+              ),
+            );
+          }
+
+          // Wait a bit then check status
+          await Future.delayed(const Duration(seconds: 3));
+          await _checkStripeAccountStatus();
+        } else {
+          throw Exception('URL cannot be launched: $onboardingUrl');
+        }
+      } catch (e) {
+        debugPrint('Error launching onboarding URL: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open onboarding page: ${e.toString()}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error setting up Stripe Connect account: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${StripeService.getErrorMessage(e)}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSettingUp = false;
+        });
+      }
+    }
   }
 
   @override
@@ -41,40 +268,74 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
   }
 
   Future<void> _selectFromDate() async {
-    final picked = await showDatePicker(
+    // Unfocus any text fields before showing picker
+    FocusScope.of(context).unfocus();
+    
+    final initialDate = _fromDate ?? DateTime.now();
+    final pickedDate = await showDatePicker(
       context: context,
-      initialDate: _fromDate ?? DateTime.now(),
+      initialDate: initialDate,
       firstDate: DateTime(2020),
       lastDate: _toDate ?? DateTime.now(),
     );
-    if (picked != null) {
-      setState(() {
-        _fromDate = picked;
-      });
-      await context.read<CarrierPaymentsProvider>().loadPayments(
-        forceRefresh: true,
-        fromDate: _fromDate,
-        toDate: _toDate,
+    if (pickedDate != null) {
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(initialDate),
       );
+      if (pickedTime != null) {
+        final picked = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+        setState(() {
+          _fromDate = picked;
+        });
+        await context.read<CarrierPaymentsProvider>().loadPayments(
+          forceRefresh: true,
+          fromDate: _fromDate,
+          toDate: _toDate,
+        );
+      }
     }
   }
 
   Future<void> _selectToDate() async {
-    final picked = await showDatePicker(
+    // Unfocus any text fields before showing picker
+    FocusScope.of(context).unfocus();
+    
+    final initialDate = _toDate ?? DateTime.now();
+    final pickedDate = await showDatePicker(
       context: context,
-      initialDate: _toDate ?? DateTime.now(),
+      initialDate: initialDate,
       firstDate: _fromDate ?? DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (picked != null) {
-      setState(() {
-        _toDate = picked;
-      });
-      await context.read<CarrierPaymentsProvider>().loadPayments(
-        forceRefresh: true,
-        fromDate: _fromDate,
-        toDate: _toDate,
+    if (pickedDate != null) {
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(initialDate),
       );
+      if (pickedTime != null) {
+        final picked = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+        setState(() {
+          _toDate = picked;
+        });
+        await context.read<CarrierPaymentsProvider>().loadPayments(
+          forceRefresh: true,
+          fromDate: _fromDate,
+          toDate: _toDate,
+        );
+      }
     }
   }
 
@@ -92,7 +353,7 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
-    return DateFormat('MMM dd, yyyy').format(date);
+    return DateFormat('MMM dd, yyyy hh:mm a').format(date);
   }
 
   String _formatTransferId(String transferId) {
@@ -145,8 +406,34 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
       // Status filter
       if (_statusFilter != null) {
         final status = payment['status'] as String? ?? 'unknown';
-        if (status.toLowerCase() != _statusFilter!.toLowerCase()) {
+        final statusLower = status.toLowerCase();
+        final filterLower = _statusFilter!.toLowerCase();
+        
+        // Handle multiple status values that map to the same filter
+        if (filterLower == 'succeeded') {
+          if (statusLower != 'succeeded' && statusLower != 'completed' && statusLower != 'paid') {
+            return false;
+          }
+        } else if (statusLower != filterLower) {
           return false;
+        }
+      }
+      
+      // Date filter (already applied in provider, but double-check here with time component)
+      if (_fromDate != null || _toDate != null) {
+        final paymentDate = payment['succeededAt'] as DateTime? ??
+                           payment['completedAt'] as DateTime? ??
+                           payment['createdAt'] as DateTime?;
+        
+        if (paymentDate != null) {
+          // For fromDate: payment must be on or after the selected date/time
+          if (_fromDate != null && paymentDate.isBefore(_fromDate!)) {
+            return false;
+          }
+          // For toDate: payment must be on or before the selected date/time (respecting time component)
+          if (_toDate != null && paymentDate.isAfter(_toDate!)) {
+            return false;
+          }
         }
       }
       
@@ -392,6 +679,240 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
     );
   }
 
+  Future<void> _showPaymentDetails(Map<String, dynamic> payment) async {
+    final authProvider = context.read<AuthProvider>();
+    final carrier = authProvider.carrierUser;
+    final status = payment['status'] as String? ?? 'unknown';
+    final amount = payment['amount'] as int? ?? 0;
+    final date = payment['succeededAt'] as DateTime? ??
+                payment['completedAt'] as DateTime? ??
+                payment['createdAt'] as DateTime?;
+    final transferId = payment['transferId'] as String? ?? 'N/A';
+    final shipperName = payment['shipperName'] as String? ?? 'Unknown Shipper';
+    final loadNumber = payment['loadNumber'] as String? ?? 
+                      payment['loadId'] as String? ?? 'N/A';
+    final shipperId = payment['shipperId'] as String?;
+    
+    // Unfocus any text fields before showing dialog
+    FocusScope.of(context).unfocus();
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Payment Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow('Transfer ID', _formatTransferId(transferId)),
+              _buildDetailRow('Date & Time', _formatDate(date)),
+              _buildDetailRow('Status', _getStatusText(status), color: _getStatusColor(status)),
+              _buildDetailRow('Amount', '\$${(amount / 100).toStringAsFixed(2)}', color: const Color(0xFF186230)),
+              const Divider(),
+              _buildDetailRow('From', shipperName),
+              _buildDetailRow('To', carrier?.companyName ?? carrier?.displayName ?? 'Carrier'),
+              _buildDetailRow('Load Number', loadNumber),
+              if (shipperId != null) _buildDetailRow('Shipper ID', shipperId),
+            ],
+          ),
+        ),
+        actions: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        _copyReceipt(context, payment);
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.copy, size: 18),
+                      label: const Text('Copy'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _printReceipt(context, payment);
+                      },
+                      icon: const Icon(Icons.print),
+                      label: const Text('Print'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF186230),
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: color ?? Colors.black,
+                fontWeight: color != null ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _printAllPayments(List<Map<String, dynamic>> payments) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final carrier = authProvider.carrierUser;
+      
+      final buffer = StringBuffer();
+      buffer.writeln('');
+      buffer.writeln('        PAYMENTS REPORT');
+      buffer.writeln('');
+      buffer.writeln('Remiles Logistics');
+      buffer.writeln('Payment Receipts Report');
+      buffer.writeln('');
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('To: ${carrier?.companyName ?? carrier?.displayName ?? 'Carrier'}');
+      buffer.writeln('Report Date: ${_formatDate(DateTime.now())}');
+      if (_fromDate != null || _toDate != null) {
+        buffer.writeln('');
+        if (_fromDate != null && _toDate != null) {
+          buffer.writeln('Period: ${_formatDate(_fromDate)} to ${_formatDate(_toDate)}');
+        } else if (_fromDate != null) {
+          buffer.writeln('From Date: ${_formatDate(_fromDate)}');
+        } else if (_toDate != null) {
+          buffer.writeln('To Date: ${_formatDate(_toDate)}');
+        }
+      }
+      if (_statusFilter != null) {
+        buffer.writeln('Status Filter: ${_getStatusText(_statusFilter!)}');
+      }
+      buffer.writeln('Total Payments: ${payments.length}');
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('');
+      
+      double totalAmount = 0;
+      for (var payment in payments) {
+        final amount = payment['amount'] as int? ?? 0;
+        totalAmount += amount / 100;
+        
+        buffer.writeln('Transfer ID: ${_formatTransferId(payment['transferId'] as String? ?? 'N/A')}');
+        buffer.writeln('Date: ${_formatDate(payment['succeededAt'] as DateTime? ?? payment['completedAt'] as DateTime? ?? payment['createdAt'] as DateTime?)}');
+        buffer.writeln('From: ${payment['shipperName'] as String? ?? 'Unknown Shipper'}');
+        buffer.writeln('Load: ${payment['loadNumber'] as String? ?? payment['loadId'] as String? ?? 'N/A'}');
+        buffer.writeln('Amount: \$${(amount / 100).toStringAsFixed(2)}');
+        buffer.writeln('Status: ${_getStatusText(payment['status'] as String? ?? 'unknown')}');
+        buffer.writeln('---');
+      }
+      
+      buffer.writeln('');
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('Total Amount: \$${totalAmount.toStringAsFixed(2)}');
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('');
+      buffer.writeln('Thank you for using Remiles!');
+      buffer.writeln('');
+      
+      final reportText = buffer.toString();
+      
+      await Printing.layoutPdf(
+        onLayout: (format) async => await _generateReportPDF(reportText, payments.length, totalAmount),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error printing report: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<Uint8List> _generateReportPDF(String reportText, int count, double totalAmount) async {
+    final pdf = pw.Document();
+    final lines = reportText.split('\n');
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: lines.map((line) {
+              if (line.trim().isEmpty) {
+                return pw.SizedBox(height: 8);
+              } else if (line.contains('PAYMENTS REPORT') || line.contains('Total Amount:')) {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.black,
+                  ),
+                );
+              } else if (line.contains('---')) {
+                return pw.Divider();
+              } else if (line.contains('Amount:') || line.contains('Total:')) {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.black,
+                  ),
+                );
+              } else {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    color: PdfColors.black,
+                  ),
+                );
+              }
+            }).toList(),
+          );
+        },
+      ),
+    );
+    
+    return pdf.save();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -407,8 +928,17 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+            return RefreshIndicator(
+              onRefresh: () async {
+                await provider.loadPayments(
+                  forceRefresh: true,
+                  fromDate: _fromDate,
+                  toDate: _toDate,
+                );
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -502,43 +1032,141 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
                   ),
                   const SizedBox(height: 20),
 
-                  /// Add Payment Method Button - For receiving payments
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: const Color(0xFF43975A), width: 2),
-                    ),
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        side: BorderSide.none,
+                  /// Stripe Connect Account Setup or Payment Methods
+                  ///
+                  /// NOTE: Only carriers need Connect accounts to receive payments.
+                  /// Shippers only need payment methods (Stripe Customer accounts).
+                  if (_isCheckingAccount)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: CircularProgressIndicator(),
                       ),
-                      onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CarrierAddPaymentMethod(),
+                    )
+                  else if (!_hasStripeAccount || _needsOnboarding)
+                    // Show setup button if no Connect account or needs onboarding
+                    Column(
+                      children: [
+                        if (_needsOnboarding && _hasStripeAccount)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                  color: Colors.orange.shade300, width: 1),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded,
+                                    color: Colors.orange.shade700, size: 20),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Your payment account needs activation. Please complete onboarding.',
+                                    style: TextStyle(
+                                      color: Colors.orange.shade900,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        Container(
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(
+                                color: const Color(0xFF43975A), width: 2),
+                          ),
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 16, horizontal: 20),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(24),
+                              ),
+                              side: BorderSide.none,
+                            ),
+                            onPressed: _isSettingUp ? null : _setupStripeConnectAccount,
+                            icon: _isSettingUp
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFF186230)),
+                                    ),
+                                  )
+                                : Icon(
+                                    _needsOnboarding
+                                        ? Icons.refresh
+                                        : Icons.account_circle,
+                                    color: const Color(0xFF186230),
+                                    size: 24,
+                                  ),
+                            label: Text(
+                              _isSettingUp
+                                  ? "Setting Up Account..."
+                                  : _needsOnboarding
+                                      ? "Complete Account Activation"
+                                      : "Set Up Payment Account",
+                              style: const TextStyle(
+                                color: Color(0xFF186230),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
                         ),
-                      );
-                        // Refresh payment methods after returning
-                        final paymentProvider = context.read<PaymentMethodsProvider>();
-                        paymentProvider.loadPaymentMethods(forceRefresh: true);
-                      },
-                      icon: const Icon(Icons.account_balance_wallet, color: Color(0xFF186230), size: 24),
-                      label: const Text(
-                        "Manage Payment Methods",
-                        style: TextStyle(
-                          color: Color(0xFF186230),
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
+                      ],
+                    )
+                  else
+                    // Show payment methods button if account exists
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                            color: const Color(0xFF43975A), width: 2),
+                      ),
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 20),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          side: BorderSide.none,
+                        ),
+                        onPressed: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const CarrierAddPaymentMethod(),
+                            ),
+                          );
+                          // Refresh payment methods after returning
+                          final paymentProvider =
+                              context.read<PaymentMethodsProvider>();
+                          paymentProvider.loadPaymentMethods(forceRefresh: true);
+                        },
+                        icon: const Icon(Icons.account_balance_wallet,
+                            color: Color(0xFF186230), size: 24),
+                        label: const Text(
+                          "Manage Payment Methods",
+                          style: TextStyle(
+                            color: Color(0xFF186230),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                   const SizedBox(height: 20),
 
                   /// Search + Filter
@@ -614,12 +1242,26 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
                   ),
                   const SizedBox(height: 24),
 
+                  /// Payments Header with Print
+                  if (filteredPayments.isNotEmpty)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Payments",
+                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        ),
+                        if (filteredPayments.isNotEmpty && (_fromDate != null || _toDate != null || _statusFilter != null))
+                          IconButton(
+                            icon: const Icon(Icons.print, color: Colors.blue),
+                            onPressed: () => _printAllPayments(filteredPayments),
+                            tooltip: 'Print All Filtered Payments',
+                          ),
+                      ],
+                    ),
+                  if (filteredPayments.isNotEmpty) const SizedBox(height: 16),
+
                   /// Payments List
-                  const Text(
-                    "Payments",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
 
                   if (filteredPayments.isEmpty)
                     Center(
@@ -688,20 +1330,24 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
                       final transferId = payment['transferId'] as String? ?? '';
                       final shipperName = payment['shipperName'] as String? ?? 'Unknown Shipper';
 
-                      return _buildPaymentCard(
-                        _formatTransferId(transferId),
-                        _formatDate(date),
-                        amount ~/ 100, // Convert cents to dollars
-                        _getStatusText(status),
-                        _getStatusColor(status),
-                        shipperName,
-                        payment['loadNumber'] as String? ?? payment['loadId'] as String? ?? 'N/A',
-                        payment,
+                      return GestureDetector(
+                        onTap: () => _showPaymentDetails(payment),
+                        child: _buildPaymentCard(
+                          _formatTransferId(transferId),
+                          _formatDate(date),
+                          amount ~/ 100, // Convert cents to dollars
+                          _getStatusText(status),
+                          _getStatusColor(status),
+                          shipperName,
+                          payment['loadNumber'] as String? ?? payment['loadId'] as String? ?? 'N/A',
+                          payment,
+                        ),
                       );
                     }),
                 ],
               ),
-            );
+            ),
+          );
           },
         ),
       ),
@@ -717,23 +1363,27 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
         ),
         const SizedBox(height: 6),
-        GestureDetector(
+        InkWell(
           onTap: onTap,
-          child: AbsorbPointer(
-            child: TextField(
-              readOnly: true,
-              enableInteractiveSelection: false,
-              controller: TextEditingController(
-                text: date != null ? DateFormat('MMM dd, yyyy').format(date) : '',
-              ),
-              decoration: InputDecoration(
-                hintText: "dd mm yy",
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade400),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    date != null ? DateFormat('MMM dd, yyyy hh:mm a').format(date) : 'Select date & time',
+                    style: TextStyle(
+                      color: date != null ? Colors.black : Colors.grey.shade600,
+                    ),
+                  ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-                suffixIcon: const Icon(Icons.calendar_today, size: 20),
-              ),
+                const Icon(Icons.calendar_today, size: 20, color: Colors.grey),
+              ],
             ),
           ),
         ),
@@ -857,29 +1507,6 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
                       color: Color(0xFF186230),
                     ),
                     overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.print, size: 20),
-                        onPressed: () => _printReceipt(context, payment),
-                        tooltip: 'Print Receipt',
-                        color: const Color(0xFF186230),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      const SizedBox(width: 4),
-                      IconButton(
-                        icon: const Icon(Icons.copy, size: 20),
-                        onPressed: () => _copyReceipt(context, payment),
-                        tooltip: 'Copy Receipt',
-                        color: const Color(0xFF186230),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                    ],
                   ),
                 ],
               ),

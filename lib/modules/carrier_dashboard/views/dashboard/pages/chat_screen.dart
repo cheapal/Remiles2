@@ -49,6 +49,7 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _messageFocusNode = FocusNode();
   List<ChatMessage> _messages = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -63,6 +64,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _otherUserProfileImage; // Profile image of the other user
   Set<String> _sendingMessageIds = {}; // Track messages that are being sent
   StreamSubscription<QuerySnapshot>? _messagesSubscription; // Stream listener for real-time updates
+  String? _extractedOtherUserId; // Extracted otherUserId from conversation if not provided in widget
+  String? _extractedOtherUserName; // Extracted otherUserName from user data if not provided in widget
 
   @override
   void initState() {
@@ -174,6 +177,24 @@ class _ChatScreenState extends State<ChatScreen> {
             _canSendMessages = true;
           });
         }
+        
+        // Extract otherUserId from conversation if not provided
+        if (widget.otherUserId == null || widget.otherUserId!.isEmpty) {
+          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          final currentUserId = authProvider.currentUser?.uid;
+          if (currentUserId != null && _conversation != null) {
+            final extractedOtherUserId = _conversation!.getOtherParticipant(currentUserId);
+            if (extractedOtherUserId.isNotEmpty) {
+              // Update widget's otherUserId by storing it in state
+              // We'll use a local variable to track this
+              _extractedOtherUserId = extractedOtherUserId;
+              // Load user name if not provided
+              if (widget.otherUserName == null || widget.otherUserName!.isEmpty) {
+                _loadOtherUserName(extractedOtherUserId);
+              }
+            }
+          }
+        }
       }
       
       // Check if load is booked
@@ -182,7 +203,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
       
       // Load other user's profile image (skip for support chats)
-      if (!widget.isSupportChat && widget.otherUserId != null) {
+      if (!widget.isSupportChat) {
         await _loadOtherUserProfile();
       }
     } catch (e) {
@@ -191,11 +212,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _loadOtherUserProfile() async {
-    if (widget.otherUserId == null) return; // Skip for support chats
+    // Get otherUserId from widget or extracted from conversation
+    final otherUserId = widget.otherUserId ?? _extractedOtherUserId;
+    if (otherUserId == null || otherUserId.isEmpty) return; // Skip if no other user ID
     
     try {
       // Try to get user profile image
-      final shipper = await FirebaseService.getShipper(widget.otherUserId!);
+      final shipper = await FirebaseService.getShipper(otherUserId);
       if (shipper != null && shipper.profileImageUrl != null) {
         if (mounted) {
           setState(() {
@@ -205,7 +228,7 @@ class _ChatScreenState extends State<ChatScreen> {
         return;
       }
       
-      final carrier = await FirebaseService.getCarrier(widget.otherUserId!);
+      final carrier = await FirebaseService.getCarrier(otherUserId);
       if (carrier != null && carrier.profileImageUrl != null && mounted) {
         setState(() {
           _otherUserProfileImage = carrier.profileImageUrl;
@@ -213,6 +236,45 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e) {
       print('Error loading other user profile: $e');
+    }
+  }
+
+  Future<void> _loadOtherUserName(String userId) async {
+    if (userId.isEmpty) return;
+    
+    try {
+      // Try to get shipper name
+      final shipper = await FirebaseService.getShipper(userId);
+      if (shipper != null) {
+        final name = shipper.companyName.isNotEmpty 
+            ? shipper.companyName 
+            : (shipper.displayName ?? 'Shipper');
+        if (mounted) {
+          setState(() {
+            _extractedOtherUserName = name;
+          });
+        }
+        return;
+      }
+      
+      // Try to get carrier name
+      final carrier = await FirebaseService.getCarrier(userId);
+      if (carrier != null && mounted) {
+        final name = (carrier.companyName?.isNotEmpty ?? false)
+            ? carrier.companyName!
+            : (carrier.displayName ?? 'Carrier');
+        setState(() {
+          _extractedOtherUserName = name;
+        });
+      }
+    } catch (e) {
+      print('Error loading other user name: $e');
+      // Set default name on error
+      if (mounted) {
+        setState(() {
+          _extractedOtherUserName = 'User';
+        });
+      }
     }
   }
 
@@ -307,6 +369,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _messagesSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
+    _messageFocusNode.dispose();
     super.dispose();
   }
 
@@ -368,16 +431,27 @@ class _ChatScreenState extends State<ChatScreen> {
           final offer = await FirebaseService.getOfferById(activeOfferId);
           if (offer != null) {
             _offersCache[activeOfferId] = offer;
+            // Only set as active offer if it's not expired
             if (offer.isActive && !offer.isExpired) {
               _activeOffer = offer;
+            } else {
+              // Clear active offer if it's expired
+              _activeOffer = null;
             }
           }
         } else {
           final cachedOffer = _offersCache[activeOfferId]!;
+          // Only set as active offer if it's not expired
           if (cachedOffer.isActive && !cachedOffer.isExpired) {
             _activeOffer = cachedOffer;
+          } else {
+            // Clear active offer if it's expired
+            _activeOffer = null;
           }
         }
+      } else {
+        // If no activeOfferId in conversation, clear active offer
+        _activeOffer = null;
       }
       
       if (mounted) {
@@ -397,7 +471,13 @@ class _ChatScreenState extends State<ChatScreen> {
         
         // Check load status after loading messages
         if (widget.loadId != null) {
-          _checkLoadStatus();
+          await _checkLoadStatus();
+          // Clear active offer if load is booked to hide timer
+          if (_isLoadBooked && mounted) {
+            setState(() {
+              _activeOffer = null;
+            });
+          }
         }
         
         // Scroll to bottom
@@ -428,7 +508,8 @@ class _ChatScreenState extends State<ChatScreen> {
       
       if (widget.otherUserId == null) return; // Skip if no other user
       
-      await FirebaseService.sendOffer(
+      // Send offer and get the offer ID
+      final offerId = await FirebaseService.sendOffer(
         conversationId: widget.conversationId,
         carrierId: user.uid,
         carrierName: carrierName,
@@ -437,7 +518,16 @@ class _ChatScreenState extends State<ChatScreen> {
         offerAmount: offerAmount,
       );
 
-      // Reload conversation and messages
+      // Immediately fetch the newly created offer and update UI
+      final newOffer = await FirebaseService.getOfferById(offerId);
+      if (newOffer != null && mounted) {
+        setState(() {
+          _offersCache[offerId] = newOffer;
+          _activeOffer = newOffer;
+        });
+      }
+
+      // Reload conversation and messages to ensure everything is in sync
       await _loadConversation();
       await _loadMessages();
       
@@ -560,6 +650,10 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) {
           setState(() {
             _isProcessingOffer = false;
+            // Clear active offer if load is booked to hide timer
+            if (_isLoadBooked) {
+              _activeOffer = null;
+            }
           });
           
           ScaffoldMessenger.of(context).showSnackBar(
@@ -611,6 +705,17 @@ class _ChatScreenState extends State<ChatScreen> {
         counterAmount: counterAmount,
       );
 
+      // Immediately fetch the updated offer and update UI
+      final updatedOffer = await FirebaseService.getOfferById(offerId);
+      if (updatedOffer != null && mounted) {
+        setState(() {
+          _offersCache[offerId] = updatedOffer;
+          if (_activeOffer?.id == offerId) {
+            _activeOffer = updatedOffer;
+          }
+        });
+      }
+
       await _loadMessages();
     } catch (e) {
       if (mounted) {
@@ -627,6 +732,18 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _handleRejectOffer(String offerId) async {
     try {
       await FirebaseService.rejectOffer(offerId);
+
+      // Immediately fetch the updated offer and update UI
+      final updatedOffer = await FirebaseService.getOfferById(offerId);
+      if (updatedOffer != null && mounted) {
+        setState(() {
+          _offersCache[offerId] = updatedOffer;
+          if (_activeOffer?.id == offerId) {
+            _activeOffer = null; // Clear active offer if it was rejected
+          }
+        });
+      }
+
       await _loadMessages();
     } catch (e) {
       if (mounted) {
@@ -753,6 +870,10 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) {
           setState(() {
             _isProcessingOffer = false;
+            // Clear active offer if load is booked to hide timer
+            if (_isLoadBooked) {
+              _activeOffer = null;
+            }
           });
           
           ScaffoldMessenger.of(context).showSnackBar(
@@ -860,12 +981,30 @@ class _ChatScreenState extends State<ChatScreen> {
     // Clear message field immediately
     _messageController.clear();
     
+    // Keep focus on text field after sending (use post-frame callback to ensure it happens after UI updates)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _messageFocusNode.canRequestFocus) {
+        _messageFocusNode.requestFocus();
+      }
+    });
+    
+    // Get receiverId for optimistic message
+    String? receiverId = widget.otherUserId ?? _extractedOtherUserId;
+    if (receiverId == null || receiverId.isEmpty) {
+      // Extract from conversation participants as last resort
+      if (_conversation != null) {
+        receiverId = _conversation!.getOtherParticipant(user.uid);
+      }
+      // Fallback to support user ID if still empty (shouldn't happen for non-support chats)
+      receiverId = receiverId ?? FirebaseService.supportUserId;
+    }
+    
     // Create optimistic message
     final optimisticMessage = ChatMessage(
       id: tempMessageId,
       conversationId: widget.conversationId,
       senderId: user.uid,
-      receiverId: widget.otherUserId ?? FirebaseService.supportUserId,
+      receiverId: receiverId,
       content: messageContent,
       timestamp: DateTime.now(),
     );
@@ -897,12 +1036,26 @@ class _ChatScreenState extends State<ChatScreen> {
           content: messageContent,
         );
       } else {
-        await FirebaseService.sendMessage(
-          conversationId: widget.conversationId,
-          senderId: user.uid,
-          receiverId: widget.otherUserId ?? '',
-          content: messageContent,
-        );
+        // Get receiverId from widget, extracted from conversation, or from conversation participants
+        String? receiverId = widget.otherUserId ?? _extractedOtherUserId;
+        if (receiverId == null || receiverId.isEmpty) {
+          // Extract from conversation participants as last resort
+          if (_conversation != null) {
+            receiverId = _conversation!.getOtherParticipant(user.uid);
+          }
+        }
+        
+        // Only send if we have a valid receiverId
+        if (receiverId != null && receiverId.isNotEmpty) {
+          await FirebaseService.sendMessage(
+            conversationId: widget.conversationId,
+            senderId: user.uid,
+            receiverId: receiverId,
+            content: messageContent,
+          );
+        } else {
+          throw Exception('Cannot send message: receiver ID not found');
+        }
       }
       
       // Remove from sending set - the real message will come from the stream
@@ -986,7 +1139,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    widget.otherUserName ?? 'User',
+                    widget.otherUserName ?? _extractedOtherUserName ?? 'User',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -1162,6 +1315,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Message input field
           _MessageInputField(
             controller: _messageController,
+            focusNode: _messageFocusNode,
             onSend: _sendMessage,
             enabled: _canSendMessages,
           ),
@@ -1366,7 +1520,8 @@ class _ChatScreenState extends State<ChatScreen> {
             .get();
         
         if (loadDoc.exists) {
-          load = LoadModel.fromFirestore(loadDoc);
+          // Pass shipperUid from parent document path
+          load = LoadModel.fromFirestore(loadDoc, parentShipperUid: shipperDoc.id);
           break;
         }
       }
@@ -1450,9 +1605,8 @@ class _ChatScreenState extends State<ChatScreen> {
             children: [
               // For Carriers only (hide buttons if load is booked or user is shipper)
               if (!_isLoadBooked && !isShipper && (carrierCheck || (currentUser != null && _activeOffer == null))) ...[
-                // Book at Original Price button (always available unless already booked)
-                if (_activeOffer?.status != OfferStatus.accepted &&
-                    (_conversation == null || !_conversation!.isNegotiationActive || !_isNegotiationExpired))
+                // Book at Original Price button (always available unless already booked or offer accepted)
+                if (_activeOffer?.status != OfferStatus.accepted)
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _handleBookAtOriginalPrice,
@@ -1493,12 +1647,11 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ),
                   ),
-                // Make Offer button (hide if offer is expired)
-                if (_activeOffer?.status != OfferStatus.accepted && 
-                    (_activeOffer == null || !_activeOffer!.isExpired))
+                // Make Offer button (always available unless offer is accepted - allows new offer after expiration)
+                if (_activeOffer?.status != OfferStatus.accepted)
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: _isNegotiationExpired ? null : () {
+                      onPressed: () {
                         showDialog(
                           context: context,
                           builder: (context) => OfferDialog(
@@ -1508,18 +1661,16 @@ class _ChatScreenState extends State<ChatScreen> {
                         );
                       },
                       icon: Icon(
-                        _activeOffer == null ? Icons.add : Icons.reply,
+                        (_activeOffer == null || _activeOffer!.isExpired) ? Icons.add : Icons.reply,
                         color: Colors.white,
                         size: 18,
                       ),
                       label: Text(
-                        _activeOffer == null ? 'Make Offer' : 'New Offer',
+                        (_activeOffer == null || _activeOffer!.isExpired) ? 'Make Offer' : 'New Offer',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: _isNegotiationExpired 
-                            ? Colors.grey 
-                            : primaryColor,
+                        backgroundColor: primaryColor,
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -1742,15 +1893,21 @@ class _ChatScreenState extends State<ChatScreen> {
       userRole = UserRole.shipper;
     }
 
-    if (widget.otherUserId == null || widget.otherUserName == null) return; // Skip for support chats
+    // Get otherUserId and otherUserName from widget or extracted values
+    final otherUserId = widget.otherUserId ?? _extractedOtherUserId;
+    final otherUserName = widget.otherUserName ?? _extractedOtherUserName;
     
-    showDialog(
-      context: context,
-      builder: (context) => UserProfileDialog(
-        userId: widget.otherUserId!,
-        userName: widget.otherUserName!,
-        userRole: userRole,
-        onReport: () => _showReportDialog(),
+    if (otherUserId == null || otherUserId.isEmpty) return; // Skip for support chats
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileDialog(
+          userId: otherUserId,
+          userName: otherUserName ?? 'User',
+          userRole: userRole,
+          onReport: () => _showReportDialog(),
+        ),
       ),
     );
   }
@@ -1761,19 +1918,22 @@ class _ChatScreenState extends State<ChatScreen> {
     final isCarrier = user != null && 
         (widget.loadId == null || (_activeOffer != null && user.uid == _activeOffer!.carrierId));
     
+    // Get otherUserName from widget or extracted values
+    final otherUserName = widget.otherUserName ?? _extractedOtherUserName;
+    
     // Determine what/who is being reported
     String reportedEntityName;
     
     if (widget.loadId != null) {
       // Reporting in load negotiation context
       if (isCarrier) {
-        reportedEntityName = widget.otherUserName ?? 'User';
+        reportedEntityName = otherUserName ?? 'User';
       } else {
-        reportedEntityName = _activeOffer?.carrierName ?? widget.otherUserName ?? 'User';
+        reportedEntityName = _activeOffer?.carrierName ?? otherUserName ?? 'User';
       }
     } else {
       // Reporting in general conversation
-      reportedEntityName = widget.otherUserName ?? 'User';
+      reportedEntityName = otherUserName ?? 'User';
     }
 
     final reasonController = TextEditingController();
@@ -1839,11 +1999,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 return;
               }
 
-              if (widget.otherUserId == null) return;
+              // Get otherUserId from widget or extracted value
+              final otherUserId = widget.otherUserId ?? _extractedOtherUserId;
+              if (otherUserId == null || otherUserId.isEmpty) return;
               
               final success = await FirebaseService.submitReport(
                 reporterId: reporter.uid,
-                reportedUserId: widget.otherUserId!,
+                reportedUserId: otherUserId,
                 reportedUserName: reportedEntityName,
                 reason: reasonController.text.trim(),
                 loadId: widget.loadId,
@@ -1988,11 +2150,13 @@ class _ReceivedMessage extends StatelessWidget {
 // Widget for the text input field at the bottom
 class _MessageInputField extends StatelessWidget {
   final TextEditingController controller;
+  final FocusNode focusNode;
   final VoidCallback onSend;
   final bool enabled;
 
   const _MessageInputField({
     required this.controller,
+    required this.focusNode,
     required this.onSend,
     this.enabled = true,
   });
@@ -2015,6 +2179,7 @@ class _MessageInputField extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
+              focusNode: focusNode,
               enabled: enabled,
               style: TextStyle(color: enabled ? Colors.black : Colors.grey),
               decoration: InputDecoration(

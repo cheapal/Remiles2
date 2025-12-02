@@ -1,6 +1,7 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const stripeLib = require("stripe");
+const express = require("express");
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
@@ -28,8 +29,81 @@ function getStripe() {
 }
 
 /**
+ * Helper function to send push notification only (no Firestore save)
+ * Used for chat messages that should only show as push notifications
+ */
+async function sendPushNotificationOnly({
+  userId,
+  title,
+  body,
+  data = {},
+}) {
+  try {
+    // Get user's FCM token - check users and role-specific collections
+    let fcmToken = null;
+
+    // First check users collection
+    const userDoc = await admin.firestore()
+        .collection("users").doc(userId).get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      fcmToken = userData && userData.fcmToken ?
+          userData.fcmToken : null;
+    }
+
+    // If not found, check shippers collection
+    if (!fcmToken) {
+      const shipperDoc = await admin.firestore()
+          .collection("shippers").doc(userId).get();
+      if (shipperDoc.exists) {
+        const shipperData = shipperDoc.data();
+        fcmToken = shipperData && shipperData.fcmToken ?
+            shipperData.fcmToken : null;
+      }
+    }
+
+    // If still not found, check carriers collection
+    if (!fcmToken) {
+      const carrierDoc = await admin.firestore()
+          .collection("carriers").doc(userId).get();
+      if (carrierDoc.exists) {
+        const carrierData = carrierDoc.data();
+        fcmToken = carrierData && carrierData.fcmToken ?
+            carrierData.fcmToken : null;
+      }
+    }
+
+    if (fcmToken) {
+      // Send push notification via FCM
+      const message = {
+        notification: {
+          title: title,
+          body: body,
+        },
+        data: {
+          ...Object.keys(data).reduce((acc, key) => {
+            acc[key] = String(data[key]);
+            return acc;
+          }, {}),
+        },
+        token: fcmToken,
+      };
+
+      try {
+        await admin.messaging().send(message);
+        console.log(`Push notification sent to user ${userId}`);
+      } catch (fcmError) {
+        console.error(`Failed to send push notification:`, fcmError);
+      }
+    }
+  } catch (error) {
+    console.error("Error sending push notification:", error);
+  }
+}
+
+/**
  * Helper function to send notifications
- * Creates a notification document in Firestore and sends push notification via FCM
+ * Creates notification in Firestore and sends push via FCM
  */
 async function sendNotification({
   userId,
@@ -53,28 +127,37 @@ async function sendNotification({
       relatedId: relatedId,
     });
 
-    // Get user's FCM token - check both users collection and role-specific collections
+    // Get user's FCM token - check users and role-specific collections
     let fcmToken = null;
-    
+
     // First check users collection
-    const userDoc = await admin.firestore().collection("users").doc(userId).get();
+    const userDoc = await admin.firestore()
+        .collection("users").doc(userId).get();
     if (userDoc.exists) {
-      fcmToken = userDoc.data()?.fcmToken;
+      const userData = userDoc.data();
+      fcmToken = userData && userData.fcmToken ?
+          userData.fcmToken : null;
     }
-    
+
     // If not found, check shippers collection
     if (!fcmToken) {
-      const shipperDoc = await admin.firestore().collection("shippers").doc(userId).get();
+      const shipperDoc = await admin.firestore()
+          .collection("shippers").doc(userId).get();
       if (shipperDoc.exists) {
-        fcmToken = shipperDoc.data()?.fcmToken;
+        const shipperData = shipperDoc.data();
+        fcmToken = shipperData && shipperData.fcmToken ?
+            shipperData.fcmToken : null;
       }
     }
-    
+
     // If still not found, check carriers collection
     if (!fcmToken) {
-      const carrierDoc = await admin.firestore().collection("carriers").doc(userId).get();
+      const carrierDoc = await admin.firestore()
+          .collection("carriers").doc(userId).get();
       if (carrierDoc.exists) {
-        fcmToken = carrierDoc.data()?.fcmToken;
+        const carrierData = carrierDoc.data();
+        fcmToken = carrierData && carrierData.fcmToken ?
+            carrierData.fcmToken : null;
       }
     }
 
@@ -296,118 +379,141 @@ exports.createPaymentIntent = functions
  * 4. Copy webhook signing secret and set:
  *    firebase functions:config:set stripe.webhook_secret="whsec_..."
  */
+// Create Express app for webhook with raw body parsing
+const webhookApp = express();
+webhookApp.use(
+    express.raw({type: "application/json"}),
+);
+
+webhookApp.post("/", async (req, res) => {
+  const sig = req.headers["stripe-signature"];
+  const webhookSecret = functions.config().stripe.webhook_secret;
+
+  if (!webhookSecret) {
+    console.error("Webhook secret not configured");
+    return res.status(500).send("Webhook secret not configured");
+  }
+
+  let event;
+
+  try {
+    // Verify webhook signature using raw body
+    const stripe = getStripe();
+    event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        webhookSecret,
+    );
+  } catch (err) {
+    console.error("Webhook signature verification failed:", err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  switch (event.type) {
+    case "payment_intent.succeeded": {
+      const paymentIntent = event.data.object;
+      console.log("PaymentIntent succeeded:", paymentIntent.id);
+
+      // Update Firestore with payment success
+      try {
+        const userId = paymentIntent.metadata &&
+            paymentIntent.metadata.userId;
+        if (userId) {
+          await admin.firestore()
+              .collection("payment_intents")
+              .where("paymentIntentId", "==", paymentIntent.id)
+              .get()
+              .then(async (snapshot) => {
+                if (!snapshot.empty) {
+                  const docRef = snapshot.docs[0].ref;
+                  await docRef.update({
+                    status: "succeeded",
+                    succeededAt: admin.firestore.FieldValue
+                        .serverTimestamp(),
+                  });
+
+                  // Send notification
+                  const paymentAmount = (paymentIntent.amount / 100)
+                      .toFixed(2);
+                  await sendNotification({
+                    userId: userId,
+                    type: "paymentReceived",
+                    title: "Payment Received",
+                    body: `Your payment of $${paymentAmount} ` +
+                        "has been received successfully.",
+                    data: {
+                      paymentIntentId: paymentIntent.id,
+                      amount: paymentIntent.amount,
+                    },
+                    relatedId: paymentIntent.id,
+                  });
+                }
+              });
+        }
+      } catch (error) {
+        console.error("Error updating payment status:", error);
+      }
+      break;
+    }
+
+    case "payment_intent.payment_failed": {
+      const failedPayment = event.data.object;
+      console.log("PaymentIntent failed:", failedPayment.id);
+
+      // Update Firestore with payment failure
+      try {
+        const userId = failedPayment.metadata &&
+            failedPayment.metadata.userId;
+        if (userId) {
+          const lastError = failedPayment.last_payment_error;
+          const errorMessage = (lastError && lastError.message) ||
+              "Unknown error";
+          await admin.firestore()
+              .collection("payment_intents")
+              .where("paymentIntentId", "==", failedPayment.id)
+              .get()
+              .then(async (snapshot) => {
+                if (!snapshot.empty) {
+                  await snapshot.docs[0].ref.update({
+                    status: "failed",
+                    failedAt: admin.firestore.FieldValue.serverTimestamp(),
+                    failureReason: errorMessage,
+                  });
+
+                  // Send notification
+                  await sendNotification({
+                    userId: userId,
+                    type: "paymentFailed",
+                    title: "Payment Failed",
+                    body: `Your payment failed: ${errorMessage}`,
+                    data: {
+                      paymentIntentId: failedPayment.id,
+                      error: errorMessage,
+                    },
+                    relatedId: failedPayment.id,
+                  });
+                }
+              });
+        }
+      } catch (error) {
+        console.error("Error updating payment failure:", error);
+      }
+      break;
+    }
+
+    default:
+      console.log(`Unhandled event type: ${event.type}`);
+  }
+
+  // Return a response to acknowledge receipt of the event
+  res.json({received: true});
+});
+
+// Export as Firebase Function
 exports.handleStripeWebhook = functions
     .region("northamerica-northeast1")
-    .https.onRequest(async (req, res) => {
-      const sig = req.headers["stripe-signature"];
-      const webhookSecret = functions.config().stripe.webhook_secret;
-
-      let event;
-
-      try {
-        // Verify webhook signature
-        const stripe = getStripe();
-        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
-      } catch (err) {
-        console.error("Webhook signature verification failed:", err.message);
-        return res.status(400).send(`Webhook Error: ${err.message}`);
-      }
-
-      // Handle the event
-      switch (event.type) {
-        case "payment_intent.succeeded": {
-          const paymentIntent = event.data.object;
-          console.log("PaymentIntent succeeded:", paymentIntent.id);
-
-          // Update Firestore with payment success
-          try {
-            const userId = paymentIntent.metadata &&
-                paymentIntent.metadata.userId;
-            if (userId) {
-              await admin.firestore()
-                  .collection("payment_intents")
-                  .where("paymentIntentId", "==", paymentIntent.id)
-                  .get()
-                  .then(async (snapshot) => {
-                    if (!snapshot.empty) {
-                      await snapshot.docs[0].ref.update({
-                        status: "succeeded",
-                        succeededAt: admin.firestore.FieldValue
-                            .serverTimestamp(),
-                      });
-                      
-                      // Send notification
-                      await sendNotification({
-                        userId: userId,
-                        type: "paymentReceived",
-                        title: "Payment Received",
-                        body: `Your payment of $${(paymentIntent.amount / 100).toFixed(2)} has been received successfully.`,
-                        data: {
-                          paymentIntentId: paymentIntent.id,
-                          amount: paymentIntent.amount,
-                        },
-                        relatedId: paymentIntent.id,
-                      });
-                    }
-                  });
-            }
-          } catch (error) {
-            console.error("Error updating payment status:", error);
-          }
-          break;
-        }
-
-        case "payment_intent.payment_failed": {
-          const failedPayment = event.data.object;
-          console.log("PaymentIntent failed:", failedPayment.id);
-
-          // Update Firestore with payment failure
-          try {
-            const userId = failedPayment.metadata &&
-                failedPayment.metadata.userId;
-            if (userId) {
-              const errorMessage = (failedPayment.last_payment_error &&
-              failedPayment.last_payment_error.message) || "Unknown error";
-              await admin.firestore()
-                  .collection("payment_intents")
-                  .where("paymentIntentId", "==", failedPayment.id)
-                  .get()
-                  .then(async (snapshot) => {
-                    if (!snapshot.empty) {
-                      await snapshot.docs[0].ref.update({
-                        status: "failed",
-                        failedAt: admin.firestore.FieldValue.serverTimestamp(),
-                        failureReason: errorMessage,
-                      });
-                      
-                      // Send notification
-                      await sendNotification({
-                        userId: userId,
-                        type: "paymentFailed",
-                        title: "Payment Failed",
-                        body: `Your payment failed: ${errorMessage}`,
-                        data: {
-                          paymentIntentId: failedPayment.id,
-                          error: errorMessage,
-                        },
-                        relatedId: failedPayment.id,
-                      });
-                    }
-                  });
-            }
-          } catch (error) {
-            console.error("Error updating payment failure:", error);
-          }
-          break;
-        }
-
-        default:
-          console.log(`Unhandled event type: ${event.type}`);
-      }
-
-      // Return a response to acknowledge receipt of the event
-      res.json({received: true});
-    });
+    .https.onRequest(webhookApp);
 
 /**
  * Firestore trigger: Send notification when load status changes
@@ -493,62 +599,146 @@ exports.onLoadStatusChange = functions
     });
 
 /**
- * Firestore trigger: Send notification when offer is accepted
+ * Firestore trigger: Send notification when offer is created
  */
-exports.onOfferAccepted = functions
+exports.onOfferCreated = functions
     .region("northamerica-northeast1")
-    .firestore.document("offers/{offerId}")
-    .onUpdate(async (change, context) => {
-      const before = change.before.data();
-      const after = change.after.data();
+    .firestore
+    .document("offers/{offerId}")
+    .onCreate(async (snap, context) => {
+      const offerData = snap.data();
 
-      // Check if offer was just accepted
-      if (before.status !== "accepted" && after.status === "accepted") {
-        try {
-          // Notify carrier
-          if (after.carrierId) {
-            await sendNotification({
-              userId: after.carrierId,
-              type: "offerAccepted",
-              title: "Offer Accepted!",
-              body: `Your offer of $${after.amount?.toFixed(2) || "N/A"} has been accepted!`,
-              data: {
-                offerId: context.params.offerId,
-                loadId: after.loadId,
-                amount: after.amount,
-              },
-              relatedId: context.params.offerId,
-            });
-          }
-
-          // Notify shipper
-          const loadDoc = await admin.firestore().collection("loads").doc(after.loadId).get();
-          if (loadDoc.exists && loadDoc.data()?.shipperId) {
-            await sendNotification({
-              userId: loadDoc.data().shipperId,
-              type: "offerAccepted",
-              title: "Offer Accepted",
-              body: `You've accepted an offer of $${after.amount?.toFixed(2) || "N/A"}.`,
-              data: {
-                offerId: context.params.offerId,
-                loadId: after.loadId,
-                amount: after.amount,
-              },
-              relatedId: context.params.offerId,
-            });
-          }
-        } catch (error) {
-          console.error("Error sending offer accepted notification:", error);
+      try {
+        // Notify shipper when carrier sends an offer
+        if (offerData.shipperId && offerData.offerAmount) {
+          await sendNotification({
+            userId: offerData.shipperId,
+            type: "offerReceived",
+            title: "New Offer Received",
+            body: `You received an offer of $${offerData.offerAmount
+                .toFixed(2)}`,
+            data: {
+              offerId: context.params.offerId,
+              loadId: offerData.loadId,
+              offerAmount: offerData.offerAmount,
+              carrierId: offerData.carrierId,
+              carrierName: offerData.carrierName || "Carrier",
+            },
+            relatedId: context.params.offerId,
+          });
         }
+      } catch (error) {
+        console.error("Error sending offer created notification:", error);
       }
 
       return null;
     });
 
 /**
- * Firestore trigger: Send notification when a message is sent in a support conversation
+ * Firestore trigger: Send notification when offer status changes
  */
-exports.onSupportMessage = functions
+exports.onOfferStatusChange = functions
+    .region("northamerica-northeast1")
+    .firestore.document("offers/{offerId}")
+    .onUpdate(async (change, context) => {
+      const before = change.before.data();
+      const after = change.after.data();
+
+      try {
+        // Check if offer was just accepted
+        if (before.status !== "accepted" && after.status === "accepted") {
+          // Notify carrier
+          if (after.carrierId) {
+            await sendNotification({
+              userId: after.carrierId,
+              type: "offerAccepted",
+              title: "Offer Accepted!",
+              body: `Your offer of $${(after.offerAmount != null &&
+                  typeof after.offerAmount === "number") ?
+                  after.offerAmount.toFixed(2) : "N/A"} has been accepted!`,
+              data: {
+                offerId: context.params.offerId,
+                loadId: after.loadId,
+                offerAmount: after.offerAmount,
+              },
+              relatedId: context.params.offerId,
+            });
+          }
+
+          // Notify shipper (use shipperId from offer document)
+          if (after.shipperId) {
+            await sendNotification({
+              userId: after.shipperId,
+              type: "offerAccepted",
+              title: "Offer Accepted",
+              body: `You've accepted an offer of $${(after.offerAmount !=
+                  null && typeof after.offerAmount === "number") ?
+                  after.offerAmount.toFixed(2) : "N/A"}.`,
+              data: {
+                offerId: context.params.offerId,
+                loadId: after.loadId,
+                offerAmount: after.offerAmount,
+              },
+              relatedId: context.params.offerId,
+            });
+          }
+        }
+
+        // Check if offer was just rejected
+        if (before.status !== "rejected" && after.status === "rejected") {
+          // Notify carrier when shipper rejects
+          if (after.carrierId) {
+            const offerAmount = (after.offerAmount != null &&
+                typeof after.offerAmount === "number") ?
+                after.offerAmount.toFixed(2) : "N/A";
+            await sendNotification({
+              userId: after.carrierId,
+              type: "offerRejected",
+              title: "Offer Rejected",
+              body: `Your offer of $${offerAmount} was rejected.`,
+              data: {
+                offerId: context.params.offerId,
+                loadId: after.loadId,
+                offerAmount: after.offerAmount,
+              },
+              relatedId: context.params.offerId,
+            });
+          }
+        }
+
+        // Check if counter-offer was made
+        const isCounterOffered = before.status !== "counterOffered" &&
+            after.status === "counterOffered";
+        if (isCounterOffered) {
+          // Notify carrier when shipper makes counter-offer
+          if (after.carrierId && after.counterOfferAmount) {
+            await sendNotification({
+              userId: after.carrierId,
+              type: "counterOfferReceived",
+              title: "Counter-Offer Received",
+              body: `Shipper counter-offered $${after.counterOfferAmount
+                  .toFixed(2)}`,
+              data: {
+                offerId: context.params.offerId,
+                loadId: after.loadId,
+                counterOfferAmount: after.counterOfferAmount,
+                originalOfferAmount: after.offerAmount,
+              },
+              relatedId: context.params.offerId,
+            });
+          }
+        }
+      } catch (error) {
+        console.error("Error sending offer status change notification:", error);
+      }
+
+      return null;
+    });
+
+/**
+ * Firestore trigger: Send notification when a message is sent
+ */
+exports.onMessageCreated = functions
     .region("northamerica-northeast1")
     .firestore.document("messages/{messageId}")
     .onCreate(async (snap, context) => {
@@ -557,6 +747,7 @@ exports.onSupportMessage = functions
       const senderId = messageData.senderId;
       const receiverId = messageData.receiverId;
       const content = messageData.content || "";
+      const messageType = messageData.type || "text";
 
       try {
         // Check if this is a support conversation
@@ -570,17 +761,18 @@ exports.onSupportMessage = functions
         }
 
         const convData = convDoc.data();
-        const isSupportConversation = convData?.isSupport === true;
+        const isSupportConversation = convData && convData.isSupport === true;
 
         if (isSupportConversation) {
-          // Send notification to the receiver
+          // For support conversations, save to notifications page
           await sendNotification({
             userId: receiverId,
             type: "message",
-            title: senderId === "support_system" 
-                ? "Support Team Replied" 
-                : "New Support Message",
-            body: content.length > 50 ? content.substring(0, 50) + "..." : content,
+            title: senderId === "support_system" ?
+                "Support Team Replied" :
+                "New Support Message",
+            body: content.length > 50 ?
+                content.substring(0, 50) + "..." : content,
             data: {
               conversationId: conversationId,
               senderId: senderId,
@@ -588,9 +780,58 @@ exports.onSupportMessage = functions
             },
             relatedId: conversationId,
           });
+        } else {
+          // For regular chat messages, send push only (no Firestore save)
+          // Skip if it's an offer message (handled by offer triggers)
+          if (messageType !== "offer") {
+            // Get sender name for notification
+            let senderName = "Someone";
+            try {
+              const senderDoc = await admin.firestore()
+                  .collection("users").doc(senderId).get();
+              if (senderDoc.exists) {
+                const senderData = senderDoc.data();
+                senderName = (senderData && senderData.displayName) ||
+                    (senderData && senderData.name) || "Someone";
+              } else {
+                // Try shippers collection
+                const shipperDoc = await admin.firestore()
+                    .collection("shippers").doc(senderId).get();
+                if (shipperDoc.exists) {
+                  const shipperData = shipperDoc.data();
+                  senderName = (shipperData && shipperData.companyName) ||
+                      (shipperData && shipperData.displayName) || "Someone";
+                } else {
+                  // Try carriers collection
+                  const carrierDoc = await admin.firestore()
+                      .collection("carriers").doc(senderId).get();
+                  if (carrierDoc.exists) {
+                    const carrierData = carrierDoc.data();
+                    senderName = (carrierData && carrierData.companyName) ||
+                        (carrierData && carrierData.displayName) || "Someone";
+                  }
+                }
+              }
+            } catch (e) {
+              console.error("Error getting sender name:", e);
+            }
+
+            await sendPushNotificationOnly({
+              userId: receiverId,
+              title: senderName,
+              body: content.length > 100 ?
+                  content.substring(0, 100) + "..." : content,
+              data: {
+                type: "message",
+                conversationId: conversationId,
+                senderId: senderId,
+                messageId: context.params.messageId,
+              },
+            });
+          }
         }
       } catch (error) {
-        console.error("Error sending support message notification:", error);
+        console.error("Error sending message notification:", error);
       }
 
       return null;
@@ -674,7 +915,28 @@ exports.createSetupIntent = functions
 
         if (userDoc.exists && userDoc.data().stripeCustomerId) {
           customerId = userDoc.data().stripeCustomerId;
-        } else {
+          // Verify the customer belongs to this user
+          try {
+            const existingCustomer =
+                await stripe.customers.retrieve(customerId);
+            if (existingCustomer.metadata && existingCustomer.metadata.userId) {
+              if (existingCustomer.metadata.userId !== decodedToken.uid) {
+                console.error(
+                    `Security issue: Customer ${customerId} belongs to user ` +
+                    `${existingCustomer.metadata.userId} but request is from ` +
+                    `${decodedToken.uid}`);
+                // Don't use this customer - create a new one
+                customerId = null;
+              }
+            }
+          } catch (error) {
+            console.error("Error verifying existing customer:", error);
+            // If we can't verify, don't use it - create a new one
+            customerId = null;
+          }
+        }
+
+        if (!customerId) {
           // Create new Stripe customer
           const customer = await stripe.customers.create({
             email: decodedToken.email,
@@ -778,22 +1040,24 @@ exports.listPaymentMethods = functions
 
       try {
         const stripe = getStripe();
+        const userId = decodedToken.uid;
 
         // Get Stripe customer ID - support both shippers and carriers
         let userDoc = await admin.firestore()
             .collection("shippers")
-            .doc(decodedToken.uid)
+            .doc(userId)
             .get();
 
         // If not a shipper, check if user is a carrier
         if (!userDoc.exists) {
           userDoc = await admin.firestore()
               .collection("carriers")
-              .doc(decodedToken.uid)
+              .doc(userId)
               .get();
         }
 
-        if (!userDoc.exists || !userDoc.data().stripeCustomerId) {
+        if (!userDoc.exists) {
+          console.log(`User ${userId} not found in shippers or carriers`);
           res.status(200).json({
             result: {
               paymentMethods: [],
@@ -802,18 +1066,49 @@ exports.listPaymentMethods = functions
           return;
         }
 
-        const customerId = userDoc.data().stripeCustomerId;
+        const userData = userDoc.data();
+        const customerId = userData.stripeCustomerId;
+
+        if (!customerId || typeof customerId !== "string") {
+          console.log(`User ${userId} does not have a valid stripeCustomerId`);
+          res.status(200).json({
+            result: {
+              paymentMethods: [],
+            },
+          });
+          return;
+        }
+
+        // Verify the customer belongs to this user by checking metadata
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer.metadata && customer.metadata.userId) {
+          if (customer.metadata.userId !== userId) {
+            console.error(
+                `Security issue: Customer ${customerId} belongs to user ` +
+                `${customer.metadata.userId} but request is from ${userId}`);
+            res.status(403).json({
+              error: {
+                status: "PERMISSION_DENIED",
+                message: "Access denied to payment methods",
+              },
+            });
+            return;
+          }
+        }
 
         // Get default payment method
-        const customer = await stripe.customers.retrieve(customerId);
         const defaultPaymentMethodId = customer.invoice_settings &&
             customer.invoice_settings.default_payment_method;
 
-        // List payment methods
+        // List payment methods - CRITICAL: filter by customer ID
         const paymentMethods = await stripe.paymentMethods.list({
           customer: customerId,
           type: "card",
         });
+
+        console.log(
+            `Found ${paymentMethods.data.length} payment methods for user ` +
+            `${userId} (customer: ${customerId})`);
 
         // Format payment methods
         const formattedMethods = paymentMethods.data.map((pm) => ({
@@ -915,12 +1210,17 @@ exports.setDefaultPaymentMethod = functions
             .doc(decodedToken.uid)
             .get();
 
+        let userCollection = "shippers"; // default
+
         // If not a shipper, check if user is a carrier
         if (!userDoc.exists) {
           userDoc = await admin.firestore()
               .collection("carriers")
               .doc(decodedToken.uid)
               .get();
+          if (userDoc.exists) {
+            userCollection = "carriers";
+          }
         }
 
         if (!userDoc.exists || !userDoc.data().stripeCustomerId) {
@@ -934,13 +1234,77 @@ exports.setDefaultPaymentMethod = functions
         }
 
         const customerId = userDoc.data().stripeCustomerId;
+        const userId = decodedToken.uid;
 
-        // Set default payment method
+        // Verify the customer belongs to this user
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer.metadata && customer.metadata.userId) {
+          if (customer.metadata.userId !== userId) {
+            console.error(
+                `Security issue: Customer ${customerId} belongs to user ` +
+                `${customer.metadata.userId} but request is from ${userId}`);
+            res.status(403).json({
+              error: {
+                status: "PERMISSION_DENIED",
+                message: "Access denied",
+              },
+            });
+            return;
+          }
+        }
+
+        // Verify the payment method belongs to this customer
+        try {
+          const paymentMethod = await stripe.paymentMethods.retrieve(
+              paymentMethodId);
+          if (paymentMethod.customer !== customerId) {
+            console.error(
+                `Security issue: Payment method ${paymentMethodId} ` +
+                `belongs to customer ${paymentMethod.customer} but user ` +
+                `${userId} tried to set it as default for ` +
+                `customer ${customerId}`);
+            res.status(403).json({
+              error: {
+                status: "PERMISSION_DENIED",
+                message: "Payment method does not belong to your account",
+              },
+            });
+            return;
+          }
+        } catch (pmError) {
+          console.error("Error retrieving payment method:", pmError);
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Payment method not found",
+            },
+          });
+          return;
+        }
+
+        // Set default payment method in Stripe
         await stripe.customers.update(customerId, {
           invoice_settings: {
             default_payment_method: paymentMethodId,
           },
         });
+
+        // Store default payment method ID in Firebase
+        try {
+          await admin.firestore()
+              .collection(userCollection)
+              .doc(decodedToken.uid)
+              .update({
+                defaultPaymentMethodId: paymentMethodId,
+                lastPaymentMethodUpdate:
+                    admin.firestore.FieldValue.serverTimestamp(),
+              });
+        } catch (firestoreError) {
+          console.error(
+              "Error storing default payment method in Firebase:",
+              firestoreError);
+          // Don't fail the request if Firestore update fails
+        }
 
         res.status(200).json({
           result: {
@@ -1048,9 +1412,55 @@ exports.deletePaymentMethod = functions
         }
 
         const customerId = userDoc.data().stripeCustomerId;
+        const userId = decodedToken.uid;
+
+        // Verify the customer belongs to this user
+        const customer = await stripe.customers.retrieve(customerId);
+        if (customer.metadata && customer.metadata.userId) {
+          if (customer.metadata.userId !== userId) {
+            console.error(
+                `Security issue: Customer ${customerId} belongs to user ` +
+                `${customer.metadata.userId} but request is from ${userId}`);
+            res.status(403).json({
+              error: {
+                status: "PERMISSION_DENIED",
+                message: "Access denied",
+              },
+            });
+            return;
+          }
+        }
+
+        // Verify the payment method belongs to this customer
+        try {
+          const paymentMethod = await stripe.paymentMethods.retrieve(
+              paymentMethodId);
+          if (paymentMethod.customer !== customerId) {
+            console.error(
+                `Security issue: Payment method ${paymentMethodId} ` +
+                `belongs to customer ${paymentMethod.customer} but user ` +
+                `${userId} tried to delete it from ` +
+                `customer ${customerId}`);
+            res.status(403).json({
+              error: {
+                status: "PERMISSION_DENIED",
+                message: "Payment method does not belong to your account",
+              },
+            });
+            return;
+          }
+        } catch (pmError) {
+          console.error("Error retrieving payment method:", pmError);
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Payment method not found",
+            },
+          });
+          return;
+        }
 
         // Check if this is the default payment method
-        const customer = await stripe.customers.retrieve(customerId);
         const defaultPaymentMethodId = customer.invoice_settings &&
             customer.invoice_settings.default_payment_method;
 
@@ -1077,6 +1487,872 @@ exports.deletePaymentMethod = functions
           error: {
             status: "INTERNAL",
             message: error.message || "Failed to delete payment method",
+          },
+        });
+      }
+    });
+
+/**
+ * Create Stripe Connect account for carrier
+ *
+ * This function creates a Stripe Connect Express account for a carrier
+ * so they can receive payment transfers.
+ *
+ * NOTE: Only carriers need Connect accounts to receive money.
+ * Shippers only need Stripe Customer accounts (for storing payment methods
+ * to send money), which are handled by createSetupIntent.
+ */
+exports.createConnectAccount = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      // Set CORS headers
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      // Get auth token
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+
+      // Verify token
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const stripe = getStripe();
+        const userId = decodedToken.uid;
+
+        // Verify user is a carrier
+        const carrierDoc = await admin.firestore()
+            .collection("carriers")
+            .doc(userId)
+            .get();
+
+        if (!carrierDoc.exists) {
+          res.status(403).json({
+            error: {
+              status: "PERMISSION_DENIED",
+              message: "Only carriers can create Connect accounts",
+            },
+          });
+          return;
+        }
+
+        const carrierData = carrierDoc.data();
+
+        // Check if account already exists
+        if (carrierData.stripeAccountId) {
+          res.status(200).json({
+            result: {
+              accountId: carrierData.stripeAccountId,
+              alreadyExists: true,
+            },
+          });
+          return;
+        }
+
+        // Create Stripe Connect Express account
+        const account = await stripe.accounts.create({
+          type: "express",
+          country: "CA", // Canada
+          email: decodedToken.email,
+          capabilities: {
+            card_payments: {requested: true},
+            transfers: {requested: true},
+          },
+          metadata: {
+            userId: userId,
+            userType: "carrier",
+          },
+        });
+
+        // Save account ID to Firebase
+        await admin.firestore()
+            .collection("carriers")
+            .doc(userId)
+            .update({
+              stripeAccountId: account.id,
+            });
+
+        res.status(200).json({
+          result: {
+            accountId: account.id,
+            accountType: account.type,
+            chargesEnabled: account.charges_enabled,
+            payoutsEnabled: account.payouts_enabled,
+            alreadyExists: false,
+          },
+        });
+      } catch (error) {
+        console.error("Error creating Connect account:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to create Connect account",
+          },
+        });
+      }
+    });
+
+/**
+ * Create Account Link for Stripe Connect onboarding
+ *
+ * This function generates an onboarding URL for carriers to complete
+ * their Stripe Connect account setup.
+ *
+ * NOTE: Only carriers need this. Shippers don't need Connect accounts
+ * since they only send money (not receive it).
+ */
+exports.createAccountLink = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      // Set CORS headers
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      // Get auth token
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+
+      // Verify token
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const stripe = getStripe();
+        const userId = decodedToken.uid;
+
+        // Get carrier's Connect account ID
+        const carrierDoc = await admin.firestore()
+            .collection("carriers")
+            .doc(userId)
+            .get();
+
+        if (!carrierDoc.exists) {
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Carrier not found",
+            },
+          });
+          return;
+        }
+
+        const carrierData = carrierDoc.data();
+        const accountId = carrierData.stripeAccountId;
+
+        if (!accountId) {
+          res.status(400).json({
+            error: {
+              status: "INVALID_ARGUMENT",
+              message: "Carrier does not have a Connect account. " +
+                  "Create one first using createConnectAccount.",
+            },
+          });
+          return;
+        }
+
+        // Get request data for return URL
+        const requestData = req.body.data || req.body;
+        // Use a simple return URL - for mobile apps, this is just a
+        // redirect target. The actual return happens when user manually
+        // returns to app
+        const returnUrl = requestData.returnUrl ||
+            "https://stripe.com";
+
+        console.log(`Creating Account Link for account ${accountId}`);
+        console.log(`Return URL: ${returnUrl}`);
+
+        // Create Account Link for onboarding
+        const accountLink = await stripe.accountLinks.create({
+          account: accountId,
+          refresh_url: returnUrl,
+          return_url: returnUrl,
+          type: "account_onboarding",
+        });
+
+        console.log(`Account Link created: ${accountLink.url}`);
+        console.log(`Expires at: ${accountLink.expires_at}`);
+
+        res.status(200).json({
+          result: {
+            url: accountLink.url,
+            expiresAt: accountLink.expires_at,
+          },
+        });
+      } catch (error) {
+        console.error("Error creating Account Link:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to create Account Link",
+          },
+        });
+      }
+    });
+
+/**
+ * Get Stripe Connect account status
+ *
+ * This function retrieves the status of a carrier's Connect account,
+ * including whether it's activated, restricted, or needs onboarding.
+ *
+ * NOTE: Only carriers need Connect accounts to receive money.
+ */
+exports.getConnectAccountStatus = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      // Set CORS headers
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      if (req.method !== "GET") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      // Get auth token
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+
+      // Verify token
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const stripe = getStripe();
+        const userId = decodedToken.uid;
+
+        // Get carrier's Connect account ID
+        const carrierDoc = await admin.firestore()
+            .collection("carriers")
+            .doc(userId)
+            .get();
+
+        if (!carrierDoc.exists) {
+          res.status(404).json({
+            error: {
+              status: "NOT_FOUND",
+              message: "Carrier not found",
+            },
+          });
+          return;
+        }
+
+        const carrierData = carrierDoc.data();
+        const accountId = carrierData.stripeAccountId;
+
+        if (!accountId) {
+          res.status(200).json({
+            result: {
+              hasAccount: false,
+              accountId: null,
+              chargesEnabled: false,
+              payoutsEnabled: false,
+              detailsSubmitted: false,
+              needsOnboarding: true,
+            },
+          });
+          return;
+        }
+
+        // Retrieve account from Stripe
+        const account = await stripe.accounts.retrieve(accountId);
+
+        // Check if account needs onboarding
+        const needsOnboarding = !account.details_submitted ||
+            !account.charges_enabled || !account.payouts_enabled;
+
+        res.status(200).json({
+          result: {
+            hasAccount: true,
+            accountId: account.id,
+            chargesEnabled: account.charges_enabled || false,
+            payoutsEnabled: account.payouts_enabled || false,
+            detailsSubmitted: account.details_submitted || false,
+            needsOnboarding: needsOnboarding,
+            restrictions: (account.requirements &&
+                account.requirements.currently_due) || [],
+            disabledReason: (account.requirements &&
+                account.requirements.disabled_reason) || null,
+          },
+        });
+      } catch (error) {
+        console.error("Error getting Connect account status:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to get Connect account status",
+          },
+        });
+      }
+    });
+
+/**
+ * Transfer payment to carrier
+ *
+ * This function handles payment transfers from shippers to carriers.
+ * It charges the shipper's payment method and transfers funds to the
+ * carrier's Stripe account.
+ *
+ * @param {Object} data - Transfer data
+ * @param {string} data.carrierId - Carrier's user ID
+ * @param {string} data.carrierStripeAccountId - Carrier's Stripe
+ *   connected account ID (optional)
+ * @param {string} data.carrierStripeCustomerId - Carrier's Stripe
+ *   customer ID (optional)
+ * @param {string} data.shipperId - Shipper's user ID
+ * @param {string} data.shipperStripeCustomerId - Shipper's Stripe
+ *   customer ID
+ * @param {string} data.shipperPaymentMethodId - Shipper's payment
+ *   method ID (optional)
+ * @param {string} data.loadId - Load ID for this payment
+ * @param {number} data.amount - Amount in cents
+ * @param {string} data.currency - Currency code (default: 'usd')
+ * @param {string} data.completionStatus - Delivery completion status
+ * @returns {Object} Transfer result with transfer ID
+ */
+exports.transferPaymentToCarrier = functions
+    .region("northamerica-northeast1")
+    .https.onRequest(async (req, res) => {
+      // Set CORS headers
+      res.set("Access-Control-Allow-Origin", "*");
+      res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+      res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+      // Handle preflight
+      if (req.method === "OPTIONS") {
+        res.status(204).send("");
+        return;
+      }
+
+      // Only allow POST
+      if (req.method !== "POST") {
+        res.status(405).json({error: "Method not allowed"});
+        return;
+      }
+
+      // Get auth token from header
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        console.error("Missing or invalid Authorization header");
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "User must be authenticated to transfer payment",
+          },
+        });
+        return;
+      }
+
+      const idToken = authHeader.split("Bearer ")[1];
+
+      // Verify the token and get user
+      let decodedToken;
+      try {
+        decodedToken = await admin.auth().verifyIdToken(idToken);
+      } catch (error) {
+        console.error("Error verifying token:", error);
+        res.status(401).json({
+          error: {
+            status: "UNAUTHENTICATED",
+            message: "Invalid authentication token",
+          },
+        });
+        return;
+      }
+
+      try {
+        const requestData = req.body.data || req.body;
+        const {
+          carrierId,
+          carrierStripeAccountId,
+          shipperId,
+          shipperStripeCustomerId,
+          shipperPaymentMethodId,
+          loadId,
+          amount,
+          currency = "usd",
+          completionStatus,
+        } = requestData;
+
+        // Validate required fields
+        if (!carrierId || !shipperId || !loadId || !amount || amount <= 0) {
+          res.status(400).json({
+            error: {
+              status: "INVALID_ARGUMENT",
+              message: "Missing required fields: carrierId, " +
+                  "shipperId, loadId, and amount are required",
+            },
+          });
+          return;
+        }
+
+        // Verify shipper is making the request
+        if (decodedToken.uid !== shipperId) {
+          res.status(403).json({
+            error: {
+              status: "PERMISSION_DENIED",
+              message: "Only the shipper can initiate payment transfers",
+            },
+          });
+          return;
+        }
+
+        const stripe = getStripe();
+
+        // Get or create shipper's Stripe customer ID if not provided
+        let finalShipperStripeCustomerId = shipperStripeCustomerId;
+        if (!finalShipperStripeCustomerId) {
+          try {
+            const shipperDoc = await admin.firestore()
+                .collection("shippers")
+                .doc(shipperId)
+                .get();
+            if (shipperDoc.exists) {
+              const shipperData = shipperDoc.data();
+              finalShipperStripeCustomerId = shipperData.stripeCustomerId;
+            }
+
+            // If still no customer ID, create one
+            if (!finalShipperStripeCustomerId) {
+              const customer = await stripe.customers.create({
+                email: decodedToken.email,
+                metadata: {
+                  userId: shipperId,
+                },
+              });
+              finalShipperStripeCustomerId = customer.id;
+
+              // Save to Firebase
+              await admin.firestore()
+                  .collection("shippers")
+                  .doc(shipperId)
+                  .update({
+                    stripeCustomerId: finalShipperStripeCustomerId,
+                  });
+            }
+          } catch (error) {
+            console.error(
+                "Error getting/creating shipper Stripe customer:",
+                error);
+            res.status(400).json({
+              error: {
+                status: "INVALID_ARGUMENT",
+                message: "Failed to get or create Stripe customer. " +
+                    "Please try again or contact support.",
+              },
+            });
+            return;
+          }
+        }
+
+        // Get shipper's payment method if not provided
+        // First check Firebase for stored payment method
+        let paymentMethodId = shipperPaymentMethodId;
+        if (!paymentMethodId) {
+          try {
+            const shipperDoc = await admin.firestore()
+                .collection("shippers")
+                .doc(shipperId)
+                .get();
+            if (shipperDoc.exists) {
+              const shipperData = shipperDoc.data();
+              paymentMethodId = shipperData.defaultPaymentMethodId;
+            }
+          } catch (error) {
+            console.error("Error getting payment method from Firebase:", error);
+          }
+        }
+
+        // If still no payment method, check Stripe customer
+        if (!paymentMethodId && finalShipperStripeCustomerId) {
+          try {
+            const customer = await stripe.customers.retrieve(
+                finalShipperStripeCustomerId);
+            paymentMethodId = customer.invoice_settings &&
+                customer.invoice_settings.default_payment_method ?
+                customer.invoice_settings.default_payment_method :
+                null;
+            // If still no payment method, get the first available one
+            // Check for all payment method types, not just cards
+            if (!paymentMethodId) {
+              // First try cards
+              let paymentMethods = await stripe.paymentMethods.list({
+                customer: finalShipperStripeCustomerId,
+                type: "card",
+              });
+              if (paymentMethods.data.length > 0) {
+                paymentMethodId = paymentMethods.data[0].id;
+              } else {
+                // If no cards, try all payment methods
+                paymentMethods = await stripe.paymentMethods.list({
+                  customer: finalShipperStripeCustomerId,
+                });
+                if (paymentMethods.data.length > 0) {
+                  paymentMethodId = paymentMethods.data[0].id;
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error retrieving shipper payment method:", error);
+            console.error("Customer ID:", finalShipperStripeCustomerId);
+          }
+        }
+
+        if (!paymentMethodId) {
+          console.error("No payment method found for shipper:", shipperId);
+          console.error("Stripe Customer ID:", finalShipperStripeCustomerId);
+          res.status(400).json({
+            error: {
+              status: "INVALID_ARGUMENT",
+              message: "Shipper does not have a payment method set up. " +
+                  "Please add a payment method in your account settings " +
+                  "before releasing payment.",
+            },
+          });
+          return;
+        }
+
+        // Step 1: Create a Payment Intent to charge the shipper
+        // If carrier has Connect account, charge directly to it using
+        // transfer_data. This avoids "insufficient funds" issue in test mode
+        const paymentIntentParams = {
+          amount: amount,
+          currency: currency.toLowerCase(),
+          customer: finalShipperStripeCustomerId,
+          payment_method: paymentMethodId,
+          confirm: true,
+          description: `Payment for load ${loadId}`,
+          automatic_payment_methods: {
+            enabled: true,
+            allow_redirects: "never",
+          },
+          metadata: {
+            loadId: loadId,
+            carrierId: carrierId,
+            shipperId: shipperId,
+            completionStatus: completionStatus || "complete",
+            type: "carrier_payment",
+          },
+        };
+
+        // If carrier has Connect account, charge directly to it
+        if (carrierStripeAccountId) {
+          paymentIntentParams.transfer_data = {
+            destination: carrierStripeAccountId,
+          };
+        }
+
+        const paymentIntent = await stripe.paymentIntents.create(
+            paymentIntentParams);
+
+        if (paymentIntent.status !== "succeeded") {
+          res.status(400).json({
+            error: {
+              status: "PAYMENT_FAILED",
+              message: `Payment intent status: ${paymentIntent.status}`,
+            },
+          });
+          return;
+        }
+
+        // Step 2: Check if payment was charged directly to Connect account
+        // If transfer_data was used, no separate transfer is needed
+        let transferId = null;
+        let transferError = null;
+
+        if (carrierStripeAccountId) {
+          // Check if payment was charged directly to Connect account
+          const transferData = paymentIntent.transfer_data;
+          if (transferData &&
+              transferData.destination === carrierStripeAccountId) {
+            // Payment was charged directly to Connect account -
+            // no transfer needed
+            transferId = paymentIntent.id;
+            console.log(
+                "Payment charged directly to Connect account:",
+                carrierStripeAccountId);
+          } else {
+            // Fallback: Try to transfer (for backwards compatibility)
+            // This should rarely happen if transfer_data was set correctly
+            try {
+              const transfer = await stripe.transfers.create({
+                amount: amount,
+                currency: currency.toLowerCase(),
+                destination: carrierStripeAccountId,
+                description: `Payment for load ${loadId}`,
+                metadata: {
+                  loadId: loadId,
+                  shipperId: shipperId,
+                  completionStatus: completionStatus || "complete",
+                },
+              });
+              transferId = transfer.id;
+            } catch (transferErr) {
+              console.error("Transfer failed:", transferErr);
+              transferError = transferErr.message || "Transfer failed";
+              // Refund the payment
+              try {
+                await stripe.refunds.create({
+                  payment_intent: paymentIntent.id,
+                });
+                console.log("Payment refunded due to transfer failure");
+              } catch (refundError) {
+                console.error("Error refunding payment:", refundError);
+              }
+            }
+          }
+        } else {
+          // Carrier doesn't have connected account - refund payment
+          transferError = "Carrier does not have a Stripe connected account " +
+              "set up. Payment was not transferred.";
+          try {
+            await stripe.refunds.create({
+              payment_intent: paymentIntent.id,
+            });
+            console.log("Payment refunded - carrier has no connected account");
+          } catch (refundError) {
+            console.error("Error refunding payment:", refundError);
+          }
+        }
+
+        // Step 3: Get carrier name and load number for transfer record
+        let carrierName = "Unknown Carrier";
+        let loadNumber = null;
+
+        try {
+          // Get carrier name
+          const carrierDoc = await admin.firestore()
+              .collection("carriers")
+              .doc(carrierId)
+              .get();
+          if (carrierDoc.exists) {
+            const carrierData = carrierDoc.data();
+            carrierName = (carrierData && carrierData.companyName) ||
+                (carrierData && carrierData.displayName) ||
+                (carrierData && carrierData.name) ||
+                "Unknown Carrier";
+          }
+        } catch (error) {
+          console.error("Error fetching carrier name:", error);
+        }
+
+        try {
+          // Get load number
+          const loadDoc = await admin.firestore()
+              .collection("loads")
+              .doc(loadId)
+              .get();
+          if (loadDoc.exists) {
+            const loadData = loadDoc.data();
+            loadNumber = loadData.loadNumber || loadData.load_id || null;
+          }
+        } catch (error) {
+          console.error("Error fetching load number:", error);
+        }
+
+        // Step 4: Store transfer record in Firestore
+        try {
+          await admin.firestore().collection("transfers").add({
+            carrierId: carrierId,
+            carrierName: carrierName,
+            shipperId: shipperId,
+            loadId: loadId,
+            loadNumber: loadNumber,
+            amount: amount / 100, // Convert cents to dollars
+            amountInCents: amount,
+            currency: currency,
+            completionStatus: completionStatus || "complete",
+            stripePaymentIntentId: paymentIntent.id,
+            stripeTransferId: transferId,
+            status: transferId ? "completed" : "failed",
+            error: transferError,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            completedAt: transferId ?
+                admin.firestore.FieldValue.serverTimestamp() : null,
+            succeededAt: transferId ?
+                admin.firestore.FieldValue.serverTimestamp() : null,
+          });
+        } catch (firestoreError) {
+          console.error("Error storing transfer record:", firestoreError);
+          // Don't fail the request if Firestore write fails
+        }
+
+        // Also store payment intent in payment_intents collection
+        // with carrier info
+        try {
+          await admin.firestore().collection("payment_intents").add({
+            userId: shipperId,
+            paymentIntentId: paymentIntent.id,
+            amount: amount,
+            currency: currency,
+            status: paymentIntent.status,
+            carrierId: carrierId,
+            carrierName: carrierName,
+            loadId: loadId,
+            loadNumber: loadNumber,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            succeededAt: paymentIntent.status === "succeeded" ?
+                admin.firestore.FieldValue.serverTimestamp() : null,
+            metadata: {
+              loadId: loadId,
+              carrierId: carrierId,
+              shipperId: shipperId,
+              completionStatus: completionStatus || "complete",
+              type: "carrier_payment",
+            },
+          });
+        } catch (logError) {
+          console.error("Error storing payment intent record:", logError);
+          // Don't fail the request if logging fails
+        }
+
+        // Step 5: Update delivery confirmation with payment info
+        // Only mark as released if transfer was successful
+        if (transferId) {
+          try {
+            const confirmationQuery = await admin.firestore()
+                .collection("delivery_confirmations")
+                .where("loadId", "==", loadId)
+                .limit(1)
+                .get();
+
+            if (!confirmationQuery.empty) {
+              await confirmationQuery.docs[0].ref.update({
+                paymentReleased: true,
+                paymentReleasedAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+                paymentAmount: amount / 100,
+                stripePaymentIntentId: paymentIntent.id,
+                stripeTransferId: transferId,
+              });
+            }
+          } catch (updateError) {
+            console.error("Error updating delivery confirmation:", updateError);
+            // Don't fail the request if update fails
+          }
+        }
+
+        // Return response - success if transfer worked, warning if not
+        if (transferId) {
+          res.status(200).json({
+            result: {
+              success: true,
+              transferId: transferId,
+              paymentIntentId: paymentIntent.id,
+              amount: amount / 100,
+              currency: currency,
+            },
+          });
+        } else {
+          // Payment was charged but transfer failed - return warning
+          res.status(200).json({
+            result: {
+              success: false,
+              warning: true,
+              message: transferError ||
+                  "Payment was charged but transfer to carrier failed. " +
+                  "Payment has been refunded.",
+              paymentIntentId: paymentIntent.id,
+              amount: amount / 100,
+              currency: currency,
+            },
+          });
+        }
+      } catch (error) {
+        console.error("Error transferring payment to carrier:", error);
+        res.status(500).json({
+          error: {
+            status: "INTERNAL",
+            message: error.message || "Failed to transfer payment to carrier",
           },
         });
       }

@@ -63,7 +63,7 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                     ),
                     const SizedBox(width: 12),
                      Text(
-                      "${widget.load.distance.toStringAsFixed(0)} (mi)",
+                      "${widget.load.distance.toStringAsFixed(0)} mi",
                       style: TextStyle(fontSize: 16,color: primaryColor,),
                     ),
                   ],
@@ -128,9 +128,10 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-                    "From : ${widget.load.originCity}, ${widget.load.originState}",
+                    "From : ${widget.load.originAddress.isNotEmpty ? widget.load.originAddress : '${widget.load.originCity}, ${widget.load.originState}'}",
                     style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w700),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                 ),
               ],
@@ -143,9 +144,10 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                 Expanded(
                   flex: 2,
                   child: Text(
-                    "To : ${widget.load.destinationCity}, ${widget.load.destinationState}",
+                    "To : ${widget.load.destinationAddress.isNotEmpty ? widget.load.destinationAddress : '${widget.load.destinationCity}, ${widget.load.destinationState}'}",
                     style: TextStyle(color: primaryColor, fontSize: 14, fontWeight: FontWeight.w700),
                     overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -201,11 +203,11 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                   children: [
                     // Single button that handles both view details and booking
                     ElevatedButton(
-                      onPressed: widget.load.status == 'available' 
+                      onPressed: widget.load.status == 'active' || widget.load.status == 'available'
                           ? () => _handleLoadAction(context)
                           : () => _showLoadDetails(context),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: widget.load.status == 'available' 
+                        backgroundColor: widget.load.status == 'active' || widget.load.status == 'available'
                             ? primaryColor
                             : _getStatusColor(widget.load.status),
                         shape: RoundedRectangleBorder(
@@ -215,7 +217,7 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                       child: FittedBox(
                         fit: BoxFit.scaleDown,
                         child: Text(
-                          widget.load.status == 'available' ? "Book Now" : _getActionText(widget.load.status), 
+                          widget.load.status == 'active' || widget.load.status == 'available' ? "Book Now" : _getActionText(widget.load.status), 
                           style: const TextStyle(color: Colors.white, fontSize: 12),
                         ),
                       ),
@@ -290,6 +292,7 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
 
   Color _getStatusColor(String status) {
     switch (status) {
+      case 'active':
       case 'available':
         return primaryColor;
       case 'booked':
@@ -307,6 +310,8 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
 
   String _getStatusText(String status) {
     switch (status) {
+      case 'active':
+        return 'Active';
       case 'available':
         return 'Available';
       case 'booked':

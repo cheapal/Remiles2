@@ -32,6 +32,18 @@ class _ShipperSettingsPageState extends State<ShipperSettingsPage> {
   bool _isVerifyingOtp = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Auto-fill phone number from user data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final shipper = context.read<AuthProvider>().shipperUser;
+      if (shipper?.phoneNumber != null && mounted) {
+        _phoneController.text = shipper!.phoneNumber!;
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
@@ -490,6 +502,15 @@ class _ShipperSettingsPageState extends State<ShipperSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final shipper = context.watch<AuthProvider>().shipperUser;
+    
+    // Update phone controller when shipper data changes
+    if (shipper?.phoneNumber != null && _phoneController.text != shipper!.phoneNumber) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _phoneController.text = shipper.phoneNumber!;
+        }
+      });
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -871,11 +892,11 @@ class _ShipperSettingsPageState extends State<ShipperSettingsPage> {
 
                     // Phone verification form (only show if phone is not verified)
                     if (!shipper.isPhoneVerified) ...[
-                      // Phone number input
+                      // Phone number input (disabled and auto-filled)
                       TextFormField(
                         controller: _phoneController,
                         keyboardType: TextInputType.phone,
-                        enabled: !_isOtpSent,
+                        enabled: false, // Always disabled - phone number should not be typed
                         decoration: InputDecoration(
                           labelText: 'Phone Number',
                           hintText: '+1234567890',
@@ -892,6 +913,10 @@ class _ShipperSettingsPageState extends State<ShipperSettingsPage> {
                             borderRadius: BorderRadius.circular(10),
                             borderSide: const BorderSide(color: Color(0xFF43975A), width: 2),
                           ),
+                          disabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.grey.shade300, width: 2),
+                          ),
                           errorBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
                             borderSide: const BorderSide(color: Colors.red, width: 2),
@@ -901,7 +926,13 @@ class _ShipperSettingsPageState extends State<ShipperSettingsPage> {
                             borderSide: const BorderSide(color: Colors.red, width: 2),
                           ),
                           filled: true,
-                          fillColor: Colors.white,
+                          fillColor: Colors.grey.shade100,
+                          helperText: 'Phone number is auto-filled from your account',
+                          helperStyle: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontFamily: 'Roboto',
+                          ),
                         ),
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {

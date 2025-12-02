@@ -11,6 +11,7 @@ class PaymentMethodsProvider with ChangeNotifier {
   bool _isRefreshing = false;
   DateTime? _lastPaymentMethodsFetch;
   DateTime? _lastTransactionsFetch;
+  String? _currentUserId; // Track current user to detect user changes
   static const Duration _cacheValidDuration = Duration(minutes: 5);
 
   // Getters
@@ -36,6 +37,25 @@ class PaymentMethodsProvider with ChangeNotifier {
   /// Load payment methods (with caching)
   /// [forceRefresh] - if true, bypasses cache and fetches fresh data
   Future<void> loadPaymentMethods({bool forceRefresh = false}) async {
+    // Check if user changed - if so, clear cache immediately
+    final currentUser = FirebaseService.currentUser;
+    final currentUserId = currentUser?.uid;
+    
+    if (currentUserId != null && _currentUserId != null && _currentUserId != currentUserId) {
+      // User changed - clear all data immediately
+      debugPrint('User changed from $_currentUserId to $currentUserId - clearing payment methods cache');
+      clear();
+    }
+    
+    // Update tracked user ID
+    _currentUserId = currentUserId;
+    
+    // If no user is logged in, clear data and return
+    if (currentUserId == null) {
+      clear();
+      return;
+    }
+    
     // Return cached data if valid and not forcing refresh
     if (!forceRefresh && _isPaymentMethodsCacheValid && _paymentMethods.isNotEmpty) {
       // Log cache hit
@@ -139,6 +159,25 @@ class PaymentMethodsProvider with ChangeNotifier {
     DateTime? fromDate,
     DateTime? toDate,
   }) async {
+    // Check if user changed - if so, clear cache immediately
+    final currentUser = FirebaseService.currentUser;
+    final currentUserId = currentUser?.uid;
+    
+    if (currentUserId != null && _currentUserId != null && _currentUserId != currentUserId) {
+      // User changed - clear all data immediately
+      debugPrint('User changed from $_currentUserId to $currentUserId - clearing transactions cache');
+      clear();
+    }
+    
+    // Update tracked user ID
+    _currentUserId = currentUserId;
+    
+    // If no user is logged in, clear data and return
+    if (currentUserId == null) {
+      clear();
+      return;
+    }
+    
     // Return cached data if valid and not forcing refresh
     if (!forceRefresh && _isTransactionsCacheValid && _transactions.isNotEmpty) {
       return;
@@ -154,38 +193,210 @@ class PaymentMethodsProvider with ChangeNotifier {
       final currentUser = FirebaseService.currentUser;
       if (currentUser == null) return;
 
-      Query query = FirebaseService.firestore
-          .collection('payment_intents')
-          .where('userId', isEqualTo: currentUser.uid)
-          .orderBy('createdAt', descending: true)
-          .limit(50);
+      List<Map<String, dynamic>> allTransactions = [];
 
-      // Apply date filters if set
-      if (fromDate != null) {
-        query = query.where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(fromDate));
+      // Load from payment_intents collection
+      try {
+        Query paymentIntentsQuery = FirebaseService.firestore
+            .collection('payment_intents')
+            .where('userId', isEqualTo: currentUser.uid)
+            .orderBy('createdAt', descending: true)
+            .limit(100);
+
+        final paymentIntentsSnapshot = await paymentIntentsQuery.get();
+        allTransactions.addAll(paymentIntentsSnapshot.docs.map((doc) {
+          final data = (doc.data() ?? <String, dynamic>{}) as Map<String, dynamic>;
+          return {
+            'id': doc.id,
+            'type': 'payment_intent',
+            'paymentIntentId': data['paymentIntentId'] ?? 'N/A',
+            'amount': data['amount'] ?? 0,
+            'currency': data['currency'] ?? 'usd',
+            'status': data['status'] ?? 'unknown',
+            'carrierId': data['carrierId'],
+            'carrierName': data['carrierName'],
+            'loadId': data['loadId'],
+            'loadNumber': data['loadNumber'],
+            'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
+            'succeededAt': (data['succeededAt'] as Timestamp?)?.toDate(),
+            'failedAt': (data['failedAt'] as Timestamp?)?.toDate(),
+            'failureReason': data['failureReason'],
+            'metadata': data['metadata'],
+          };
+        }));
+      } catch (e) {
+        debugPrint('Error loading payment_intents: $e');
       }
-      if (toDate != null) {
-        final endOfDay = DateTime(toDate.year, toDate.month, toDate.day, 23, 59, 59);
-        query = query.where('createdAt', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay));
+
+      // Load from transfers collection (shipper payments to carriers)
+      try {
+        Query transfersQuery = FirebaseService.firestore
+            .collection('transfers')
+            .where('shipperId', isEqualTo: currentUser.uid)
+            .orderBy('createdAt', descending: true)
+            .limit(200);
+
+        final transfersSnapshot = await transfersQuery.get();
+        allTransactions.addAll(transfersSnapshot.docs.map((doc) {
+          final data = (doc.data() ?? <String, dynamic>{}) as Map<String, dynamic>;
+          // Convert amount: amountInCents is in cents, amount is in dollars
+          final amountInCents = data['amountInCents'] as int?;
+          final amountDollars = data['amount'] as num?;
+          final amount = amountInCents ?? 
+              (amountDollars != null ? (amountDollars * 100).toInt() : 0);
+          
+          return {
+            'id': doc.id,
+            'type': 'transfer',
+            'transferId': data['stripeTransferId'] ?? doc.id,
+            'paymentIntentId': data['stripePaymentIntentId'] ?? 
+                              data['stripeTransferId'] ?? 
+                              doc.id,
+            'amount': amount,
+            'currency': data['currency'] ?? 'usd',
+            'status': data['status'] ?? 'completed',
+            'carrierId': data['carrierId'],
+            'carrierName': data['carrierName'],
+            'loadId': data['loadId'],
+            'loadNumber': data['loadNumber'],
+            'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
+            'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
+            'succeededAt': (data['succeededAt'] as Timestamp?)?.toDate() ?? 
+                          (data['completedAt'] as Timestamp?)?.toDate() ??
+                          (data['createdAt'] as Timestamp?)?.toDate(),
+            'metadata': data,
+          };
+        }));
+      } catch (e) {
+        debugPrint('Error loading transfers: $e');
+        // If query fails (e.g., missing index), try without orderBy
+        try {
+          final transfersSnapshot = await FirebaseService.firestore
+              .collection('transfers')
+              .where('shipperId', isEqualTo: currentUser.uid)
+              .limit(200)
+              .get();
+          
+          allTransactions.addAll(transfersSnapshot.docs.map((doc) {
+            final data = doc.data();
+            // Convert amount: amountInCents is in cents, amount is in dollars
+            final amountInCents = data['amountInCents'] as int?;
+            final amountDollars = data['amount'] as num?;
+            final amount = amountInCents ?? 
+                (amountDollars != null ? (amountDollars * 100).toInt() : 0);
+            
+            return {
+              'id': doc.id,
+              'type': 'transfer',
+              'transferId': data['stripeTransferId'] ?? doc.id,
+              'paymentIntentId': data['stripePaymentIntentId'] ?? 
+                                data['stripeTransferId'] ?? 
+                                doc.id,
+              'amount': amount,
+              'currency': data['currency'] ?? 'usd',
+              'status': data['status'] ?? 'completed',
+              'carrierId': data['carrierId'],
+              'carrierName': data['carrierName'],
+              'loadId': data['loadId'],
+              'loadNumber': data['loadNumber'],
+              'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
+              'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
+              'succeededAt': (data['succeededAt'] as Timestamp?)?.toDate() ?? 
+                            (data['completedAt'] as Timestamp?)?.toDate() ??
+                            (data['createdAt'] as Timestamp?)?.toDate(),
+              'metadata': data,
+            };
+          }));
+        } catch (e2) {
+          debugPrint('Error loading transfers (fallback): $e2');
+        }
       }
 
-      final snapshot = await query.get();
-      _transactions = snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        return {
-          'id': doc.id,
-          'paymentIntentId': data['paymentIntentId'] ?? 'N/A',
-          'amount': data['amount'] ?? 0,
-          'currency': data['currency'] ?? 'usd',
-          'status': data['status'] ?? 'unknown',
-          'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
-          'succeededAt': (data['succeededAt'] as Timestamp?)?.toDate(),
-          'failedAt': (data['failedAt'] as Timestamp?)?.toDate(),
-          'failureReason': data['failureReason'],
-          'metadata': data['metadata'],
-        };
-      }).toList();
+      // Deduplicate: If a payment_intent has a corresponding transfer,
+      // prefer the transfer (it has more complete info about carrier payments)
+      final Map<String, Map<String, dynamic>> uniqueTransactions = {};
+      final Set<String> transferPaymentIntentIds = {};
+      
+      // First pass: collect all transfer paymentIntentIds
+      for (final transaction in allTransactions) {
+        if (transaction['type'] == 'transfer') {
+          final paymentIntentId = transaction['paymentIntentId'] as String?;
+          if (paymentIntentId != null && paymentIntentId != 'N/A') {
+            transferPaymentIntentIds.add(paymentIntentId);
+            // Use paymentIntentId as key, prefer transfer over payment_intent
+            uniqueTransactions[paymentIntentId] = transaction;
+          } else {
+            // If no paymentIntentId, use id as key
+            uniqueTransactions[transaction['id'] as String] = transaction;
+          }
+        }
+      }
+      
+      // Second pass: add payment_intents only if they don't have a matching transfer
+      for (final transaction in allTransactions) {
+        if (transaction['type'] == 'payment_intent') {
+          final paymentIntentId = transaction['paymentIntentId'] as String?;
+          if (paymentIntentId != null && paymentIntentId != 'N/A') {
+            // Skip if we already have a transfer for this payment intent
+            if (!transferPaymentIntentIds.contains(paymentIntentId)) {
+              uniqueTransactions[paymentIntentId] = transaction;
+            }
+          } else {
+            // If no paymentIntentId, use id as key (only if not already added)
+            final id = transaction['id'] as String;
+            if (!uniqueTransactions.containsKey(id)) {
+              uniqueTransactions[id] = transaction;
+            }
+          }
+        }
+      }
 
+      // Convert back to list
+      allTransactions = uniqueTransactions.values.toList();
+
+      // Sort all transactions by date (most recent first)
+      allTransactions.sort((a, b) {
+        final dateA = a['succeededAt'] as DateTime? ?? 
+                     a['completedAt'] as DateTime? ?? 
+                     a['createdAt'] as DateTime? ?? 
+                     DateTime(1970);
+        final dateB = b['succeededAt'] as DateTime? ?? 
+                     b['completedAt'] as DateTime? ?? 
+                     b['createdAt'] as DateTime? ?? 
+                     DateTime(1970);
+        return dateB.compareTo(dateA);
+      });
+
+      // Apply date filters in memory (respecting time component)
+      if (fromDate != null || toDate != null) {
+        allTransactions = allTransactions.where((transaction) {
+          final transactionDate = transaction['succeededAt'] as DateTime? ??
+                                transaction['completedAt'] as DateTime? ??
+                                transaction['createdAt'] as DateTime?;
+          
+          if (transactionDate == null) return false;
+          
+          // For fromDate: transaction must be on or after the selected date/time
+          if (fromDate != null) {
+            // Compare dates and times, but allow same day if time is equal or later
+            if (transactionDate.isBefore(fromDate)) {
+              return false;
+            }
+          }
+          
+          // For toDate: transaction must be on or before the selected date/time
+          if (toDate != null) {
+            // Compare dates and times exactly, including the time component
+            if (transactionDate.isAfter(toDate)) {
+              return false;
+            }
+          }
+          
+          return true;
+        }).toList();
+      }
+
+      _transactions = allTransactions;
       _lastTransactionsFetch = DateTime.now();
       
       // Log success
@@ -416,6 +627,7 @@ class PaymentMethodsProvider with ChangeNotifier {
     _transactions = [];
     _lastPaymentMethodsFetch = null;
     _lastTransactionsFetch = null;
+    _currentUserId = null; // Clear user tracking
     notifyListeners();
   }
 }

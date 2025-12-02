@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/app_state_provider.dart';
 import '../../../core/firebase_service.dart';
@@ -29,6 +30,12 @@ class _ShipperAccountDetailsPageState extends State<ShipperAccountDetailsPage> {
   
   // Business type multi-select
   List<String> _selectedBusinessTypes = [];
+  
+  // Phone number availability checking
+  Timer? _phoneCheckTimer;
+  bool _isCheckingPhone = false;
+  String? _phoneAvailabilityMessage;
+  bool? _isPhoneAvailable;
   
   // Business type options
   static const List<String> _businessTypeOptions = [
@@ -70,10 +77,86 @@ class _ShipperAccountDetailsPageState extends State<ShipperAccountDetailsPage> {
     if (shipper?.businessType != null && shipper!.businessType!.isNotEmpty) {
       _selectedBusinessTypes = shipper.businessType!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     }
+    
+    // Add listener for phone number changes
+    _phoneNumberController.addListener(_onPhoneNumberChanged);
+  }
+  
+  void _onPhoneNumberChanged() {
+    // Cancel previous timer
+    _phoneCheckTimer?.cancel();
+    
+    final phoneNumber = _phoneNumberController.text.trim();
+    
+    // Clear previous message if field is empty
+    if (phoneNumber.isEmpty) {
+      setState(() {
+        _phoneAvailabilityMessage = null;
+        _isPhoneAvailable = null;
+        _isCheckingPhone = false;
+      });
+      return;
+    }
+    
+    // Don't check if it's the same as current phone number
+    final shipper = context.read<AuthProvider>().shipperUser;
+    if (phoneNumber == (shipper?.phoneNumber ?? '')) {
+      setState(() {
+        _phoneAvailabilityMessage = null;
+        _isPhoneAvailable = null;
+        _isCheckingPhone = false;
+      });
+      return;
+    }
+    
+    // Debounce: wait 500ms after user stops typing
+    _phoneCheckTimer = Timer(const Duration(milliseconds: 500), () {
+      _checkPhoneAvailability(phoneNumber);
+    });
+  }
+  
+  Future<void> _checkPhoneAvailability(String phoneNumber) async {
+    if (phoneNumber.trim().isEmpty) return;
+    
+    setState(() {
+      _isCheckingPhone = true;
+      _phoneAvailabilityMessage = null;
+      _isPhoneAvailable = null;
+    });
+    
+    try {
+      final shipper = context.read<AuthProvider>().shipperUser;
+      final isAvailable = await FirebaseService.isPhoneNumberAvailable(
+        phoneNumber: phoneNumber,
+        excludeUid: shipper?.uid,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _isCheckingPhone = false;
+          _isPhoneAvailable = isAvailable;
+          if (isAvailable) {
+            _phoneAvailabilityMessage = 'Phone number is available';
+          } else {
+            _phoneAvailabilityMessage = 'Phone number is already in use';
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCheckingPhone = false;
+          _phoneAvailabilityMessage = 'Error checking availability';
+          _isPhoneAvailable = null;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    _phoneCheckTimer?.cancel();
+    _phoneNumberController.removeListener(_onPhoneNumberChanged);
     _displayNameController.dispose();
     _phoneNumberController.dispose();
     _companyNameController.dispose();
@@ -235,12 +318,7 @@ class _ShipperAccountDetailsPageState extends State<ShipperAccountDetailsPage> {
                     const SizedBox(height: 16),
 
                     // Phone Number
-                    _buildTextField(
-                      label: 'Phone Number',
-                      controller: _phoneNumberController,
-                      icon: Icons.phone,
-                      keyboardType: TextInputType.phone,
-                    ),
+                    _buildPhoneNumberField(),
                     const SizedBox(height: 16),
 
                     // Company Name
@@ -360,6 +438,94 @@ class _ShipperAccountDetailsPageState extends State<ShipperAccountDetailsPage> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _buildPhoneNumberField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: _phoneNumberController,
+          keyboardType: TextInputType.phone,
+          style: const TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 16,
+            color: Colors.black87,
+          ),
+          validator: (value) {
+            if (value == null || value.trim().isEmpty) {
+              return 'Please enter a phone number';
+            }
+            if (_isPhoneAvailable == false) {
+              return 'Phone number is already in use';
+            }
+            return null;
+          },
+          decoration: InputDecoration(
+            labelText: 'Phone Number',
+            labelStyle: const TextStyle(
+              color: Color(0xFF186230),
+              fontFamily: 'Roboto',
+            ),
+            prefixIcon: const Icon(Icons.phone, color: Color(0xFF186230)),
+            suffixIcon: _isCheckingPhone
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF186230)),
+                      ),
+                    ),
+                  )
+                : _isPhoneAvailable != null
+                    ? Icon(
+                        _isPhoneAvailable! ? Icons.check_circle : Icons.error,
+                        color: _isPhoneAvailable! ? Colors.green : Colors.red,
+                      )
+                    : null,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(
+                color: _isPhoneAvailable == false ? Colors.red : const Color(0xFF43975A),
+                width: 2,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(
+                color: _isPhoneAvailable == false ? Colors.red : const Color(0xFF43975A),
+                width: 2,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.red, width: 2),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: const BorderSide(color: Colors.red, width: 2),
+            ),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+        ),
+        if (_phoneAvailabilityMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8.0, left: 12.0),
+            child: Text(
+              _phoneAvailabilityMessage!,
+              style: TextStyle(
+                fontSize: 12,
+                color: _isPhoneAvailable == true ? Colors.green : Colors.red,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ),
+      ],
     );
   }
 

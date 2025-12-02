@@ -19,6 +19,7 @@ class _BookedNowState extends State<BookedNow> {
   bool _isBooking = false;
   String _currentStatus = '';
   String? _bookedByCarrierId; // Store bookedByCarrierId in state
+  bool _isDescriptionExpanded = false;
 
   @override
   void initState() {
@@ -180,79 +181,49 @@ class _BookedNowState extends State<BookedNow> {
             const SizedBox(height: 8),
 
             /// Shipper
-             Text(
-              "Shipper : ${widget.load.shipperName}",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
-            ),
-            const SizedBox(height: 8),
-
-            /// Description
-             Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: "Description : ",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: primaryColor,
-                    ),
-                  ),
-                  TextSpan(
-                    text: widget.load.description.isNotEmpty ? widget.load.description : "No description provided",
-                    style: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            /// Tags
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withOpacity(0.4),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: const Text(
-                    "FRAGILE",
-                    style: TextStyle(color: Colors.white),
+                Text(
+                  "Shipper : ",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: primaryColor,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade700,
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.blue.withOpacity(0.4),
-                        blurRadius: 6,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: const Text(
-                    "Temperature Control",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                Text(
+                  widget.load.shipperName.isNotEmpty ? widget.load.shipperName : "No shipper name provided",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black,
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 8),
+
+            /// Description
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Description :",
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: primaryColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                _buildExpandableDescription(),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            /// Tags
+            _buildTags(),
             const SizedBox(height: 20),
 
             /// Payment
@@ -318,9 +289,9 @@ class _BookedNowState extends State<BookedNow> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _currentStatus == 'available' && !_isBooking ? _bookLoad : null,
+                onPressed: (_currentStatus == 'active' || _currentStatus == 'available') && !_isBooking ? _bookLoad : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _currentStatus == 'available' ? primaryColor : Colors.grey,
+                  backgroundColor: (_currentStatus == 'active' || _currentStatus == 'available') ? primaryColor : Colors.grey,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -336,14 +307,14 @@ class _BookedNowState extends State<BookedNow> {
                       ),
                     )
                   : Text(
-                      _currentStatus == 'available' ? "Accept" : "Already ${_currentStatus.toUpperCase()}",
+                      (_currentStatus == 'active' || _currentStatus == 'available') ? "Accept" : "Already ${_currentStatus.toUpperCase()}",
                       style: const TextStyle(fontSize: 16, color: Colors.white),
                     ),
               ),
             ),
 
-            // Only show negotiate button for available loads
-            if (_currentStatus == 'available') ...[
+            // Only show negotiate button for active/available loads
+            if (_currentStatus == 'active' || _currentStatus == 'available') ...[
               const SizedBox(height: 20),
 
               SizedBox(
@@ -365,10 +336,42 @@ class _BookedNowState extends State<BookedNow> {
               ),
             ],
 
+            // Show cancel button if load is booked by current user
+            if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && _isBookedByCurrentUser()) ...[
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isBooking ? null : _cancelLoad,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isBooking 
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text(
+                        "Cancel Booking",
+                        style: TextStyle(fontSize: 16, color: Colors.white),
+                      ),
+                ),
+              ),
+            ],
+
            // Show "View on Map" button only if load was booked by current user
             //if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && _isBookedByCurrentUser()) ...[
-            // Show "View on Map" button if load was booked by current user (any status except available)
-            if (_currentStatus != 'available' && _isBookedByCurrentUser()) ...[
+            // Show "View on Map" button if load was booked by current user (any status except active/available)
+            if (_currentStatus != 'active' && _currentStatus != 'available' && _isBookedByCurrentUser()) ...[
               const SizedBox(height: 20),
 
               SizedBox(
@@ -402,6 +405,225 @@ class _BookedNowState extends State<BookedNow> {
     );
   }
 
+  /// Build expandable description with read more/less
+  Widget _buildExpandableDescription() {
+    final description = widget.load.description.isNotEmpty 
+        ? widget.load.description 
+        : "No description provided";
+    
+    // Check if description is long enough to need truncation
+    // Approximate: 3 lines at ~50 characters per line = 150 characters
+    final needsTruncation = description.length > 150;
+    
+    if (!needsTruncation) {
+      // Short description, no need for expand/collapse
+      return Text(
+        description,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: Colors.black,
+        ),
+      );
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          description,
+          maxLines: _isDescriptionExpanded ? null : 3,
+          overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.black,
+          ),
+        ),
+        const SizedBox(height: 4),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _isDescriptionExpanded = !_isDescriptionExpanded;
+            });
+          },
+          child: Text(
+            _isDescriptionExpanded ? "Read less" : "Read more",
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: primaryColor,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Build tags from load data
+  Widget _buildTags() {
+    final tags = <String>[];
+    
+    // Get tags from additionalData
+    if (widget.load.additionalData != null) {
+      final additionalData = widget.load.additionalData!;
+      if (additionalData['tags'] != null) {
+        final additionalTags = additionalData['tags'];
+        if (additionalTags is List) {
+          for (final tag in additionalTags) {
+            if (tag is String) {
+              tags.add(tag);
+            }
+          }
+        } else if (additionalTags is String) {
+          tags.add(additionalTags);
+        }
+      }
+    }
+    
+    // If no tags found, return empty widget
+    if (tags.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Build tag widgets as grey pills
+    return Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: tags.map((tag) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade400,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Text(
+            tag,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Future<void> _cancelLoad() async {
+    // Show confirmation dialog first
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Cancel Booking',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Are you sure you want to cancel this booking? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'No',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Yes, Cancel',
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // If user cancelled, return early
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      setState(() {
+        _isBooking = true;
+      });
+
+      final user = FirebaseService.currentUser;
+      if (user == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please log in to cancel bookings')),
+        );
+        setState(() {
+          _isBooking = false;
+        });
+        return;
+      }
+
+      final success = await FirebaseService.updateCarrierLoadStatus(
+        loadId: widget.load.id,
+        status: 'cancelled',
+        carrierUid: user.uid,
+      );
+
+      if (success) {
+        setState(() {
+          _currentStatus = 'cancelled';
+          _isBooking = false;
+        });
+        
+        // Refresh load status to ensure we have latest data from Firestore
+        await _refreshLoadStatus();
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking cancelled successfully'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        
+        // Notify parent widget to refresh
+        if (widget.onLoadBooked != null) {
+          widget.onLoadBooked!();
+        }
+      } else {
+        setState(() {
+          _isBooking = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to cancel booking. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _isBooking = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
   String _formatDate(DateTime date) {
     final months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -420,6 +642,7 @@ class _BookedNowState extends State<BookedNow> {
 
   Color _getStatusColor(String status) {
     switch (status) {
+      case 'active':
       case 'available':
         return primaryColor;
       case 'booked':

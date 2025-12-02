@@ -1,10 +1,15 @@
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_add_payment_method.dart';
 import 'package:Remiles/providers/payment_methods_provider.dart';
+import 'package:Remiles/providers/auth_provider.dart';
 import 'package:Remiles/core/payment_logo_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
 
 class PaymentMethodsPage extends StatefulWidget {
   const PaymentMethodsPage({super.key});
@@ -37,40 +42,74 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
   }
 
   Future<void> _selectFromDate() async {
-    final picked = await showDatePicker(
+    // Unfocus any text fields before showing picker
+    FocusScope.of(context).unfocus();
+    
+    final initialDate = _fromDate ?? DateTime.now();
+    final pickedDate = await showDatePicker(
       context: context,
-      initialDate: _fromDate ?? DateTime.now(),
+      initialDate: initialDate,
       firstDate: DateTime(2020),
       lastDate: _toDate ?? DateTime.now(),
     );
-    if (picked != null) {
-      setState(() {
-        _fromDate = picked;
-      });
-      await context.read<PaymentMethodsProvider>().loadTransactions(
-        forceRefresh: true,
-        fromDate: _fromDate,
-        toDate: _toDate,
+    if (pickedDate != null) {
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(initialDate),
       );
+      if (pickedTime != null) {
+        final picked = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+        setState(() {
+          _fromDate = picked;
+        });
+        await context.read<PaymentMethodsProvider>().loadTransactions(
+          forceRefresh: true,
+          fromDate: _fromDate,
+          toDate: _toDate,
+        );
+      }
     }
   }
 
   Future<void> _selectToDate() async {
-    final picked = await showDatePicker(
+    // Unfocus any text fields before showing picker
+    FocusScope.of(context).unfocus();
+    
+    final initialDate = _toDate ?? DateTime.now();
+    final pickedDate = await showDatePicker(
       context: context,
-      initialDate: _toDate ?? DateTime.now(),
+      initialDate: initialDate,
       firstDate: _fromDate ?? DateTime(2020),
       lastDate: DateTime.now(),
     );
-    if (picked != null) {
-      setState(() {
-        _toDate = picked;
-      });
-      await context.read<PaymentMethodsProvider>().loadTransactions(
-        forceRefresh: true,
-        fromDate: _fromDate,
-        toDate: _toDate,
+    if (pickedDate != null) {
+      final pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(initialDate),
       );
+      if (pickedTime != null) {
+        final picked = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+        setState(() {
+          _toDate = picked;
+        });
+        await context.read<PaymentMethodsProvider>().loadTransactions(
+          forceRefresh: true,
+          fromDate: _fromDate,
+          toDate: _toDate,
+        );
+      }
     }
   }
 
@@ -88,8 +127,9 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
-    return DateFormat('MMM dd, yyyy').format(date);
+    return DateFormat('MMM dd, yyyy hh:mm a').format(date);
   }
+
 
   String _formatTransactionId(String paymentIntentId) {
     // Extract last 4 characters for display
@@ -118,6 +158,8 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
   String _getStatusText(String status) {
     switch (status.toLowerCase()) {
       case 'succeeded':
+      case 'completed':
+      case 'paid':
         return 'Paid';
       case 'pending':
         return 'Pending';
@@ -126,9 +168,10 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
       case 'failed':
         return 'Failed';
       case 'canceled':
+      case 'cancelled':
         return 'Canceled';
       default:
-        return 'Unknown';
+        return status.isNotEmpty ? status : 'Unknown';
     }
   }
 
@@ -139,20 +182,48 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
       // Status filter
       if (_statusFilter != null) {
         final status = transaction['status'] as String? ?? 'unknown';
-        if (status.toLowerCase() != _statusFilter!.toLowerCase()) {
+        final statusLower = status.toLowerCase();
+        final filterLower = _statusFilter!.toLowerCase();
+        
+        // Handle multiple status values that map to the same filter
+        if (filterLower == 'succeeded') {
+          if (statusLower != 'succeeded' && statusLower != 'completed' && statusLower != 'paid') {
+            return false;
+          }
+        } else if (statusLower != filterLower) {
           return false;
+        }
+      }
+      
+      // Date filter (already applied in provider, but double-check here with time component)
+      if (_fromDate != null || _toDate != null) {
+        final transactionDate = transaction['succeededAt'] as DateTime? ??
+                                transaction['completedAt'] as DateTime? ??
+                                transaction['createdAt'] as DateTime?;
+        
+        if (transactionDate != null) {
+          // For fromDate: transaction must be on or after the selected date/time
+          if (_fromDate != null && transactionDate.isBefore(_fromDate!)) {
+            return false;
+          }
+          // For toDate: transaction must be on or before the selected date/time (respecting time component)
+          if (_toDate != null && transactionDate.isAfter(_toDate!)) {
+            return false;
+          }
         }
       }
       
       // Search filter
       if (searchQuery.isNotEmpty) {
-        final paymentIntentId = transaction['paymentIntentId'] as String? ?? '';
-        final transactionId = _formatTransactionId(paymentIntentId).toLowerCase();
+        final carrierName = (transaction['carrierName'] as String? ?? '').toLowerCase();
+        final loadNumber = (transaction['loadNumber'] as String? ?? 
+                           transaction['loadId'] as String? ?? '').toLowerCase();
         final amount = transaction['amount'] as int? ?? 0;
         final amountStr = (amount ~/ 100).toString();
         final status = _getStatusText(transaction['status'] as String? ?? 'unknown').toLowerCase();
         
-        if (!transactionId.contains(searchQuery) &&
+        if (!carrierName.contains(searchQuery) &&
+            !loadNumber.contains(searchQuery) &&
             !amountStr.contains(searchQuery) &&
             !status.contains(searchQuery)) {
           return false;
@@ -164,6 +235,9 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
   }
 
   Future<void> _showFilterDialog() async {
+    // Unfocus any text fields before showing dialog
+    FocusScope.of(context).unfocus();
+    
     String? selectedFilter = _statusFilter;
     const String cancelSentinel = '__CANCEL__';
     
@@ -276,11 +350,20 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
               return const Center(child: CircularProgressIndicator());
             }
 
-            return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+            return RefreshIndicator(
+              onRefresh: () async {
+                await provider.loadTransactions(
+                  forceRefresh: true,
+                  fromDate: _fromDate,
+                  toDate: _toDate,
+                );
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
               /// Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -331,7 +414,7 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
                         ),
                       )
                     else
-                      ...paymentMethods.take(1).map((method) {
+                      ...paymentMethods.where((method) => method['isDefault'] == true).take(1).map((method) {
                         final card = method['card'] as Map<String, dynamic>;
                         final brand = card['brand'] as String? ?? 'visa';
                         final last4 = card['last4'] as String? ?? '0000';
@@ -431,33 +514,16 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
                       decoration: InputDecoration(
                         hintText: "Search",
                         prefixIcon: const Icon(Icons.search),
-                        suffixIcon: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_searchController.text.isNotEmpty)
-                              IconButton(
-                                icon: const Icon(Icons.clear, size: 20),
-                                onPressed: () {
-                                  setState(() {
-                                    _searchController.clear();
-                                  });
-                                },
-                              ),
-                            GestureDetector(
-                              onTap: _showFilterDialog,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: SvgPicture.asset(
-                                'assets/filter_2.svg',
-                                fit: BoxFit.scaleDown,
-                                  colorFilter: _statusFilter != null
-                                      ? const ColorFilter.mode(Colors.blue, BlendMode.srcIn)
-                                      : null,
-                                ),
-                              ),
-                            ),
-                          ],
-                              ),
+                            suffixIcon: _searchController.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(Icons.clear, size: 20),
+                                    onPressed: () {
+                                      setState(() {
+                                        _searchController.clear();
+                                      });
+                                    },
+                                  )
+                                : null,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
@@ -472,15 +538,38 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
               ),
               const SizedBox(height: 24),
 
-              /// Transactions Header
-                    const Row(
+              /// Transactions Header with Filter
+              Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                  Text(
+                children: [
+                  const Text(
                     "Transactions",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  SizedBox(),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (filteredTransactions.isNotEmpty && (_fromDate != null || _toDate != null || _statusFilter != null))
+                        IconButton(
+                          icon: const Icon(Icons.print, color: Colors.blue),
+                          onPressed: () => _printAllTransactions(filteredTransactions),
+                          tooltip: 'Print All Filtered Transactions',
+                        ),
+                      GestureDetector(
+                        onTap: _showFilterDialog,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: SvgPicture.asset(
+                            'assets/filter_2.svg',
+                            fit: BoxFit.scaleDown,
+                            colorFilter: _statusFilter != null
+                                ? const ColorFilter.mode(Colors.blue, BlendMode.srcIn)
+                                : null,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
               const SizedBox(height: 16),
@@ -538,22 +627,32 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
                       ...filteredTransactions.map((transaction) {
                         final status = transaction['status'] as String? ?? 'unknown';
                         final amount = transaction['amount'] as int? ?? 0;
-                        final date = transaction['createdAt'] as DateTime? ??
-                            transaction['succeededAt'] as DateTime? ??
-                            transaction['failedAt'] as DateTime;
-                        final paymentIntentId = transaction['paymentIntentId'] as String? ?? '';
+                        final date = transaction['succeededAt'] as DateTime? ??
+                            transaction['completedAt'] as DateTime? ??
+                            transaction['createdAt'] as DateTime? ??
+                            transaction['failedAt'] as DateTime?;
+                        final carrierName = transaction['carrierName'] as String?;
+                        final loadNumber = transaction['loadNumber'] as String? ?? 
+                                         transaction['loadId'] as String?;
 
-                        return _buildTransactionCard(
-                          _formatTransactionId(paymentIntentId),
-                          _formatDate(date),
-                          amount ~/ 100, // Convert cents to dollars
-                          _getStatusText(status),
-                          _getStatusColor(status),
+                        return GestureDetector(
+                          onTap: () => _showTransactionDetails(transaction),
+                          child: _buildTransactionCard(
+                            carrierName ?? 'Unknown Carrier',
+                            _formatDate(date),
+                            amount ~/ 100, // Convert cents to dollars
+                            _getStatusText(status),
+                            _getStatusColor(status),
+                            transaction,
+                            carrierName: carrierName,
+                            loadNumber: loadNumber,
+                          ),
                         );
                       }),
-            ],
-          ),
-              );
+                  ],
+                ),
+              ),
+            );
           },
         ),
       ),
@@ -569,20 +668,27 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
           style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black),
         ),
         const SizedBox(height: 6),
-        GestureDetector(
+        InkWell(
           onTap: onTap,
-          child: TextField(
-          readOnly: true,
-            controller: TextEditingController(
-              text: date != null ? DateFormat('MMM dd, yyyy').format(date) : 'dd mm yy',
-            ),
-          decoration: InputDecoration(
-            hintText: "dd mm yy",
-            border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade400),
               borderRadius: BorderRadius.circular(12),
             ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-              suffixIcon: const Icon(Icons.calendar_today, size: 20),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    date != null ? DateFormat('MMM dd, yyyy hh:mm a').format(date) : 'Select date & time',
+                    style: TextStyle(
+                      color: date != null ? Colors.black : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.calendar_today, size: 20, color: Colors.grey),
+              ],
             ),
           ),
         ),
@@ -591,7 +697,11 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
   }
 
   Widget _buildTransactionCard(
-      String id, String date, int amount, String status, Color color) {
+      String id, String date, int amount, String status, Color color,
+      Map<String, dynamic> transaction, {
+      String? carrierName,
+      String? loadNumber,
+    }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
@@ -610,9 +720,40 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(id, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 4),
-          Text(date, style: const TextStyle(color: Colors.grey)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(id, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 4),
+                    Text(date, style: const TextStyle(color: Colors.grey)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (carrierName != null || loadNumber != null) ...[
+            const SizedBox(height: 8),
+            if (carrierName != null)
+              Text(
+                'To: $carrierName',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            if (loadNumber != null)
+              Text(
+                'Load: $loadNumber',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+          ],
           const Divider(height: 20),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -644,5 +785,346 @@ class _PaymentMethodsPageState extends State<PaymentMethodsPage> {
         ],
       ),
     );
+  }
+
+  String _formatInvoice(Map<String, dynamic> transaction, dynamic shipper, {DateTime? fromDate, DateTime? toDate}) {
+    final buffer = StringBuffer();
+    buffer.writeln('');
+    buffer.writeln('        PAYMENT INVOICE');
+    buffer.writeln('');
+    buffer.writeln('Remiles Logistics');
+    buffer.writeln('Payment Transaction Invoice');
+    buffer.writeln('');
+    buffer.writeln('----------------------------------------');
+    
+    final transactionId = transaction['paymentIntentId'] as String? ?? transaction['transferId'] as String? ?? 'N/A';
+    buffer.writeln('Transaction ID: ${_formatTransactionId(transactionId)}');
+    
+    final date = transaction['succeededAt'] as DateTime? ??
+                transaction['completedAt'] as DateTime? ??
+                transaction['createdAt'] as DateTime?;
+    buffer.writeln('Date & Time: ${_formatDate(date)}');
+    buffer.writeln('Status: ${_getStatusText(transaction['status'] as String? ?? 'unknown')}');
+    
+    if (fromDate != null || toDate != null) {
+      buffer.writeln('');
+      if (fromDate != null && toDate != null) {
+        buffer.writeln('Period: ${_formatDate(fromDate)} to ${_formatDate(toDate)}');
+      } else if (fromDate != null) {
+        buffer.writeln('From Date: ${_formatDate(fromDate)}');
+      } else if (toDate != null) {
+        buffer.writeln('To Date: ${_formatDate(toDate)}');
+      }
+    }
+    
+    buffer.writeln('');
+    
+    buffer.writeln('From: ${shipper?.companyName ?? shipper?.displayName ?? 'Shipper'}');
+    
+    final carrierName = transaction['carrierName'] as String?;
+    if (carrierName != null) {
+      buffer.writeln('To: $carrierName');
+    }
+    
+    buffer.writeln('');
+    
+    final loadNumber = transaction['loadNumber'] as String? ?? transaction['loadId'] as String?;
+    if (loadNumber != null) {
+      buffer.writeln('Load ID: $loadNumber');
+      buffer.writeln('');
+    }
+    
+    buffer.writeln('----------------------------------------');
+    final amount = transaction['amount'] as int? ?? 0;
+    buffer.writeln('Amount: \$${(amount / 100).toStringAsFixed(2)}');
+    buffer.writeln('----------------------------------------');
+    buffer.writeln('');
+    buffer.writeln('Thank you for using Remiles!');
+    buffer.writeln('');
+    return buffer.toString();
+  }
+
+  Future<void> _showTransactionDetails(Map<String, dynamic> transaction) async {
+    final authProvider = context.read<AuthProvider>();
+    final shipper = authProvider.shipperUser;
+    final status = transaction['status'] as String? ?? 'unknown';
+    final amount = transaction['amount'] as int? ?? 0;
+    final date = transaction['succeededAt'] as DateTime? ??
+                transaction['completedAt'] as DateTime? ??
+                transaction['createdAt'] as DateTime?;
+    final paymentIntentId = transaction['paymentIntentId'] as String? ?? 
+                           transaction['transferId'] as String? ?? 'N/A';
+    final carrierName = transaction['carrierName'] as String? ?? 'Unknown Carrier';
+    final loadNumber = transaction['loadNumber'] as String? ?? 
+                      transaction['loadId'] as String? ?? 'N/A';
+    final carrierId = transaction['carrierId'] as String?;
+    
+    // Unfocus any text fields before showing dialog
+    FocusScope.of(context).unfocus();
+    
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Transaction Details'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildDetailRow('Transaction ID', _formatTransactionId(paymentIntentId)),
+              _buildDetailRow('Date & Time', _formatDate(date)),
+              _buildDetailRow('Status', _getStatusText(status), color: _getStatusColor(status)),
+              _buildDetailRow('Amount', '\$${(amount / 100).toStringAsFixed(2)}', color: Colors.green),
+              const Divider(),
+              _buildDetailRow('From', shipper?.companyName ?? shipper?.displayName ?? 'Shipper'),
+              _buildDetailRow('To', carrierName),
+              _buildDetailRow('Load Number', loadNumber),
+              if (carrierId != null) _buildDetailRow('Carrier ID', carrierId),
+              const Divider(),
+              _buildDetailRow('Type', transaction['type'] as String? ?? 'transfer'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              _printInvoice(transaction);
+            },
+            icon: const Icon(Icons.print),
+            label: const Text('Print Invoice'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, {Color? color}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: color ?? Colors.black,
+                fontWeight: color != null ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _printInvoice(Map<String, dynamic> transaction) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+      final invoiceText = _formatInvoice(transaction, shipper, fromDate: _fromDate, toDate: _toDate);
+      
+      await Printing.layoutPdf(
+        onLayout: (format) async => await _generateInvoicePDF(invoiceText, transaction, shipper),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error printing invoice: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _printAllTransactions(List<Map<String, dynamic>> transactions) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+      
+      final buffer = StringBuffer();
+      buffer.writeln('');
+      buffer.writeln('        TRANSACTIONS REPORT');
+      buffer.writeln('');
+      buffer.writeln('Remiles Logistics');
+      buffer.writeln('Payment Transactions Report');
+      buffer.writeln('');
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('From: ${shipper?.companyName ?? shipper?.displayName ?? 'Shipper'}');
+      buffer.writeln('Report Date: ${_formatDate(DateTime.now())}');
+      if (_fromDate != null || _toDate != null) {
+        buffer.writeln('');
+        if (_fromDate != null && _toDate != null) {
+          buffer.writeln('Period: ${_formatDate(_fromDate)} to ${_formatDate(_toDate)}');
+        } else if (_fromDate != null) {
+          buffer.writeln('From Date: ${_formatDate(_fromDate)}');
+        } else if (_toDate != null) {
+          buffer.writeln('To Date: ${_formatDate(_toDate)}');
+        }
+      }
+      if (_statusFilter != null) {
+        buffer.writeln('Status Filter: ${_getStatusText(_statusFilter!)}');
+      }
+      buffer.writeln('Total Transactions: ${transactions.length}');
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('');
+      
+      double totalAmount = 0;
+      for (var transaction in transactions) {
+        final amount = transaction['amount'] as int? ?? 0;
+        totalAmount += amount / 100;
+        
+        buffer.writeln('Transaction ID: ${_formatTransactionId(transaction['paymentIntentId'] as String? ?? transaction['transferId'] as String? ?? 'N/A')}');
+        buffer.writeln('Date: ${_formatDate(transaction['succeededAt'] as DateTime? ?? transaction['completedAt'] as DateTime? ?? transaction['createdAt'] as DateTime?)}');
+        buffer.writeln('To: ${transaction['carrierName'] as String? ?? 'Unknown Carrier'}');
+        buffer.writeln('Amount: \$${(amount / 100).toStringAsFixed(2)}');
+        buffer.writeln('Status: ${_getStatusText(transaction['status'] as String? ?? 'unknown')}');
+        buffer.writeln('---');
+      }
+      
+      buffer.writeln('');
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('Total Amount: \$${totalAmount.toStringAsFixed(2)}');
+      buffer.writeln('----------------------------------------');
+      buffer.writeln('');
+      buffer.writeln('Thank you for using Remiles!');
+      buffer.writeln('');
+      
+      final reportText = buffer.toString();
+      
+      await Printing.layoutPdf(
+        onLayout: (format) async => await _generateReportPDF(reportText, transactions.length, totalAmount),
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error printing report: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<Uint8List> _generateReportPDF(String reportText, int count, double totalAmount) async {
+    final pdf = pw.Document();
+    final lines = reportText.split('\n');
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: lines.map((line) {
+              if (line.trim().isEmpty) {
+                return pw.SizedBox(height: 8);
+              } else if (line.contains('TRANSACTIONS REPORT') || line.contains('Total Amount:')) {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.black,
+                  ),
+                );
+              } else if (line.contains('---')) {
+                return pw.Divider();
+              } else if (line.contains('Amount:') || line.contains('Total:')) {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 14,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.black,
+                  ),
+                );
+              } else {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 11,
+                    color: PdfColors.black,
+                  ),
+                );
+              }
+            }).toList(),
+          );
+        },
+      ),
+    );
+    
+    return pdf.save();
+  }
+
+  Future<Uint8List> _generateInvoicePDF(String invoiceText, Map<String, dynamic> transaction, dynamic shipper) async {
+    final pdf = pw.Document();
+    final lines = invoiceText.split('\n');
+    
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(40),
+        build: (pw.Context context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: lines.map((line) {
+              if (line.trim().isEmpty) {
+                return pw.SizedBox(height: 8);
+              } else if (line.contains('PAYMENT INVOICE')) {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 20,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.black,
+                  ),
+                );
+              } else if (line.contains('---')) {
+                return pw.Divider();
+              } else if (line.contains('Amount:')) {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                    color: PdfColors.black,
+                  ),
+                );
+              } else {
+                return pw.Text(
+                  line,
+                  style: pw.TextStyle(
+                    fontSize: 12,
+                    color: PdfColors.black,
+                  ),
+                );
+              }
+            }).toList(),
+          );
+        },
+      ),
+    );
+    
+    return pdf.save();
   }
 }

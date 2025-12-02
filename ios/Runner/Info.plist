@@ -61,8 +61,8 @@
     <string>This app needs access to your location to show your current position on the map and track delivery progress.</string>
     <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
     <string>This app needs access to your location to show your current position on the map and track delivery progress.</string>
-     <key>pk_test_51RkhVRR1kSahGVhD3aSTz1c8p8TOJRKNYkITYLD7zmsTfY4TYX823mwMxfmaRjU1aGjEYLYG2u3lrMZOYKgHFNaC00RpxM6fkF</key>
-   <string>pk_test_YOUR_PUBLISHABLE_KEY_HERE</string>
+     <key>pk_test_YOUR_PUBLISHABLE_KEY_HERE</key>
+   <string>pk_test_51RqCWCCEmM4LMAn7QdeqDoEmBstjnp01McbGYajDk9EWU5F7m0Izvm84F9DpxaecQFFo81dD5DZrtiThSMiP9QdI004pe9wGBG</string>
     <!-- Google Maps API Key -->
     <key>GMSApiKey</key>
     <string>AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ</string>

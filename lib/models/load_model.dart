@@ -62,16 +62,33 @@ class LoadModel {
   });
 
   // Factory constructor from Firestore document
-  factory LoadModel.fromFirestore(DocumentSnapshot doc) {
+  factory LoadModel.fromFirestore(DocumentSnapshot doc, {String? parentShipperUid}) {
     try {
       final data = doc.data() as Map<String, dynamic>;
+      // Use parentShipperUid if provided (from subcollection path), otherwise use data
+      final shipperUid = parentShipperUid ?? data['shipperUid'] ?? '';
+      
+      // Get description - check multiple possible field names
+      final description = data['description'] ?? 
+                         data['loadDescription'] ?? 
+                         data['notes'] ?? 
+                         data['details'] ?? 
+                         '';
+      
+      // Get shipperName - check multiple possible field names
+      final shipperName = data['shipperName'] ?? 
+                         data['shipper_name'] ?? 
+                         data['companyName'] ?? 
+                         data['displayName'] ?? 
+                         '';
+      
       return LoadModel(
         id: doc.id,
-        shipperUid: data['shipperUid'] ?? '',
-        shipperName: data['shipperName'] ?? '',
+        shipperUid: shipperUid,
+        shipperName: shipperName,
         title: data['title'] ?? '',
-        description: data['description'] ?? '',
-        price: _parseDouble(data['price']) ?? 0.0,
+        description: description,
+        price: _parseDouble(data['price']) ?? _parseDouble(data['quoteBudget']) ?? 0.0,
         distance: _parseDouble(data['distance']) ?? 0.0,
         originAddress: data['originAddress'] ?? '',
         originCity: data['originCity'] ?? '',

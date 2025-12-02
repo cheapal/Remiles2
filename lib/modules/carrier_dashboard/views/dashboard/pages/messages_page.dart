@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:Remiles/core/firebase_service.dart';
@@ -39,20 +40,22 @@ class _MessagesPageState extends State<MessagesPage> {
   int _currentPage = 0;
   bool _hasMore = true;
   bool _isNavigating = false; // Prevent multiple simultaneous navigations
+  StreamSubscription<List<ChatConversation>>? _conversationsSubscription;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_onSearchChanged);
     _scrollController.addListener(_onScroll);
-    // Load conversations on init instead of in build method
+    // Start listening to conversations stream
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadConversations();
+      _startListeningToConversations();
     });
   }
 
   @override
   void dispose() {
+    _conversationsSubscription?.cancel();
     _searchController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -73,13 +76,65 @@ class _MessagesPageState extends State<MessagesPage> {
     }
   }
 
-  Future<void> _loadConversations({bool refresh = false}) async {
-    // Prevent multiple simultaneous loads
-    if (_isLoading && !refresh) {
+  void _startListeningToConversations({bool showLoading = true}) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final user = authProvider.currentUser;
+    
+    if (user == null) {
+      if (mounted) {
+        setState(() {
+          _allConversations = [];
+          _isLoading = false;
+          _hasLoadedInitial = true;
+        });
+      }
       return;
     }
 
-    if (refresh) {
+    if (mounted && showLoading) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+
+    // Cancel existing subscription if any
+    _conversationsSubscription?.cancel();
+
+    // Listen to real-time updates
+    _conversationsSubscription = FirebaseService.getUserConversationsStream(user.uid)
+        .listen(
+      (conversations) {
+        // Load offers and preload user names and load prices in parallel
+        Future.wait([
+          _loadOffersForConversations(conversations),
+          _preloadUserNames(conversations, user.uid),
+          _preloadLoadPrices(conversations),
+        ]).then((_) {
+          if (mounted) {
+            setState(() {
+              _allConversations = conversations;
+              _isLoading = false;
+              _hasLoadedInitial = true;
+            });
+            _applyFilters();
+          }
+        });
+      },
+      onError: (error) {
+        print('Error listening to conversations: $error');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+            _hasLoadedInitial = true;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _refreshConversations() async {
+    // Clear caches and reset pagination
+    if (mounted) {
       setState(() {
         _currentPage = 0;
         _hasMore = true;
@@ -87,48 +142,9 @@ class _MessagesPageState extends State<MessagesPage> {
         _userNameCache.clear();
         _loadPriceCache.clear();
       });
-    } else {
-      setState(() {
-        _isLoading = true;
-      });
     }
-
-    try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final user = authProvider.currentUser;
-      
-      if (user == null) {
-        setState(() {
-          _allConversations = [];
-          _isLoading = false;
-          _hasLoadedInitial = true; // Mark as loaded even if no user
-        });
-        return;
-      }
-
-      final conversations = await FirebaseService.getUserConversations(user.uid);
-      
-      // Load offers and preload user names and load prices in parallel
-      await Future.wait([
-        _loadOffersForConversations(conversations),
-        _preloadUserNames(conversations, user.uid),
-        _preloadLoadPrices(conversations),
-      ]);
-
-      setState(() {
-        _allConversations = conversations;
-        _isLoading = false;
-        _hasLoadedInitial = true; // Mark that initial load is complete
-      });
-
-      _applyFilters();
-    } catch (e) {
-      print('Error loading conversations: $e');
-      setState(() {
-        _isLoading = false;
-        _hasLoadedInitial = true; // Mark as loaded even on error to prevent loops
-      });
-    }
+    // Restart the stream to force a refresh (show loading on manual refresh)
+    _startListeningToConversations(showLoading: true);
   }
 
   Future<void> _preloadUserNames(List<ChatConversation> conversations, String currentUserId) async {
@@ -345,7 +361,7 @@ class _MessagesPageState extends State<MessagesPage> {
                   const SizedBox(height: 12),
                   Expanded(
                     child: RefreshIndicator(
-                      onRefresh: () => _loadConversations(refresh: true),
+                      onRefresh: _refreshConversations,
                       child: _buildConversationsList(),
                     ),
                   ),
@@ -478,9 +494,11 @@ class _MessagesPageState extends State<MessagesPage> {
     // Prevent multiple simultaneous navigations
     if (_isNavigating) return;
     
-    setState(() {
-      _isNavigating = true;
-    });
+    if (mounted) {
+      setState(() {
+        _isNavigating = true;
+      });
+    }
 
     try {
       // Get cached user name or use default
@@ -507,10 +525,7 @@ class _MessagesPageState extends State<MessagesPage> {
             ),
           ),
         );
-        // Refresh conversations after returning from chat
-        if (context.mounted) {
-          _loadConversations(refresh: true);
-        }
+        // No need to manually refresh - stream will update automatically
       }
     } finally {
       if (mounted) {

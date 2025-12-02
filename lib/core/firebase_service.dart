@@ -572,6 +572,57 @@ class FirebaseService {
     }
   }
 
+  /// Check if a phone number is available (not already used by another user)
+  /// Returns true if phone number is available, false if already in use
+  /// Excludes the current user's phone number from the check
+  static Future<bool> isPhoneNumberAvailable({
+    required String phoneNumber,
+    String? excludeUid,
+  }) async {
+    try {
+      // Normalize phone number (ensure it starts with +)
+      String normalizedPhone = phoneNumber.trim();
+      if (!normalizedPhone.startsWith('+')) {
+        normalizedPhone = '+$normalizedPhone';
+      }
+
+      // Check in shippers collection
+      final shippersQuery = await shippers
+          .where('phoneNumber', isEqualTo: normalizedPhone)
+          .get();
+
+      for (var doc in shippersQuery.docs) {
+        // Skip if this is the current user's document
+        if (excludeUid != null && doc.id == excludeUid) {
+          continue;
+        }
+        // Phone number is already in use
+        return false;
+      }
+
+      // Check in carriers collection
+      final carriersQuery = await carriers
+          .where('phoneNumber', isEqualTo: normalizedPhone)
+          .get();
+
+      for (var doc in carriersQuery.docs) {
+        // Skip if this is the current user's document
+        if (excludeUid != null && doc.id == excludeUid) {
+          continue;
+        }
+        // Phone number is already in use
+        return false;
+      }
+
+      // Phone number is available
+      return true;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Check phone number availability failed');
+      // On error, return true to allow the user to proceed (fail open)
+      return true;
+    }
+  }
+
   // Enhanced authentication methods with role handling
   static Future<UserCredential?> signUpShipper({
     required String email,
@@ -2055,11 +2106,17 @@ class FirebaseService {
       print('Message saved to messages collection');
 
       // Update conversation with last message
-      await conversations.doc(conversationId).update({
+      final updateData = <String, dynamic>{
         'lastMessage': message.toFirestore(),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
-        'unreadCount.$receiverId': true,
-      });
+      };
+      
+      // Only update unreadCount if receiverId is valid (not empty)
+      if (receiverId.isNotEmpty) {
+        updateData['unreadCount.$receiverId'] = true;
+      }
+      
+      await conversations.doc(conversationId).update(updateData);
       print('Conversation updated with last message');
       
       // Send notification for support messages
@@ -2307,6 +2364,19 @@ class FirebaseService {
     required String shipperUid,
   }) async {
     try {
+      // Validate inputs
+      if (carrierUid.isEmpty) {
+        throw Exception('carrierUid cannot be empty');
+      }
+      if (shipperUid.isEmpty) {
+        throw Exception('shipperUid cannot be empty');
+      }
+      if (loadId.isEmpty) {
+        throw Exception('loadId cannot be empty');
+      }
+      
+      print('createLoadConversation: loadId=$loadId, carrierUid=$carrierUid, shipperUid=$shipperUid');
+      
       // Check if conversation already exists for this load-carrier pair
       final existingConversations = await conversations
           .where('loadId', isEqualTo: loadId)
@@ -2316,6 +2386,7 @@ class FirebaseService {
       for (final doc in existingConversations.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final participants = List<String>.from(data['participants'] ?? []);
+        print('Checking existing conversation ${doc.id}: participants=$participants');
         if (participants.contains(shipperUid)) {
           print('Found existing load conversation: ${doc.id}');
           return doc.id;
@@ -2324,18 +2395,38 @@ class FirebaseService {
 
       // Create new conversation for load negotiation
       final conversationId = conversations.doc().id;
+      final participantsList = [carrierUid, shipperUid];
+      print('Creating new conversation with participants: $participantsList');
+      
       final conversation = ChatConversation(
         id: conversationId,
-        participants: [carrierUid, shipperUid],
+        participants: participantsList,
         loadId: loadId,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
-      await conversations.doc(conversationId).set(conversation.toFirestore());
+      final firestoreData = conversation.toFirestore();
+      print('Conversation firestore data: $firestoreData');
+      print('Participants in firestore data: ${firestoreData['participants']}');
+      
+      await conversations.doc(conversationId).set(firestoreData);
+      
+      // Verify the conversation was saved correctly
+      final savedDoc = await conversations.doc(conversationId).get();
+      if (savedDoc.exists) {
+        final savedData = savedDoc.data() as Map<String, dynamic>;
+        final savedParticipants = List<String>.from(savedData['participants'] ?? []);
+        print('Verified saved conversation participants: $savedParticipants');
+        if (savedParticipants.length != 2) {
+          print('WARNING: Conversation saved with ${savedParticipants.length} participants instead of 2!');
+        }
+      }
+      
       print('Created new load conversation: $conversationId');
       return conversationId;
     } catch (e) {
+      print('Error in createLoadConversation: $e');
       await recordError(e, StackTrace.current, reason: 'Failed to create load conversation');
       rethrow;
     }
@@ -2535,7 +2626,7 @@ class FirebaseService {
         }
 
         final loadData = loadDoc.data() as Map<String, dynamic>;
-        if (loadData['status'] != 'available') {
+        if (loadData['status'] != 'active' && loadData['status'] != 'available') {
           throw Exception('Load is no longer available');
         }
 
@@ -3115,7 +3206,7 @@ class FirebaseService {
             .collection('shippers')
             .doc(shipperUid)
             .collection('loads')
-            .where('status', isEqualTo: 'available');
+            .where('status', isEqualTo: 'active');
 
         // Apply equipment filter
         // if (equipmentFilter != 'all') {
@@ -3137,9 +3228,24 @@ class FirebaseService {
         //                         ? carrier.address! 
         //                         : null);
         
+        // Get shipper name from shipper document
+        final shipperData = shipperDoc.data() as Map<String, dynamic>?;
+        final shipperName = shipperData?['displayName'] ?? 
+                           shipperData?['companyName'] ?? 
+                           shipperData?['shipperName'] ?? 
+                           shipperData?['name'] ?? 
+                           '';
+        
         for (final doc in snapshot.docs) {
           try {
-            final load = LoadModel.fromFirestore(doc);
+            // Pass shipperUid from parent document path
+            var load = LoadModel.fromFirestore(doc, parentShipperUid: shipperUid);
+            
+            // If shipperName is missing from load, use the one from shipper document
+            if (load.shipperName.isEmpty && shipperName.isNotEmpty) {
+              load = load.copyWith(shipperName: shipperName);
+            }
+            
             // Use async version without distance API calls (commented out)
             final matchPercentage = await calculateLoadMatchPercentage(
               load, 
@@ -3248,7 +3354,7 @@ class FirebaseService {
             .collection('shippers')
             .doc(shipperUid)
             .collection('loads')
-            .where('status', isEqualTo: 'available');
+            .where('status', isEqualTo: 'active');
 
         // Get booked loads by this carrier
         Query bookedQuery = _firestore
@@ -3274,10 +3380,25 @@ class FirebaseService {
         //                         ? carrier.address! 
         //                         : null);
         
+        // Get shipper name from shipper document
+        final shipperData = shipperDoc.data() as Map<String, dynamic>?;
+        final shipperName = shipperData?['displayName'] ?? 
+                           shipperData?['companyName'] ?? 
+                           shipperData?['shipperName'] ?? 
+                           shipperData?['name'] ?? 
+                           '';
+        
         // Process available loads (exclude those booked by other carriers)
         for (final doc in availableSnapshot.docs) {
           try {
-            final load = LoadModel.fromFirestore(doc);
+            // Pass shipperUid from parent document path
+            var load = LoadModel.fromFirestore(doc, parentShipperUid: shipperUid);
+            
+            // If shipperName is missing from load, use the one from shipper document
+            if (load.shipperName.isEmpty && shipperName.isNotEmpty) {
+              load = load.copyWith(shipperName: shipperName);
+            }
+            
             // Only include if not booked by another carrier
             // Check for null, empty string, or same carrier ID
             final bookedById = load.bookedByCarrierId;
@@ -3307,7 +3428,14 @@ class FirebaseService {
         // Process booked loads
         for (final doc in bookedSnapshot.docs) {
           try {
-            final load = LoadModel.fromFirestore(doc);
+            // Pass shipperUid from parent document path
+            var load = LoadModel.fromFirestore(doc, parentShipperUid: shipperUid);
+            
+            // If shipperName is missing from load, use the one from shipper document
+            if (load.shipperName.isEmpty && shipperName.isNotEmpty) {
+              load = load.copyWith(shipperName: shipperName);
+            }
+            
             allLoads.add(load);
           } catch (e) {
             print('Error parsing booked load ${doc.id}: $e');
@@ -3395,9 +3523,24 @@ class FirebaseService {
 
         final snapshot = await query.get();
         
+        // Get shipper name from shipper document
+        final shipperData = shipperDoc.data() as Map<String, dynamic>?;
+        final shipperName = shipperData?['displayName'] ?? 
+                           shipperData?['companyName'] ?? 
+                           shipperData?['shipperName'] ?? 
+                           shipperData?['name'] ?? 
+                           '';
+        
         for (final doc in snapshot.docs) {
           try {
-            final load = LoadModel.fromFirestore(doc);
+            // Pass shipperUid from parent document path
+            var load = LoadModel.fromFirestore(doc, parentShipperUid: shipperUid);
+            
+            // If shipperName is missing from load, use the one from shipper document
+            if (load.shipperName.isEmpty && shipperName.isNotEmpty) {
+              load = load.copyWith(shipperName: shipperName);
+            }
+            
             allLoads.add(load);
           } catch (e) {
             print('Error parsing booked load ${doc.id}: $e');
@@ -3573,8 +3716,8 @@ class FirebaseService {
         throw Exception('Load not found');
       }
 
-      // Check if load is still available
-      if (loadData['status'] != 'available') {
+      // Check if load is still available (active or available status)
+      if (loadData['status'] != 'active' && loadData['status'] != 'available') {
         print('DEBUG bookLoad: Load is no longer available, status: ${loadData['status']}');
         throw Exception('Load is no longer available');
       }
@@ -3606,7 +3749,7 @@ class FirebaseService {
         }
         
         final currentLoadData = loadDoc.data() as Map<String, dynamic>;
-        if (currentLoadData['status'] != 'available') {
+        if (currentLoadData['status'] != 'active' && currentLoadData['status'] != 'available') {
           throw Exception('Load is no longer available');
         }
 

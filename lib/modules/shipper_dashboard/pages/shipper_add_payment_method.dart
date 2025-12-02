@@ -77,11 +77,12 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
   }
 
   Future<void> _deletePaymentMethod(String paymentMethodId, bool isDefault, List<Map<String, dynamic>> paymentMethods) async {
-    if (isDefault && paymentMethods.length > 1) {
+    // Prevent deleting the only payment method
+    if (paymentMethods.length == 1) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please set another payment method as default first.'),
+            content: Text('Cannot delete the only payment method. Please add another one first.'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -89,25 +90,49 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Payment Method'),
-        content: const Text('Are you sure you want to delete this payment method?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+    // If deleting default and there are other methods, warn user
+    if (isDefault && paymentMethods.length > 1) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Default Payment Method'),
+          content: const Text('This is your default payment method. Another payment method will be set as default. Continue?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
 
-    if (confirmed != true) return;
+      if (confirmed != true) return;
+    } else {
+      // For non-default methods, just confirm deletion
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete Payment Method'),
+          content: const Text('Are you sure you want to delete this payment method?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+
+      if (confirmed != true) return;
+    }
 
     try {
       final provider = context.read<PaymentMethodsProvider>();

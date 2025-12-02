@@ -1239,11 +1239,49 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     }
   }
 
+  bool _isConfirmButtonEnabled() {
+    if (_selectedLoad == null) return false;
+    
+    final locationType = _activeLocation ?? 'delivery';
+    
+    // Pickup confirmation is always allowed
+    if (locationType == 'pickup') {
+      return true;
+    }
+    
+    // For delivery confirmation, pickup must be confirmed first
+    if (locationType == 'delivery' || locationType == 'shipper' || _activeLocation == null) {
+      // If delivery is already confirmed, allow viewing it
+      if (_deliveryConfirmationData != null) {
+        return true;
+      }
+      // For confirming delivery, pickup must be confirmed first
+      return _pickupConfirmationData != null;
+    }
+    
+    return true;
+  }
+
   Future<void> _showConfirmationDialog() async {
     if (_selectedLoad == null) return;
     
     final locationType = _activeLocation ?? 'delivery';
     final isPickup = locationType == 'pickup';
+    
+    // Prevent confirming delivery if pickup is not confirmed
+    // Allow viewing already confirmed delivery even if pickup data is missing
+    if (!isPickup && _pickupConfirmationData == null && _deliveryConfirmationData == null) {
+      // Show a message to the user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please confirm pickup before confirming delivery'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
     
     await Navigator.push(
       context,
@@ -2237,27 +2275,29 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
                       const SizedBox(height: 40), // instead of Spacer()
 
-                      // bottom row with confirm button (hidden when shipper is selected)
-                      if (_activeLocation != 'shipper')
+                      // bottom row with confirm button
+                      if (_selectedLoad != null)
                         Row(
                           children: [
                             const Spacer(),
                             ElevatedButton(
-                              onPressed: _selectedLoad != null ? () => _showConfirmationDialog() : null,
+                              onPressed: _isConfirmButtonEnabled() ? () => _showConfirmationDialog() : null,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: green,
+                                backgroundColor: _isConfirmButtonEnabled() ? green : Colors.grey,
                                 padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
-                                elevation: 8,
-                                shadowColor: Colors.black45,
+                                elevation: _isConfirmButtonEnabled() ? 8 : 0,
+                                shadowColor: _isConfirmButtonEnabled() ? Colors.black45 : Colors.transparent,
                               ),
                               child: Text(
                                 _getConfirmButtonText(),
                                 textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                    fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                                style: TextStyle(
+                                    fontSize: 16, 
+                                    fontWeight: FontWeight.w700, 
+                                    color: _isConfirmButtonEnabled() ? Colors.white : Colors.grey.shade300),
                               ),
                             ),
                           ],

@@ -1462,11 +1462,14 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
       // Only process payment if there's an amount and it's a payment release
       if (paymentAmount != null && paymentAmount > 0 && isPaymentRelease) {
         try {
+          // Get carrier name for transaction record
+          final carrierName = _carrier?.displayName ?? _carrier?.companyName ?? 'Unknown Carrier';
           await _releasePaymentToCarrier(
             carrierId: carrierId,
             loadId: loadId,
             amount: paymentAmount,
             completionStatus: completionStatus,
+            carrierName: carrierName,
           );
         } catch (e) {
           print('Error releasing payment: $e');
@@ -1686,6 +1689,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     required String loadId,
     required double amount,
     required String completionStatus,
+    required String carrierName,
   }) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -1707,6 +1711,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
           shipperId: currentUser.uid,
           amountInCents: (amount * 100).toInt(),
           completionStatus: completionStatus,
+          carrierName: carrierName,
         );
         
         if (success) {
@@ -1848,6 +1853,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
         // Store transfer record in Firestore
         await FirebaseFirestore.instance.collection('transfers').add({
           'carrierId': carrierId,
+          'carrierName': carrierName,
           'shipperId': currentUser.uid,
           'loadId': loadId,
           'amount': amount,
@@ -2233,14 +2239,17 @@ class _DeliveryConfirmationDialogState extends State<_DeliveryConfirmationDialog
       
       final completionStatus = widget.existingConfirmation?['completionStatus']?.toString().toLowerCase() ?? 'complete';
       
+      // Use a small tolerance for floating-point comparison
+      const tolerance = 0.01;
+      
       // Complete orders must have full payment
       if (completionStatus == 'complete') {
-        return amount == totalAmount;
+        return (amount - totalAmount).abs() < tolerance;
       }
       
       // Partial orders must have more than half
       if (completionStatus == 'partial') {
-        return amount > totalAmount / 2 && amount <= totalAmount;
+        return amount > (totalAmount / 2) - tolerance && amount <= totalAmount + tolerance;
       }
       
       return false;
@@ -2335,23 +2344,23 @@ class _DeliveryConfirmationDialogState extends State<_DeliveryConfirmationDialog
     
     // If this is payment release, pre-fill payment amount based on completion status
     if (widget.isPaymentRelease && widget.existingConfirmation != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_paymentController.text.isEmpty) {
-          final existingPayment = widget.existingConfirmation!['paymentAmount'];
-          if (existingPayment != null) {
-            _paymentController.text = (existingPayment is num 
-                ? existingPayment.toDouble() 
-                : double.tryParse(existingPayment.toString()) ?? 0.0).toStringAsFixed(2);
-          } else if (totalAmount != null) {
-            // Pre-fill based on completion status
-            if (completionStatus == 'complete') {
-              _paymentController.text = totalAmount.toStringAsFixed(2);
-            } else if (completionStatus == 'partial') {
-              _paymentController.text = (totalAmount / 2).toStringAsFixed(2);
-            }
+      // Set the payment amount immediately to avoid validation issues
+      if (_paymentController.text.isEmpty) {
+        final existingPayment = widget.existingConfirmation!['paymentAmount'];
+        if (existingPayment != null) {
+          final amount = existingPayment is num 
+              ? existingPayment.toDouble() 
+              : double.tryParse(existingPayment.toString()) ?? 0.0;
+          _paymentController.text = _formatAmount(amount);
+        } else if (totalAmount != null) {
+          // Pre-fill based on completion status
+          if (completionStatus == 'complete') {
+            _paymentController.text = _formatAmount(totalAmount);
+          } else if (completionStatus == 'partial') {
+            _paymentController.text = _formatAmount(totalAmount / 2);
           }
         }
-      });
+      }
     }
     
     return Dialog(
@@ -2920,6 +2929,14 @@ class _DeliveryConfirmationDialogState extends State<_DeliveryConfirmationDialog
     }
   }
   
+  // Format amount to remove unnecessary .00
+  String _formatAmount(double amount) {
+    // Convert to string with 2 decimal places, then remove trailing zeros and decimal point if needed
+    String result = amount.toStringAsFixed(2);
+    result = result.replaceAll(RegExp(r'\.?0+$'), '');
+    return result;
+  }
+  
   Widget _buildPaymentReleaseSection(double? totalAmount, String completionStatus) {
     if (totalAmount == null) {
       return Container(
@@ -3004,6 +3021,7 @@ class _DeliveryConfirmationDialogState extends State<_DeliveryConfirmationDialog
         TextField(
           controller: _paymentController,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
+          readOnly: true,
           decoration: InputDecoration(
             labelText: 'Payment Amount',
             hintText: completionStatus == 'complete'

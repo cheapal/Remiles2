@@ -587,23 +587,23 @@ class ShipperContactSupportPage extends StatelessWidget {
                 context,
                 Icons.email,
                 'Email Support',
-                'support@remiles.com',
+                'info@remileslogistics.com',
                 'Send us an email and we\'ll get back to you within 24 hours',
                 () {
                   _openEmailSupport(context);
                 },
               ),
-              const SizedBox(height: 16),
-              _buildContactCard(
-                context,
-                Icons.phone,
-                'Phone Support',
-                '+1 (555) 123-4567',
-                'Call us Monday-Friday, 9 AM - 5 PM EST',
-                () {
-                  _openPhoneSupport(context);
-                },
-              ),
+              // const SizedBox(height: 16),
+              // _buildContactCard(
+              //   context,
+              //   Icons.phone,
+              //   'Phone Support',
+              //   '+1 (555) 123-4567',
+              //   'Call us Monday-Friday, 9 AM - 5 PM EST',
+              //   () {
+              //     _openPhoneSupport(context);
+              //   },
+              // ),
               const SizedBox(height: 16),
               _buildContactCard(
                 context,
@@ -803,7 +803,7 @@ class ShipperContactSupportPage extends StatelessWidget {
   }
   
   static Future<void> _openEmailSupport(BuildContext context) async {
-    const email = 'support@remiles.com';
+    const email = 'info@remileslogistics.com';
     try {
       final Uri emailUri = Uri(
         scheme: 'mailto',

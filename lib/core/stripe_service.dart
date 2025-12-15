@@ -1154,6 +1154,7 @@ class StripeService {
     required String shipperId,
     int? amountInCents,
     String completionStatus = 'complete',
+    String? carrierName,
   }) async {
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -1185,6 +1186,7 @@ class StripeService {
             'shipperId': shipperId,
             if (amountInCents != null) 'amount': amountInCents,
             'completionStatus': completionStatus,
+            if (carrierName != null) 'carrierName': carrierName,
           },
         }),
       ).timeout(

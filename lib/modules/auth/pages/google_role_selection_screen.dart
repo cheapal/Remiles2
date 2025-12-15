@@ -9,6 +9,8 @@ import '../../carrier_onboarding/carrier_onboarding_wrapper.dart';
 import '../../shipper_onboarding/shipper_onboarding_wrapper.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_1.dart';
+import '../../carrier_dashboard/views/dashboard/pages/carrier_dashboard_1.dart';
+import '../../carrier_dashboard/views/dashboard/pages/main_page.dart';
 
 /// Role selection screen specifically for Google Sign-In flow
 /// User is already authenticated via Google, we just need to create their account in Firestore
@@ -145,12 +147,38 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
         }
       }
     } else if (userRole == UserRole.carrier) {
-      print('Google Role Selection: Navigating to Carrier Onboarding Wrapper');
-      if (context.mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-          (route) => false,
-        );
+      final carrier = authProvider.carrierUser;
+      if (carrier != null && !carrier.isOnboardingComplete) {
+        print('Google Role Selection: Navigating to Carrier Onboarding Wrapper');
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
+            (route) => false,
+          );
+        }
+      } else if (carrier != null) {
+        // Check if dashboard steps are completed
+        print('Google Role Selection: Checking if carrier dashboard steps are completed...');
+        final isDashboardComplete = await FirebaseService.isCarrierDashboardComplete(carrier.uid);
+        print('Google Role Selection: Carrier dashboard complete: $isDashboardComplete');
+        
+        if (!isDashboardComplete) {
+          print('Google Role Selection: Navigating to Carrier Dashboard 1');
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const CarrierDashboard1()),
+              (route) => false,
+            );
+          }
+        } else {
+          print('Google Role Selection: Navigating to Carrier Main Page');
+          if (context.mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const MainPage()),
+              (route) => false,
+            );
+          }
+        }
       }
     }
   }

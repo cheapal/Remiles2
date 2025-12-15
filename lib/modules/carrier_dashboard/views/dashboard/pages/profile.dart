@@ -17,6 +17,7 @@ import 'help_legal_page.dart';
 import 'carrier_boost_my_profile.dart';
 import 'carrier_payment_page.dart';
 import 'app_settings_page.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/profile_document_management.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});
@@ -271,344 +272,492 @@ class _ProfileState extends State<Profile> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final carrier = authProvider.carrierUser;
+    final bool isTabletOrDesktop = MediaQuery.of(context).size.width > 600;
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          TopNavigationBar(context),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Column(
-              children: [
-                const SizedBox(height: 10),
-                // Profile Header
-                Stack(
-                  alignment: Alignment.topCenter,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
+      body: CustomScrollView(
+        slivers: [
+          // Top Navigation
+          SliverToBoxAdapter(
+            child: TopNavigationBar(context),
+          ),
+          
+          // Profile Header with Gradient
+          SliverToBoxAdapter(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF1C6B4A),
+                    const Color(0xFF43975A),
+                    const Color(0xFF81AB3A),
+                  ],
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(30),
+                  bottomRight: Radius.circular(30),
+                ),
+              ),
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTabletOrDesktop ? 100.0 : 20.0,
+                  vertical: 30,
+                ),
+                child: Column(
                   children: [
-                    Column(
+                    const SizedBox(height: 20),
+                    // Profile Picture
+                    Stack(
+                      alignment: Alignment.center,
                       children: [
-                        const SizedBox(height: 130),
                         Container(
-                          width: 172,
-                          height: 50,
+                          width: 140,
+                          height: 140,
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFF43975A), width: 2),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.25),
-                                blurRadius: 4,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withOpacity(0.3),
+                                Colors.white.withOpacity(0.1),
+                              ],
+                            ),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.5),
+                              width: 3,
+                            ),
                           ),
-                          child: Center(
-                            child: Text(
-                              carrier?.companyName ?? carrier?.companyName ?? 'Company Name',
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
-                                color: Color(0xFF186230),
-                              ),
-                              textAlign: TextAlign.center,
-                              overflow: TextOverflow.ellipsis,
+                        ),
+                        GestureDetector(
+                          onTap: _isUploadingImage ? null : _changeProfilePicture,
+                          child: Container(
+                            width: 130,
+                            height: 130,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.2),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: Stack(
+                              children: [
+                                ClipOval(
+                                  child: carrier?.profileImageUrl != null
+                                      ? Image.network(
+                                          carrier!.profileImageUrl!,
+                                          width: 130,
+                                          height: 130,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            return Container(
+                                              width: 130,
+                                              height: 130,
+                                              decoration: const BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Color(0xFFF5F7FA),
+                                              ),
+                                              child: const Icon(
+                                                Icons.person,
+                                                size: 80,
+                                                color: Color(0xFF43975A),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : Container(
+                                          width: 130,
+                                          height: 130,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Color(0xFFF5F7FA),
+                                          ),
+                                          child: const Icon(
+                                            Icons.person,
+                                            size: 80,
+                                            color: Color(0xFF43975A),
+                                          ),
+                                        ),
+                                ),
+                                if (_isUploadingImage)
+                                  Container(
+                                    width: 130,
+                                    height: 130,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.black.withOpacity(0.5),
+                                    ),
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 30,
+                                        height: 30,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 3,
+                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (!_isUploadingImage)
+                                  Positioned(
+                                    bottom: 0,
+                                    right: 0,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        GestureDetector(
+                                          onTap: _changeProfilePicture,
+                                          child: Container(
+                                            width: 36,
+                                            height: 36,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: const Color(0xFF43975A),
+                                              border: Border.all(color: Colors.white, width: 3),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.2),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: const Icon(
+                                              Icons.camera_alt,
+                                              color: Colors.white,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ),
+                                        if (carrier?.profileImageUrl != null && carrier!.profileImageUrl!.isNotEmpty) ...[
+                                          const SizedBox(width: 8),
+                                          GestureDetector(
+                                            onTap: _deleteProfilePicture,
+                                            child: Container(
+                                              width: 36,
+                                              height: 36,
+                                              decoration: BoxDecoration(
+                                                shape: BoxShape.circle,
+                                                color: Colors.red,
+                                                border: Border.all(color: Colors.white, width: 3),
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Colors.black.withOpacity(0.2),
+                                                    blurRadius: 8,
+                                                    offset: const Offset(0, 2),
+                                                  ),
+                                                ],
+                                              ),
+                                              child: const Icon(
+                                                Icons.delete,
+                                                color: Colors.white,
+                                                size: 18,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ),
                       ],
                     ),
-                    GestureDetector(
-                      onTap: _isUploadingImage ? null : _changeProfilePicture,
-                      child: Container(
-                        width: 106,
-                        height: 106,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFF43975A),
-                          border: Border.all(color: Colors.white, width: 4),
+                    const SizedBox(height: 24),
+                    // Company Name
+                    Text(
+                      carrier?.companyName ?? 'Company Name',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 16),
+                    // Stats Row
+                    if (carrier != null)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildStatChip(
+                            icon: Icons.star_rounded,
+                            value: carrier.rating != null
+                                ? '${carrier.rating!.toStringAsFixed(1)}'
+                                : 'N/A',
+                            color: const Color(0xFFFDD610),
+                          ),
+                          const SizedBox(width: 12),
+                          _buildVerifiedChip(
+                            isVerified: (carrier.isVerified || carrier.isPhoneVerified),
+                          ),
+                          const SizedBox(width: 12),
+                          _buildStatChip(
+                            icon: Icons.local_shipping_rounded,
+                            value: _isLoadingStats
+                                ? '...'
+                                : '${_completedOrders ?? carrier.totalDeliveries ?? 0}',
+                            color: Colors.white,
+                            isLoading: _isLoadingStats,
+                          ),
+                        ],
+                      ),
+                    const SizedBox(height: 30),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Main Content
+          SliverPadding(
+            padding: EdgeInsets.symmetric(
+              horizontal: isTabletOrDesktop ? 100.0 : 20.0,
+              vertical: 24,
+            ),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // Stats Cards
+                if (carrier != null) ...[
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildStatCard(
+                          icon: Icons.star_rounded,
+                          label: 'Rating',
+                          value: carrier.rating != null
+                              ? '${carrier.rating!.toStringAsFixed(1)}'
+                              : 'N/A',
+                          color: const Color(0xFFFDD610),
                         ),
-                        child: Stack(
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildStatCard(
+                          icon: Icons.local_shipping_rounded,
+                          label: 'Deliveries',
+                          value: _isLoadingStats
+                              ? '...'
+                              : '${_completedOrders ?? carrier.totalDeliveries ?? 0}',
+                          color: const Color(0xFF43975A),
+                          isLoading: _isLoadingStats,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Section Title
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'Account Settings',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Color(0xFF1A1A1A),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+
+                // Profile Options
+                _buildModernProfileOption(
+                  'Account Details',
+                  Icons.account_circle_rounded,
+                  'Manage your personal information',
+                  () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AccountDetailsPage(),
+                      ),
+                    );
+                    _loadCarrierStats();
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildModernProfileOption(
+                  'Payment Method',
+                  Icons.payment_rounded,
+                  'Manage payment methods',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CarrierPaymentPage(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildModernProfileOption(
+                  'Load Preferences',
+                  Icons.tune_rounded,
+                  'Customize your load preferences',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CarrierPreferencesPage(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildModernProfileOption(
+                  'Documents',
+                  Icons.description_rounded,
+                  'Manage your documents',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfileDocumentManagment(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _buildModernProfileOption(
+                  'Boost My Profile',
+                  Icons.rocket_launch_rounded,
+                  'Promote your profile',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CarrierBoostMyProfile(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 24),
+
+                // Section Title
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'Support & More',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Color(0xFF1A1A1A),
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+
+                _buildModernProfileOption(
+                  'Settings',
+                  Icons.settings_rounded,
+                  'App settings and preferences',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+                // App Settings - only visible in debug mode
+                if (kDebugMode) ...[
+                  const SizedBox(height: 12),
+                  _buildModernProfileOption(
+                    'App Settings',
+                    Icons.admin_panel_settings_rounded,
+                    'Developer settings',
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AppSettingsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _buildModernProfileOption(
+                  'Help & Legal',
+                  Icons.help_outline_rounded,
+                  'Get help and view legal info',
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CarrierHelpLegalPage(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+
+                // Logout Button
+                Container(
+                  width: double.infinity,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.red.shade400,
+                        Colors.red.shade600,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.3),
+                        blurRadius: 12,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => _showLogoutDialog(context),
+                      borderRadius: BorderRadius.circular(16),
+                      child: const Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Center(
-                              child: carrier?.profileImageUrl != null
-                                  ? ClipOval(
-                                      child: Image.network(
-                                        carrier!.profileImageUrl!,
-                                        width: 98,
-                                        height: 98,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return Container(
-                                            width: 98,
-                                            height: 98,
-                                            decoration: const BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: Color(0xFFFFFEF6),
-                                            ),
-                                            child: const Icon(Icons.person, size: 70, color: Color(0xFF43975A)),
-                                          );
-                                        },
-                                      ),
-                                    )
-                                  : Container(
-                                      width: 98,
-                                      height: 98,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Color(0xFFFFFEF6),
-                                      ),
-                                      child: const Icon(Icons.person, size: 70, color: Color(0xFF43975A)),
-                                    ),
+                            Icon(Icons.logout_rounded, color: Colors.white, size: 22),
+                            SizedBox(width: 12),
+                            Text(
+                              'Log Out',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
                             ),
-                            if (_isUploadingImage)
-                              Container(
-                                width: 106,
-                                height: 106,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Colors.black.withOpacity(0.5),
-                                ),
-                                child: const Center(
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            if (!_isUploadingImage)
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    GestureDetector(
-                                      onTap: _changeProfilePicture,
-                                      child: Container(
-                                        width: 28,
-                                        height: 28,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: const Color(0xFF43975A),
-                                          border: Border.all(color: Colors.white, width: 2),
-                                        ),
-                                        child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                                      ),
-                                    ),
-                                    if (carrier?.profileImageUrl != null && carrier!.profileImageUrl!.isNotEmpty) ...[
-                                      const SizedBox(width: 4),
-                                      GestureDetector(
-                                        onTap: _deleteProfilePicture,
-                                        child: Container(
-                                          width: 28,
-                                          height: 28,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Colors.red,
-                                            border: Border.all(color: Colors.white, width: 2),
-                                          ),
-                                          child: const Icon(Icons.delete, color: Colors.white, size: 16),
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
                           ],
                         ),
                       ),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Ratings and Shipments
-                if (carrier != null)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Star Rating - always show
-                        const Icon(Icons.star, color: Color(0xFFFDD610), size: 16),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            carrier.rating != null
-                                ? '${carrier.rating!.toStringAsFixed(1)}'
-                                : 'N/A',
-                            style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: carrier.rating != null ? Colors.black87 : Colors.grey),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Verified Badge - always show (based on account or phone verification)
-                        Container(
-                          width: 14,
-                          height: 14,
-                          decoration: BoxDecoration(
-                            color: (carrier.isVerified || carrier.isPhoneVerified)
-                                ? const Color(0xFF81AB3A)
-                                : Colors.grey.shade400,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            size: 9,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            (carrier.isVerified || carrier.isPhoneVerified) ? 'Verified' : 'Unverified',
-                            style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: (carrier.isVerified || carrier.isPhoneVerified) ? Colors.black87 : Colors.grey),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Shipments
-                        Icon(Icons.local_shipping, size: 16, color: Colors.black87),
-                        const SizedBox(width: 4),
-                        _isLoadingStats
-                            ? const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Flexible(
-                                child: Text(
-                                  '${_completedOrders ?? carrier.totalDeliveries ?? 0}',
-                                  style: const TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                      ],
-                    ),
-                  ),
-                const SizedBox(height: 20),
-
-                // Profile Options
-                _buildProfileOption('Account Details', Icons.account_circle, () async {
-                  await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AccountDetailsPage(),
-                    ),
-                  );
-                  // Refresh stats when returning from Account Details
-                  _loadCarrierStats();
-                }),
-                const SizedBox(height: 16),
-                _buildProfileOption('Payment Method', Icons.credit_card, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CarrierPaymentPage(),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 16),
-                _buildProfileOption('Load Preferences', Icons.tune, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CarrierPreferencesPage(),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 16),
-                _buildProfileOption('Documents', Icons.description, () {}),
-                const SizedBox(height: 16),
-                _buildProfileOption('Boost My Load', Icons.rocket_launch, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CarrierBoostMyProfile(),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 16),
-                _buildProfileOption('Settings', Icons.settings, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const SettingsPage(),
-                    ),
-                  );
-                }),
-                // App Settings - only visible in debug mode
-                if (kDebugMode) ...[
-                  const SizedBox(height: 16),
-                  _buildProfileOption('App Settings', Icons.admin_panel_settings, () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AppSettingsPage(),
-                      ),
-                    );
-                  }),
-                ],
-                const SizedBox(height: 16),
-                _buildProfileOption('Help & Legal', Icons.help_outline, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const CarrierHelpLegalPage(),
-                    ),
-                  );
-                }),
-                const SizedBox(height: 16),
-                // Logout button
-                GestureDetector(
-                  onTap: () => _showLogoutDialog(context),
-                  child: Container(
-                    width: 172,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF43975A), width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.25),
-                          blurRadius: 4,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Log Out',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontWeight: FontWeight.w500,
-                          fontSize: 16,
-                          color: Color(0xFF186230),
-                        ),
-                      ),
-                    ),
                   ),
                 ),
-              ],
+                const SizedBox(height: 32),
+              ]),
             ),
           ),
         ],
@@ -709,46 +858,237 @@ class _ProfileState extends State<Profile> {
       print('Logout error: $e');
     }
   }
+
+  Widget _buildStatChip({
+    required IconData icon,
+    required String value,
+    required Color color,
+    bool isLoading = false,
+  }) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.2),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: Colors.white.withOpacity(0.3),
+        width: 1,
+      ),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 6),
+        isLoading
+            ? const SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Text(
+                value,
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+      ],
+    ),
+  );
+  }
+
+  Widget _buildVerifiedChip({required bool isVerified}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+    decoration: BoxDecoration(
+      color: isVerified
+          ? const Color(0xFF81AB3A).withOpacity(0.3)
+          : Colors.white.withOpacity(0.2),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(
+        color: isVerified
+            ? const Color(0xFF81AB3A)
+            : Colors.white.withOpacity(0.3),
+        width: isVerified ? 1.5 : 1,
+      ),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            color: isVerified
+                ? const Color(0xFF81AB3A)
+                : Colors.grey.shade400,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            Icons.check_rounded,
+            color: Colors.white,
+            size: 12,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          isVerified ? 'Verified' : 'Unverified',
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isVerified ? Colors.white : Colors.white.withOpacity(0.8),
+          ),
+        ),
+      ],
+    ),
+  );
+  }
+
+  Widget _buildStatCard({
+  required IconData icon,
+  required String label,
+  required String value,
+  required Color color,
+  bool isLoading = false,
+}) {
+  return Container(
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.08),
+          blurRadius: 20,
+          offset: const Offset(0, 4),
+        ),
+      ],
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        isLoading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Text(
+                value,
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+      ],
+    ),
+  );
 }
 
-Widget _buildProfileOption(String text, IconData icon, VoidCallback onTap) {
-  return GestureDetector(
-    onTap: onTap,
-    child: Container(
-      width: double.infinity,
-      height: 41,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(7.29),
-        border: Border.all(color: const Color(0xFF43975A), width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.25),
-            blurRadius: 4,
-            offset: const Offset(0, 4),
+Widget _buildModernProfileOption(
+  String title,
+  IconData icon,
+  String subtitle,
+  VoidCallback onTap,
+) {
+  return Material(
+    color: Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.grey.shade200,
+            width: 1,
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
         child: Row(
           children: [
-            Icon(icon, color: const Color(0xFF186230)),
-            const SizedBox(width: 10),
-            Text(
-              text,
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                color: Color(0xFF186230),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF43975A).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: const Color(0xFF43975A),
+                size: 24,
               ),
             ),
-            const Spacer(),
-            Icon(Icons.arrow_forward_ios, color: Colors.grey[400]),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 16,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 13,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              color: Colors.grey.shade400,
+              size: 18,
+            ),
           ],
         ),
       ),
     ),
   );
+  }
 }

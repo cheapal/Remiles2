@@ -1065,6 +1065,77 @@ class FirebaseService {
     }
   }
 
+  // Save carrier dashboard response
+  static Future<void> saveCarrierDashboardResponse(
+    String carrierUid,
+    String screenKey,
+    Map<String, dynamic> response,
+  ) async {
+    try {
+      await _firestore
+          .collection('carriers')
+          .doc(carrierUid)
+          .collection('dashboard_responses')
+          .doc(screenKey)
+          .set(response, SetOptions(merge: true));
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save carrier dashboard response');
+      rethrow;
+    }
+  }
+
+  // Get carrier dashboard response
+  static Future<Map<String, dynamic>?> getCarrierDashboardResponse(
+    String carrierUid,
+    String screenKey,
+  ) async {
+    try {
+      final doc = await _firestore
+          .collection('carriers')
+          .doc(carrierUid)
+          .collection('dashboard_responses')
+          .doc(screenKey)
+          .get();
+      
+      return doc.exists ? doc.data() : null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get carrier dashboard response');
+      return null;
+    }
+  }
+
+  // Check if carrier has completed all dashboard steps
+  static Future<bool> isCarrierDashboardComplete(String carrierUid) async {
+    try {
+      // Check if both dashboard steps are completed
+      final dashboard2 = await getCarrierDashboardResponse(carrierUid, 'dashboard_2_business_info');
+      final dashboard3 = await getCarrierDashboardResponse(carrierUid, 'dashboard_3_business_number');
+      
+      return dashboard2 != null && dashboard3 != null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Check carrier dashboard complete failed');
+      return false;
+    }
+  }
+
+  // Upload carrier document to Firebase Storage
+  static Future<String?> uploadCarrierDocument(
+    String carrierUid,
+    String documentType,
+    File imageFile,
+  ) async {
+    try {
+      final ref = _storage.ref().child('carriers/$carrierUid/documents/$documentType.jpg');
+      final uploadTask = ref.putFile(imageFile);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload carrier document');
+      return null;
+    }
+  }
+
   // Update user password
   static Future<void> updatePassword(String newPassword) async {
     try {

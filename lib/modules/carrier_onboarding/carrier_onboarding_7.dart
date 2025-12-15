@@ -1,4 +1,4 @@
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/main_page.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_1.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -271,10 +271,10 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
       // Call the completion callback if provided
       widget.onOnboardingComplete?.call();
       
-      // Navigate to the main dashboard and clear all previous screens
+      // Navigate to carrier dashboard 1 and clear all previous screens
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainPage()),
+          MaterialPageRoute(builder: (_) => const CarrierDashboard1()),
           (route) => false, // Remove all previous routes
         );
       }
@@ -290,7 +290,7 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
         );
         // Still navigate to dashboard even if there's an error
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const MainPage()),
+          MaterialPageRoute(builder: (_) => const CarrierDashboard1()),
           (route) => false, // Remove all previous routes
         );
       }

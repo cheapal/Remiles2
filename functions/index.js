@@ -2703,6 +2703,7 @@ exports.captureEscrowPayment = functions
           shipperId,
           amount,
           completionStatus = "complete",
+          carrierName: providedCarrierName,
         } = requestData;
 
         if (!paymentIntentId || !loadId || !carrierId || !shipperId) {
@@ -2855,9 +2856,30 @@ exports.captureEscrowPayment = functions
           completionStatus: completionStatus,
         });
 
+        // Get carrier name if not provided
+        let carrierName = providedCarrierName || "Unknown Carrier";
+        if (!providedCarrierName) {
+          try {
+            const carrierDoc = await admin.firestore()
+                .collection("carriers")
+                .doc(carrierId)
+                .get();
+            if (carrierDoc.exists) {
+              const carrierData = carrierDoc.data();
+              carrierName = (carrierData && carrierData.companyName) ||
+                  (carrierData && carrierData.displayName) ||
+                  (carrierData && carrierData.name) ||
+                  "Unknown Carrier";
+            }
+          } catch (error) {
+            console.error("Error fetching carrier name:", error);
+          }
+        }
+
         // Store transfer record
         await admin.firestore().collection("transfers").add({
           carrierId: carrierId,
+          carrierName: carrierName,
           shipperId: shipperId,
           loadId: loadId,
           amount: actualAmount / 100,

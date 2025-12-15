@@ -10,6 +10,8 @@ import '../modules/shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import '../modules/shipper_dashboard/pages/shipper_dashboard_1.dart';
 import '../modules/carrier_onboarding/carrier_onboarding_wrapper.dart';
 import '../modules/shipper_onboarding/shipper_onboarding_wrapper.dart';
+import '../modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_1.dart';
+import '../modules/carrier_dashboard/views/dashboard/pages/main_page.dart';
 import '../models/user_model.dart';
 import 'firebase_service.dart';
 
@@ -144,12 +146,46 @@ class _AuthWrapperState extends State<AuthWrapper> {
           }
         }
       } else if (_authProvider.currentUser?.role == UserRole.carrier) {
-        print('AuthWrapper: Navigating to Carrier Onboarding Wrapper');
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-            (route) => false,
-          );
+        final carrier = _authProvider.carrierUser;
+        if (carrier != null && carrier.isOnboardingComplete == false) {
+          print('AuthWrapper: Navigating to Carrier Onboarding Wrapper');
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
+              (route) => false,
+            );
+          }
+        } else if (carrier != null) {
+          // Check if dashboard steps are completed
+          print('AuthWrapper: Checking if carrier dashboard steps are completed...');
+          final isDashboardComplete = await FirebaseService.isCarrierDashboardComplete(carrier.uid);
+          print('AuthWrapper: Carrier dashboard complete: $isDashboardComplete');
+          
+          if (!isDashboardComplete) {
+            print('AuthWrapper: Navigating to Carrier Dashboard 1');
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const CarrierDashboard1()),
+                (route) => false,
+              );
+            }
+          } else {
+            print('AuthWrapper: Navigating to Carrier Main Page');
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const MainPage()),
+                (route) => false,
+              );
+            }
+          }
+        } else {
+          print('AuthWrapper: No carrier data found, navigating to login');
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(builder: (_) => const LoginScreen()),
+              (route) => false,
+            );
+          }
         }
       } else {
         // If role is not determined or invalid, go to login

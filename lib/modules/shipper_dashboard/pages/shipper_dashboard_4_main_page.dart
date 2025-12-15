@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
 
@@ -1129,8 +1130,6 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
   }
 }
 
-var selectedTab = 0;
-
 class ShipperDashboardHomePage extends StatefulWidget {
   const ShipperDashboardHomePage({super.key});
 
@@ -1143,12 +1142,18 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
   int _totalLoads = 0;
   int _completedLoads = 0;
   int _matchedLoads = 0;
+  
+  // Loads list state
+  List<Map<String, dynamic>> _loads = [];
+  bool _isLoadingLoads = false;
+  int selectedTab = 0;
 
   @override
   void initState() {
     super.initState();
     _loadCarbonFootprintInterest();
     _loadLoadStats();
+    _loadLoads();
   }
 
   Future<void> _loadCarbonFootprintInterest() async {
@@ -1206,6 +1211,131 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
       });
     } catch (e) {
       print('Error loading shipper load stats: $e');
+    }
+  }
+
+  Future<void> _loadLoads() async {
+    if (_isLoadingLoads) return;
+    
+    setState(() => _isLoadingLoads = true);
+    
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+      
+      if (shipper == null) {
+        setState(() {
+          _loads = [];
+          _isLoadingLoads = false;
+        });
+        return;
+      }
+      
+      // Determine status filter based on selectedTab
+      String statusFilter = 'all';
+      if (selectedTab == 1) {
+        // In Progress: get all and filter client-side for active/inTransit/booked
+        statusFilter = 'all';
+      } else if (selectedTab == 2) {
+        statusFilter = 'completed';
+      }
+      
+      final result = await FirebaseService.getShipperLoads(
+        shipperUid: shipper.uid,
+        status: statusFilter,
+        limit: 10,
+      );
+      
+      List<Map<String, dynamic>> loads = result['loads'] as List<Map<String, dynamic>>;
+      
+      // Filter for "In Progress" tab (active, inTransit, booked)
+      if (selectedTab == 1) {
+        loads = loads.where((load) {
+          final status = load['status']?.toString() ?? '';
+          return status == 'active' || status == 'inTransit' || status == 'booked';
+        }).toList();
+      }
+      
+      if (!mounted) return;
+      
+      setState(() {
+        _loads = loads;
+        _isLoadingLoads = false;
+      });
+    } catch (e) {
+      print('Error loading loads: $e');
+      if (!mounted) return;
+      setState(() {
+        _loads = [];
+        _isLoadingLoads = false;
+      });
+    }
+  }
+  
+  String _formatDate(dynamic dateValue) {
+    if (dateValue == null) return 'N/A';
+    
+    try {
+      DateTime date;
+      if (dateValue is String) {
+        date = DateTime.parse(dateValue);
+      } else if (dateValue is DateTime) {
+        date = dateValue;
+      } else if (dateValue is Timestamp) {
+        // Handle Firestore Timestamp
+        date = dateValue.toDate();
+      } else {
+        return 'N/A';
+      }
+      
+      // Format as "Sep 1st, 2025"
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final day = date.day;
+      final suffix = _getDaySuffix(day);
+      return '${months[date.month - 1]} ${day}$suffix, ${date.year}';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+  
+  String _getDaySuffix(int day) {
+    if (day >= 11 && day <= 13) {
+      return 'th';
+    }
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  }
+  
+  String _formatWeight(dynamic weight) {
+    if (weight == null) return 'N/A';
+    try {
+      final w = weight is String ? double.tryParse(weight) : (weight is num ? weight.toDouble() : null);
+      if (w == null) return 'N/A';
+      return '${w.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} lb';
+    } catch (e) {
+      return 'N/A';
+    }
+  }
+
+  String _formatStatus(String status) {
+    switch (status) {
+      case 'active':
+        return 'Active';
+      case 'inTransit':
+        return 'In-Transit';
+      case 'booked':
+        return 'Booked';
+      case 'completed':
+        return 'Completed';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status.isNotEmpty ? status : 'Active';
     }
   }
 
@@ -1454,8 +1584,10 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () =>
-                                    setState(() => selectedTab = 0),
+                        onTap: () {
+                          setState(() => selectedTab = 0);
+                          _loadLoads();
+                        },
                         child: Container(
                           padding:
                           const EdgeInsets.symmetric(
@@ -1495,8 +1627,10 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () =>
-                                    setState(() => selectedTab = 1),
+                        onTap: () {
+                          setState(() => selectedTab = 1);
+                          _loadLoads();
+                        },
                         child: Container(
                           padding:
                           const EdgeInsets.symmetric(
@@ -1536,8 +1670,10 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: GestureDetector(
-                        onTap: () =>
-                                    setState(() => selectedTab = 2),
+                        onTap: () {
+                          setState(() => selectedTab = 2);
+                          _loadLoads();
+                        },
                         child: Container(
                           padding:
                           const EdgeInsets.symmetric(
@@ -1577,19 +1713,71 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                   ],
                 ),
                 const SizedBox(height: 24),
-                aiMatchCard(
-                  context,
-                  recommended: true,
-                  matchPercent: 97,
-                  loadId: '#1234',
-                  from: 'Toronto, ON',
-                  to: 'Montreal. QC',
-                  pickup: 'Sep 1st, 2025',
-                  delivery: 'Sep 3rd, 2025',
-                  weight: '15,000 lb',
-                  docs: '2 Docs',
-                  equipment: 'Flatbed',
-                ),
+                // Dynamic loads list
+                if (_isLoadingLoads)
+                  const Padding(
+                    padding: EdgeInsets.all(20.0),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_loads.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Center(
+                      child: Text(
+                        'No loads found',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: 260,
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      itemCount: _loads.length,
+                      itemBuilder: (context, index) {
+                        final load = _loads[index];
+                    final loadId = load['id']?.toString() ?? 'N/A';
+                    final from = '${load['originCity'] ?? ''}, ${load['originState'] ?? ''}'.trim();
+                    final to = '${load['destinationCity'] ?? ''}, ${load['destinationState'] ?? ''}'.trim();
+                    final pickupDate = load['pickupDate'];
+                    final deliveryDate = load['deliveryDate'];
+                    final weight = _formatWeight(load['weight']);
+                    final equipment = load['equipmentNeeded']?.toString() ?? 'N/A';
+                    final matchPercent = (load['matchPercentage'] != null 
+                        ? (load['matchPercentage'] is num 
+                            ? load['matchPercentage'].toDouble() 
+                            : double.tryParse(load['matchPercentage'].toString()) ?? 0.0)
+                        : 0.0).round();
+                    final rawStatus = load['status']?.toString() ?? 'active';
+                    final statusText = _formatStatus(rawStatus);
+                    
+                        // Count documents (simplified - you might want to fetch actual count)
+                        final docs = '0 Docs'; // TODO: Get actual document count if available
+                        
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: aiMatchCard(
+                            context,
+                            recommended: matchPercent >= 20,
+                            matchPercent: matchPercent,
+                            loadId: '#${loadId.length > 8 ? loadId.substring(0, 8) : loadId}',
+                            from: from.isEmpty ? 'N/A' : from,
+                            to: to.isEmpty ? 'N/A' : to,
+                            pickup: _formatDate(pickupDate),
+                            delivery: _formatDate(deliveryDate),
+                            weight: weight,
+                            docs: docs,
+                            equipment: equipment,
+                            status: statusText,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
 
               ],
             ),

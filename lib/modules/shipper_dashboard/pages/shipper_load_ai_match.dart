@@ -114,9 +114,9 @@ class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
                     // Status row: In-Transit (active), Cancelled Loads, Completed Loads
                     Row(
                       children: [
-                        statusPill('In-Transit', 0, active: true),
-                        statusPill('Cancelled Loads', 1),
-                        statusPill('Completed Loads', 2),
+                        filterStatusPill('In-Transit', 0, active: true),
+                        filterStatusPill('Cancelled Loads', 1),
+                        filterStatusPill('Completed Loads', 2),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -318,8 +318,8 @@ Widget bigButton(String text, {required Color bg, required Color textColor}) {
   );
 }
 
-// Small status pills row
-Widget statusPill(String text, int index, {bool active = false}) {
+// Small status pills row (for filters)
+Widget filterStatusPill(String text, int index, {bool active = false}) {
   return Expanded(
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4.0),
@@ -365,6 +365,7 @@ Widget aiMatchCard(
       required String weight,
       required String docs,
       required String equipment,
+      String? status,
     }) {
   return Container(
     width: double.infinity,
@@ -417,11 +418,11 @@ Widget aiMatchCard(
               ),
             ),
 
-            // Right: Available gradient pill, ID, match %
+            // Right: Status gradient pill, ID, match %
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                availablePill(),
+                statusPill(status ?? 'Available'),
                 const SizedBox(height: 8),
                 Text(
                   'Load ID $loadId',
@@ -495,14 +496,33 @@ Widget aiMatchCard(
   );
 }
 
-Widget availablePill() {
+Widget statusPill(String status) {
+  // Basic color mapping by status
+  Color start = primaryColor;
+  Color end = aiGradientEnd;
+
+  final lower = status.toLowerCase();
+  if (lower.contains('completed')) {
+    start = const Color(0xFF2E7D32); // green
+    end = const Color(0xFF66BB6A);
+  } else if (lower.contains('in-transit') || lower.contains('in transit')) {
+    start = const Color(0xFF1565C0); // blue
+    end = const Color(0xFF42A5F5);
+  } else if (lower.contains('booked')) {
+    start = const Color(0xFFEF6C00); // orange
+    end = const Color(0xFFFFA726);
+  } else if (lower.contains('cancelled')) {
+    start = const Color(0xFFC62828); // red
+    end = const Color(0xFFEF5350);
+  }
+
   return Container(
     width: 110.45,
     height: 38.37,
     alignment: Alignment.center,
     decoration: BoxDecoration(
       gradient:  LinearGradient(
-        colors: [primaryColor, aiGradientEnd],
+        colors: [start, end],
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
       ),
@@ -516,9 +536,9 @@ Widget availablePill() {
         ),
       ],
     ),
-    child: const Text(
-      'Available',
-      style: TextStyle(
+    child: Text(
+      status,
+      style: const TextStyle(
         color: Colors.white,
         fontSize: 13,
         fontWeight: FontWeight.w600,

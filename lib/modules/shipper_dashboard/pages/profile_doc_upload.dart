@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:Remiles/providers/auth_provider.dart';
 import 'package:Remiles/models/user_model.dart';
 import 'package:Remiles/core/firebase_service.dart';
@@ -17,6 +18,7 @@ class ProfileDocUpload extends StatefulWidget {
 class _ProfileDocUploadState extends State<ProfileDocUpload> {
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = true;
+  bool _isUploading = false;
   Map<String, DocumentInfo> _documents = {};
   
   // Document definitions for carriers
@@ -183,6 +185,29 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
 
   Future<void> _uploadDocument(DocumentInfo docInfo) async {
     try {
+      final authProvider = context.read<AuthProvider>();
+      final appStateProvider = context.read<AppStateProvider>();
+      final userRole = authProvider.userRole;
+
+      // Optional: pick new expiry date when uploading Cargo Insurance (shipper)
+      String? newExpiryStr;
+      if (userRole == UserRole.shipper &&
+          docInfo.key == 'insuranceDocumentUrl') {
+        final now = DateTime.now();
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: now,
+          firstDate: DateTime(now.year - 1),
+          lastDate: DateTime(now.year + 10),
+        );
+
+        // User cancelled date selection → cancel upload
+        if (picked == null) {
+          return;
+        }
+        newExpiryStr = DateFormat('MM/dd/yyyy').format(picked);
+      }
+
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 2000,
@@ -192,10 +217,20 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
 
       if (image == null) return;
 
-      final authProvider = context.read<AuthProvider>();
-      final appStateProvider = context.read<AppStateProvider>();
-      final userRole = authProvider.userRole;
+      // Delete old file (if any) BEFORE uploading new one so we don't
+      // accidentally delete the freshly uploaded file at the same path.
+      if (docInfo.url != null && docInfo.url!.isNotEmpty) {
+        try {
+          await FirebaseService.deleteFileFromURL(docInfo.url!);
+        } catch (e) {
+          print('Error deleting old file: $e');
+          // Continue even if deletion fails
+        }
+      }
 
+      setState(() {
+        _isUploading = true;
+      });
       appStateProvider.showLoadingWithMessage('Uploading document...');
 
       String? newUrl;
@@ -221,16 +256,6 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
 
       if (newUrl == null) {
         throw Exception('Failed to upload document');
-      }
-
-      // Delete old file if exists
-      if (docInfo.url != null && docInfo.url!.isNotEmpty) {
-        try {
-          await FirebaseService.deleteFileFromURL(docInfo.url!);
-        } catch (e) {
-          print('Error deleting old file: $e');
-          // Continue even if deletion fails
-        }
       }
 
       // Update dashboard response
@@ -262,11 +287,16 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
             docInfo.screenKey,
           );
           
-          final updatedData = {
+          final Map<String, dynamic> updatedData = {
             ...?currentData,
             docInfo.key: newUrl,
             'timestamp': DateTime.now().toIso8601String(),
           };
+
+          // If this is Cargo Insurance, also update its expiry date
+          if (docInfo.key == 'insuranceDocumentUrl' && newExpiryStr != null) {
+            updatedData['expiryDate'] = newExpiryStr;
+          }
           
           await FirebaseService.saveShipperDashboardResponse(
             shipper.uid,
@@ -303,6 +333,12 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
             duration: const Duration(seconds: 3),
           ),
         );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUploading = false;
+        });
       }
     }
   }
@@ -471,55 +507,69 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
         ? _shipperDocuments
         : _carrierDocuments;
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          "Document Management",
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-          ),
-        ),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SafeArea(
-              child: ListView.separated(
-                padding: const EdgeInsets.all(16),
-                itemCount: documents.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 12),
-                itemBuilder: (context, index) {
-                  final docInfo = documents[index];
-                  final currentDoc = _documents[docInfo.key] ?? docInfo;
-                  final hasDocument = currentDoc.url != null && currentDoc.url!.isNotEmpty;
-
-                  return _buildDocumentCard(currentDoc, hasDocument);
-                },
+    return Stack(
+      children: [
+        Scaffold(
+          backgroundColor: Colors.white,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            centerTitle: true,
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back, color: Colors.black),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            title: const Text(
+              "Document Management",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
               ),
             ),
+          ),
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : SafeArea(
+                  child: ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: documents.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final docInfo = documents[index];
+                      final currentDoc = _documents[docInfo.key] ?? docInfo;
+                      final hasDocument = currentDoc.url != null &&
+                          currentDoc.url!.isNotEmpty;
+
+                      return _buildDocumentCard(currentDoc, hasDocument);
+                    },
+                  ),
+                ),
+        ),
+        if (_isUploading)
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.3),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
   Widget _buildDocumentCard(DocumentInfo docInfo, bool hasDocument) {
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
+                  shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: docInfo.isRequired && !hasDocument
               ? Colors.red.withOpacity(0.5)
               : Colors.grey.shade300,
           width: docInfo.isRequired && !hasDocument ? 2 : 1,
-        ),
+                ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -725,11 +775,11 @@ class _DocumentViewerScreen extends StatelessWidget {
                     Text(
                       'Failed to load image',
                       style: TextStyle(color: Colors.white),
-                    ),
-                  ],
                 ),
-              );
-            },
+                  ],
+              ),
+            );
+          },
           ),
         ),
       ),

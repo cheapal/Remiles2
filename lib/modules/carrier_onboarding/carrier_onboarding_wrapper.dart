@@ -81,10 +81,10 @@ class _CarrierOnboardingWrapperState extends State<CarrierOnboardingWrapper> {
         // Navigate to appropriate screen and clear the navigation stack
         if (mounted) {
           if (isDashboardComplete) {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const MainPage()),
-              (route) => false, // Remove all previous routes including onboarding
-            );
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const MainPage()),
+            (route) => false, // Remove all previous routes including onboarding
+          );
           } else {
             Navigator.of(context).pushAndRemoveUntil(
               MaterialPageRoute(builder: (_) => const CarrierDashboard1()),

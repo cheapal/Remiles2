@@ -149,12 +149,12 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
     } else if (userRole == UserRole.carrier) {
       final carrier = authProvider.carrierUser;
       if (carrier != null && !carrier.isOnboardingComplete) {
-        print('Google Role Selection: Navigating to Carrier Onboarding Wrapper');
-        if (context.mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-            (route) => false,
-          );
+      print('Google Role Selection: Navigating to Carrier Onboarding Wrapper');
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
+          (route) => false,
+        );
         }
       } else if (carrier != null) {
         // Check if dashboard steps are completed

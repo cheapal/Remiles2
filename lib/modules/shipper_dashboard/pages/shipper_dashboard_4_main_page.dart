@@ -1,6 +1,5 @@
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/bottom_navigation_bar.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/more.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_add_payment_method.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_Screen.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_manage_loads.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_post_load.dart';
@@ -8,7 +7,6 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.da
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_payment_page.dart';
-import 'package:Remiles/providers/payment_methods_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
@@ -1142,11 +1140,15 @@ class ShipperDashboardHomePage extends StatefulWidget {
 
 class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
   bool _isCarbonFootprintInterested = false;
+  int _totalLoads = 0;
+  int _completedLoads = 0;
+  int _matchedLoads = 0;
 
   @override
   void initState() {
     super.initState();
     _loadCarbonFootprintInterest();
+    _loadLoadStats();
   }
 
   Future<void> _loadCarbonFootprintInterest() async {
@@ -1182,6 +1184,31 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
     }
   }
 
+  Future<void> _loadLoadStats() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final shipper = authProvider.shipperUser;
+
+      if (shipper == null) {
+        return;
+      }
+
+      final stats = await FirebaseService.getShipperLoadStats(shipper.uid);
+
+      if (!mounted) return;
+
+      setState(() {
+        _totalLoads = stats['total'] ?? 0;
+        _completedLoads = stats['completed'] ?? 0;
+        _matchedLoads = (stats['booked'] ?? 0) +
+            (stats['inTransit'] ?? 0) +
+            (stats['completed'] ?? 0);
+      });
+    } catch (e) {
+      print('Error loading shipper load stats: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
@@ -1200,6 +1227,20 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
   }
   
   Widget _buildHomePage(BuildContext context, String displayName) {
+    // Derived performance metrics
+    final int totalLoads = _totalLoads;
+    final int completedLoads = _completedLoads;
+    final int matchedLoads = _matchedLoads;
+
+    final double deliveredOnTimePercent =
+        totalLoads > 0 ? (completedLoads / totalLoads * 100) : 0;
+
+    final double carrierMatchPercent =
+        totalLoads > 0 ? (matchedLoads / totalLoads * 100) : 0;
+
+    final double carrierMatchProgress =
+        (carrierMatchPercent / 100).clamp(0.0, 1.0);
+
     return  // Main content start
       SingleChildScrollView(
         child: Column(
@@ -1601,12 +1642,12 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Flexible(
+                          Flexible(
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                '42',
-                                style: TextStyle(
+                                '$totalLoads',
+                                style: const TextStyle(
                                   color: Colors.black,
                                   fontSize: 24,
                                   fontWeight: FontWeight
@@ -1676,12 +1717,12 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                             ),
                           ),
                           const SizedBox(width: 12),
-                          const Flexible(
+                          Flexible(
                             child: FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Text(
-                                '95%',
-                                style: TextStyle(
+                                '${deliveredOnTimePercent.toStringAsFixed(0)}%',
+                                style: const TextStyle(
                                   color: Colors.black,
                                   fontSize: 24,
                                   fontWeight: FontWeight
@@ -1747,7 +1788,7 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                           borderRadius:
                           BorderRadius.circular(10),
                           child: LinearProgressIndicator(
-                            value: 0.87,
+                            value: carrierMatchProgress,
                             backgroundColor:
                             Colors.grey[300],
                             valueColor:
@@ -1759,9 +1800,9 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Text(
-                      '87%',
-                      style: TextStyle(
+                    Text(
+                      '${carrierMatchPercent.toStringAsFixed(0)}%',
+                      style: const TextStyle(
                         color: Colors.black,
                         fontSize: 20,
                         fontWeight: FontWeight.w900,

@@ -465,6 +465,13 @@ class FirebaseService {
       final ref = _storage.refFromURL(url);
       await ref.delete();
     } catch (e) {
+      // If the file doesn't exist, that's fine – nothing to delete.
+      if (e is FirebaseException && e.code == 'object-not-found') {
+        if (AppConfig.enableDebugLogging) {
+          print('deleteFileFromURL: object not found, skipping delete for $url');
+        }
+        return;
+      }
       await recordError(e, StackTrace.current, reason: 'File deletion from URL failed');
       rethrow;
     }

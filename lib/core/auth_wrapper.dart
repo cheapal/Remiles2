@@ -148,12 +148,12 @@ class _AuthWrapperState extends State<AuthWrapper> {
       } else if (_authProvider.currentUser?.role == UserRole.carrier) {
         final carrier = _authProvider.carrierUser;
         if (carrier != null && carrier.isOnboardingComplete == false) {
-          print('AuthWrapper: Navigating to Carrier Onboarding Wrapper');
-          if (mounted) {
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-              (route) => false,
-            );
+        print('AuthWrapper: Navigating to Carrier Onboarding Wrapper');
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
+            (route) => false,
+          );
           }
         } else if (carrier != null) {
           // Check if dashboard steps are completed

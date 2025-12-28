@@ -1150,8 +1150,8 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     final podUrl = podUrlFromConfirmation ?? podUrlFromLoad;
     final hasPOD = podUrl != null && podUrl.isNotEmpty;
     final hasUnreadPOD = load['hasUnreadPOD'] == true || load['hasUnreadPOD'] == 1;
-    // final status = load['status']?.toString().toLowerCase() ?? ''; // Temporarily unused
-    // final isDeliveryDone = status == 'in-transit' || status == 'completed'; // Temporarily unused
+    final status = load['status']?.toString().toLowerCase() ?? '';
+    final isDeliveryDone = status == 'in-transit' || status == 'completed';
     final isConfirmed = _deliveryConfirmationData != null;
     
     // Check payment status from Firebase document
@@ -1172,19 +1172,17 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     // View button should be enabled if POD exists OR confirmation exists
     final canView = hasPOD || isConfirmed;
     
-    // TEMPORARY: Confirm button is always enabled for testing
-    // Original logic (commented out for restoration):
     // Confirm button should be enabled if:
-    // Case 1: Not confirmed yet - need delivery done AND POD exists
+    // Case 1: Not confirmed yet - need delivery done AND POD exists (documents uploaded)
     // Case 2: Confirmed but payment not done - always enable (for payment release)
     // Case 3: Confirmed and payment done - disable
-    // final canConfirm = isDeliveryDone && 
-    //                   (
-    //                     // Not confirmed: need POD
-    //                     (!isConfirmed && hasPOD) ||
-    //                     // Confirmed but payment not done: always enable for payment release
-    //                     (isConfirmed && !isPaymentDone)
-    //                   );
+    final canConfirm = isDeliveryDone && 
+                      (
+                        // Not confirmed: need POD (documents uploaded)
+                        (!isConfirmed && hasPOD) ||
+                        // Confirmed but payment not done: always enable for payment release
+                        (isConfirmed && !isPaymentDone)
+                      );
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1296,15 +1294,17 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton(
-                onPressed: () => _showDeliveryConfirmationDialog(context, load),
+                onPressed: canConfirm
+                    ? () => _showDeliveryConfirmationDialog(context, load)
+                    : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: green,
+                  backgroundColor: canConfirm ? green : Colors.grey,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 4,
+                  elevation: canConfirm ? 4 : 0,
                 ),
                 child: Text(
                   isConfirmed && !isPaymentDone 

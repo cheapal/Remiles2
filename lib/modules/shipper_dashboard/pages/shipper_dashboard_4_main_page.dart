@@ -7,6 +7,7 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.da
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_payment_page.dart';
+import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_details_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';
@@ -1760,19 +1761,22 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                         
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16.0),
-                          child: aiMatchCard(
-                            context,
-                            recommended: matchPercent >= 20,
-                            matchPercent: matchPercent,
-                            loadId: '#${loadId.length > 8 ? loadId.substring(0, 8) : loadId}',
-                            from: from.isEmpty ? 'N/A' : from,
-                            to: to.isEmpty ? 'N/A' : to,
-                            pickup: _formatDate(pickupDate),
-                            delivery: _formatDate(deliveryDate),
-                            weight: weight,
-                            docs: docs,
-                            equipment: equipment,
-                            status: statusText,
+                          child: GestureDetector(
+                            onTap: () => _showLoadDetails(load),
+                            child: aiMatchCard(
+                              context,
+                              recommended: matchPercent >= 20,
+                              matchPercent: matchPercent,
+                              loadId: '#${loadId.length > 8 ? loadId.substring(0, 8) : loadId}',
+                              from: from.isEmpty ? 'N/A' : from,
+                              to: to.isEmpty ? 'N/A' : to,
+                              pickup: _formatDate(pickupDate),
+                              delivery: _formatDate(deliveryDate),
+                              weight: weight,
+                              docs: docs,
+                              equipment: equipment,
+                              status: statusText,
+                            ),
                           ),
                         );
                       },
@@ -2016,6 +2020,14 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  void _showLoadDetails(Map<String, dynamic> load) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ShipperLoadDetailsPage(load: load),
       ),
     );
   }

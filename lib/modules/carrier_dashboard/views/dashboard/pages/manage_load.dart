@@ -489,7 +489,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
               sizeFactor: _sortAnimation,
               axisAlignment: -1.0,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.fromLTRB(10, 0, 16, 10),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -506,7 +506,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
   }
 
   Widget _buildFilterButtons() {
-    final filters = ['All', 'Available Loads', 'My Bookings', 'In-Transit', 'Cancelled Loads', 'Completed Loads'];
+    final filters = ['All', 'Available', 'My Bookings', 'In-Transit', 'Cancelled', 'Completed'];
     
     return Column(
       mainAxisSize: MainAxisSize.min,

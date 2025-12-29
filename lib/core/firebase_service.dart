@@ -19,6 +19,7 @@ import '../models/load_model.dart';
 import '../models/offer_model.dart';
 import '../services/notification_service.dart';
 import '../models/notification_model.dart';
+import '../models/academy_content.dart';
 // import 'utils/distance_service.dart'; // Temporarily disabled until Distance Matrix API is activated
 
 /// Firebase service class to handle all Firebase operations
@@ -3298,7 +3299,7 @@ class FirebaseService {
         final snapshot = await query.get();
         
         // Google API key for distance calculations (temporarily not used)
-        // const String googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+        // const String googleApiKey = AppConstants.googleApiKey;
         
         // Get carrier's current location (use address if currentLocation is not available)
         // Temporarily not used until Distance Matrix API is activated
@@ -3451,7 +3452,7 @@ class FirebaseService {
         final bookedSnapshot = await bookedQuery.get();
         
         // Google API key for distance calculations (temporarily not used)
-        // const String googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+        // const String googleApiKey = AppConstants.googleApiKey;
         
         // Get carrier's current location (temporarily not used)
         // final carrierLocation = carrier.currentLocation ?? 
@@ -4237,5 +4238,267 @@ class FirebaseService {
       status: 'deposited',
       loadId: loadId,
     );
+  }
+
+  // ==================== Academy Content Methods ====================
+
+  /// Upload academy thumbnail image
+  static Future<String?> uploadAcademyThumbnail(File imageFile) async {
+    try {
+      // Validate file size (5MB limit)
+      final fileSize = await imageFile.length();
+      if (fileSize > 5 * 1024 * 1024) {
+        throw Exception('Image file is too large. Maximum size is 5MB');
+      }
+      
+      final fileName = 'thumbnail_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = _storage.ref().child('academy/thumbnails/$fileName');
+      
+      // Set metadata with content type
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        cacheControl: 'public, max-age=31536000',
+      );
+      
+      final uploadTask = ref.putFile(imageFile, metadata);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload academy thumbnail');
+      return null;
+    }
+  }
+
+  /// Upload academy video
+  static Future<String?> uploadAcademyVideo(File videoFile) async {
+    try {
+      // Validate file size (50MB limit)
+      final fileSize = await videoFile.length();
+      if (fileSize > 50 * 1024 * 1024) {
+        throw Exception('Video file is too large. Maximum size is 50MB');
+      }
+      
+      final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final ref = _storage.ref().child('academy/videos/$fileName');
+      
+      // Set metadata with content type
+      final metadata = SettableMetadata(
+        contentType: 'video/mp4',
+        cacheControl: 'public, max-age=31536000',
+      );
+      
+      final uploadTask = ref.putFile(videoFile, metadata);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload academy video');
+      return null;
+    }
+  }
+
+  /// Upload academy document
+  static Future<String?> uploadAcademyDocument(File documentFile) async {
+    try {
+      // Validate file size (10MB limit)
+      final fileSize = await documentFile.length();
+      if (fileSize > 10 * 1024 * 1024) {
+        throw Exception('Document file is too large. Maximum size is 10MB');
+      }
+      
+      final fileName = 'document_${DateTime.now().millisecondsSinceEpoch}';
+      final extension = documentFile.path.split('.').last;
+      final ref = _storage.ref().child('academy/documents/$fileName.$extension');
+      
+      // Determine content type based on extension
+      String contentType = 'application/octet-stream';
+      switch (extension.toLowerCase()) {
+        case 'pdf':
+          contentType = 'application/pdf';
+          break;
+        case 'doc':
+          contentType = 'application/msword';
+          break;
+        case 'docx':
+          contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          break;
+        case 'txt':
+          contentType = 'text/plain';
+          break;
+      }
+      
+      // Set metadata with content type
+      final metadata = SettableMetadata(
+        contentType: contentType,
+        cacheControl: 'public, max-age=31536000',
+      );
+      
+      final uploadTask = ref.putFile(documentFile, metadata);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload academy document');
+      return null;
+    }
+  }
+
+  /// Get all academy content as a stream
+  static Stream<List<AcademyContent>> getAcademyContentStream() {
+    return _firestore
+        .collection('academy_content')
+        .orderBy('order')
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => AcademyContent.fromFirestore(doc)).toList();
+    });
+  }
+
+  /// Get all academy content (one-time fetch)
+  static Future<List<AcademyContent>> getAcademyContent() async {
+    try {
+      final snapshot = await _firestore
+          .collection('academy_content')
+          .orderBy('order')
+          .orderBy('createdAt', descending: true)
+          .get();
+      return snapshot.docs.map((doc) => AcademyContent.fromFirestore(doc)).toList();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get academy content');
+      return [];
+    }
+  }
+
+  /// Get academy content by ID
+  static Future<AcademyContent?> getAcademyContentById(String contentId) async {
+    try {
+      final doc = await _firestore.collection('academy_content').doc(contentId).get();
+      if (doc.exists) {
+        return AcademyContent.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get academy content by ID');
+      return null;
+    }
+  }
+
+  /// Save or update academy content
+  static Future<void> saveAcademyContent(AcademyContent content) async {
+    try {
+      final data = content.toFirestore();
+      data['updatedAt'] = Timestamp.now();
+      
+      if (content.id.isEmpty || !await _academyContentExists(content.id)) {
+        // Create new content
+        data['createdAt'] = Timestamp.now();
+        await _firestore.collection('academy_content').add(data);
+      } else {
+        // Update existing content
+        await _firestore.collection('academy_content').doc(content.id).update(data);
+      }
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save academy content');
+      rethrow;
+    }
+  }
+
+  /// Check if academy content exists
+  static Future<bool> _academyContentExists(String contentId) async {
+    try {
+      final doc = await _firestore.collection('academy_content').doc(contentId).get();
+      return doc.exists;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Delete academy content and associated files
+  static Future<void> deleteAcademyContent(String contentId) async {
+    try {
+      final content = await getAcademyContentById(contentId);
+      if (content == null) return;
+
+      // Delete files from storage
+      if (content.thumbnailUrl != null) {
+        try {
+          final ref = _storage.refFromURL(content.thumbnailUrl!);
+          await ref.delete();
+        } catch (e) {
+          print('Warning: Failed to delete thumbnail: $e');
+        }
+      }
+
+      if (content.videoUrl != null) {
+        try {
+          final ref = _storage.refFromURL(content.videoUrl!);
+          await ref.delete();
+        } catch (e) {
+          print('Warning: Failed to delete video: $e');
+        }
+      }
+
+      if (content.documentUrl != null) {
+        try {
+          final ref = _storage.refFromURL(content.documentUrl!);
+          await ref.delete();
+        } catch (e) {
+          print('Warning: Failed to delete document: $e');
+        }
+      }
+
+      // Delete Firestore document
+      await _firestore.collection('academy_content').doc(contentId).delete();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to delete academy content');
+      rethrow;
+    }
+  }
+
+  /// Get academy playlists
+  static Future<List<Map<String, dynamic>>> getAcademyPlaylists() async {
+    try {
+      final snapshot = await _firestore
+          .collection('academy_playlists')
+          .orderBy('name')
+          .get();
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        return {
+          'id': doc.id,
+          ...data,
+        };
+      }).toList();
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to get academy playlists');
+      return [];
+    }
+  }
+
+  /// Create or update academy playlist
+  static Future<void> saveAcademyPlaylist({
+    required String? playlistId,
+    required String name,
+    String? description,
+  }) async {
+    try {
+      final data = <String, dynamic>{
+        'name': name,
+        'description': description,
+        'updatedAt': Timestamp.now(),
+      };
+
+      if (playlistId == null || playlistId.isEmpty) {
+        data['createdAt'] = Timestamp.now();
+        await _firestore.collection('academy_playlists').add(data);
+      } else {
+        await _firestore.collection('academy_playlists').doc(playlistId).update(data);
+      }
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to save academy playlist');
+      rethrow;
+    }
   }
 }

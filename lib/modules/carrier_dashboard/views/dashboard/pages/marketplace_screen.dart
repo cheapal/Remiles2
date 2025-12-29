@@ -23,6 +23,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:signature/signature.dart';
+import 'package:Remiles/core/constants/app_constants.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   final String? initialLoadId;
@@ -458,7 +459,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       // NOTE: This API key must have "Directions API" enabled in Google Cloud Console
       // Go to: https://console.cloud.google.com/apis/library/directions-backend.googleapis.com
       // Make sure the API is enabled for your project
-      const String apiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+      const String apiKey = AppConstants.googleApiKey;
       
       // Use driving mode to get actual road route
       final String url = 

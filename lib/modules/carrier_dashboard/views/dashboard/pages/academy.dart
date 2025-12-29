@@ -1,8 +1,8 @@
-
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.dart';
 import 'package:flutter/material.dart';
-
-
+import '../../../../../../core/firebase_service.dart';
+import '../../../../../../models/academy_content.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AcademyScreen extends StatefulWidget {
   const AcademyScreen({super.key});
@@ -13,6 +13,8 @@ class AcademyScreen extends StatefulWidget {
 
 class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -24,7 +26,91 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    setState(() {
+      _searchQuery = value.toLowerCase();
+    });
+  }
+
+  bool _matchesSearch(AcademyContent content) {
+    if (_searchQuery.isEmpty) return true;
+    final query = _searchQuery.toLowerCase();
+    return content.title.toLowerCase().contains(query) ||
+        content.description.toLowerCase().contains(query) ||
+        content.tags.any((tag) => tag.toLowerCase().contains(query));
+  }
+
+  Future<void> _shareContent(AcademyContent content) async {
+    try {
+      final url = content.videoUrl ?? content.documentUrl ?? '';
+      final shareText = '${content.title}\n\n${content.description}\n\n${url.isNotEmpty ? url : ''}';
+      await Share.share(
+        shareText,
+        subject: content.title,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _openContent(AcademyContent content) async {
+    if (content.contentType == 'video' && content.videoUrl != null) {
+      // Open video in webview or external player
+      if (await canLaunchUrl(Uri.parse(content.videoUrl!))) {
+        await launchUrl(Uri.parse(content.videoUrl!), mode: LaunchMode.externalApplication);
+      }
+    } else if (content.contentType == 'document' && content.documentUrl != null) {
+      // Open document in webview
+      if (await canLaunchUrl(Uri.parse(content.documentUrl!))) {
+        await launchUrl(Uri.parse(content.documentUrl!), mode: LaunchMode.externalApplication);
+      }
+    } else {
+      // Show details dialog
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(content.title),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(content.description),
+                if (content.tags.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  const Text('Tags:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: content.tags.map((tag) => Chip(
+                      label: Text(tag),
+                      backgroundColor: Colors.grey.shade200,
+                    )).toList(),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -56,7 +142,7 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
           ),
           tabs: const [
             Tab(text: 'VIDEOS'),
-            Tab(text: 'PLAYLISTS'),
+            Tab(text: 'FILES'),
           ],
         ),
       ),
@@ -64,28 +150,27 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Content for the first tab
-          _buildTabContent(),
-          // Content for the second tab (can be different)
-          // For this example, we'll show the same layout
-          _buildTabContent(),
+          // Videos tab
+          _buildTabContent(contentType: 'video'),
+          // Playlists tab
+          _buildTabContent(contentType: 'playlist'),
         ],
       ),
     );
   }
 
   /// Builds the content layout for a single tab page.
-  Widget _buildTabContent() {
+  Widget _buildTabContent({required String contentType}) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
       child: Column(
         children: [
           // Search Bar
           _buildSearchBar(),
-          const SizedBox(height: 40),
-          // Video Grid
+          const SizedBox(height: 20),
+          // Content Grid
           Expanded(
-            child: _buildVideoGrid(),
+            child: _buildContentGrid(contentType: contentType),
           ),
         ],
       ),
@@ -94,93 +179,287 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
 
   /// Builds the styled search bar widget.
   Widget _buildSearchBar() {
-    return   Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0),
-      child: searchBar(hint: 'Search My Loads',showTrail: false),
+    return Container(
+      height: 36,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(25, 85, 41, 0.36),
+            blurRadius: 2.8,
+            spreadRadius: 1,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 12),
+          Icon(Icons.search, size: 18, color: Colors.black.withOpacity(0.6)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              onChanged: _onSearchChanged,
+              decoration: InputDecoration(
+                hintText: 'Search videos and documents...',
+                hintStyle: const TextStyle(
+                  color: Color(0xFF959595),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+                isDense: true,
+                border: InputBorder.none,
+              ),
+            ),
+          ),
+          if (_searchQuery.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.clear, size: 18),
+              onPressed: () {
+                _searchController.clear();
+                _onSearchChanged('');
+              },
+            ),
+          const SizedBox(width: 6),
+        ],
+      ),
     );
   }
 
-  /// Builds the grid of video placeholders.
-  Widget _buildVideoGrid() {
-    // Using a list of 8 for better scrolling demonstration
-    return GridView.builder(
-      itemCount: 8,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,        // 2 columns
-        crossAxisSpacing: 16.0,   // Horizontal space
-        mainAxisSpacing: 16.0,    // Vertical space
-        childAspectRatio: 0.75,   // Adjusted for title and caption space
-      ),
-      itemBuilder: (context, index) {
-        return _buildVideoThumbnail();
+  /// Builds the grid of content items.
+  Widget _buildContentGrid({required String contentType}) {
+    return StreamBuilder<List<AcademyContent>>(
+      stream: FirebaseService.getAcademyContentStream(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text('Error: ${snapshot.error}'),
+              ],
+            ),
+          );
+        }
+
+        final allContent = snapshot.data ?? [];
+        
+        // Filter content based on tab
+        List<AcademyContent> filteredContent;
+        if (contentType == 'playlist') {
+          // Show documents in the FILES tab
+          filteredContent = allContent.where((content) => 
+            content.contentType == 'document' && _matchesSearch(content)
+          ).toList();
+        } else {
+          // Show only videos in the VIDEOS tab
+          filteredContent = allContent.where((content) => 
+            content.contentType == 'video' && _matchesSearch(content)
+          ).toList();
+        }
+
+        if (filteredContent.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _searchQuery.isNotEmpty ? Icons.search_off : Icons.video_library_outlined,
+                  size: 64,
+                  color: Colors.grey.shade400,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _searchQuery.isNotEmpty
+                      ? 'No content found matching your search'
+                      : 'No content available yet',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16.0,
+            mainAxisSpacing: 16.0,
+            childAspectRatio: 0.75,
+          ),
+          itemCount: filteredContent.length,
+          itemBuilder: (context, index) {
+            return _buildContentThumbnail(filteredContent[index]);
+          },
+        );
       },
     );
   }
 
-  /// Builds a single video thumbnail placeholder.
-  Widget _buildVideoThumbnail() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Video thumbnail container
-        Expanded(
-          flex: 2,
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade400,
-              borderRadius: BorderRadius.circular(15.0),
+  /// Builds a single content thumbnail.
+  Widget _buildContentThumbnail(AcademyContent content) {
+    return GestureDetector(
+      onTap: () => _openContent(content),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16.0),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              spreadRadius: 2,
+              offset: const Offset(0, 4),
             ),
-            child:  Center(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.9),
-                  shape: BoxShape.circle,
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 5,
+              spreadRadius: 1,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Thumbnail container
+            Expanded(
+              flex: 2,
+              child: ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(16.0),
+                  topRight: Radius.circular(16.0),
                 ),
-                padding: const EdgeInsets.all(4.0),
-                child: Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                  size: 40,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      color: Colors.grey.shade400,
+                      child: content.thumbnailUrl != null
+                          ? Image.network(
+                              content.thumbnailUrl!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return _buildPlaceholderThumbnail(content.contentType);
+                              },
+                            )
+                          : _buildPlaceholderThumbnail(content.contentType),
+                    ),
+                    // Play icon overlay for videos, document icon for documents - properly centered
+                    Positioned.fill(
+                      child: Center(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.6),
+                            shape: BoxShape.circle,
+                          ),
+                          padding: const EdgeInsets.all(12.0),
+                          child: Icon(
+                            content.contentType == 'video' ? Icons.play_arrow : Icons.description,
+                            color: Colors.white,
+                            size: 36,
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Share button
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: () => _shareContent(content),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.7),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.share,
+                              color: Colors.white,
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        // Title and caption section
-        Expanded(
-          flex: 1,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Getting Started',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+            const SizedBox(height: 8),
+            // Title and description section
+            Expanded(
+              flex: 1,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    Text(
+                      content.title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        height: 1.2,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Expanded(
+                      child: Text(
+                        content.description,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          height: 1.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Introduction to the app',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade700,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderThumbnail(String contentType) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.grey.shade300,
+      ),
+      child: Center(
+        child: Icon(
+          contentType == 'video' ? Icons.video_library : Icons.description,
+          size: 48,
+          color: Colors.grey.shade600,
+        ),
+      ),
     );
   }
 }

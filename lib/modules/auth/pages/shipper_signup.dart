@@ -510,6 +510,21 @@ class _ShipperSignUpScreenState extends State<ShipperSignUpScreen> {
                 return const SizedBox.shrink();
               },
             ),
+            // Back button
+            Positioned(
+              top: 50 * scale,
+              left: 10 * scale,
+              child: IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: Colors.black,
+                  size: 40 * scale,
+                ),
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+              ),
+            ),
             Positioned(
               bottom: 0,
               left: 0,

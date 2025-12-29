@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
+import 'package:Remiles/core/constants/app_constants.dart';
 
 class CarrierDashboard2 extends StatefulWidget {
   const CarrierDashboard2({super.key});
@@ -77,8 +78,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
     'Other',
   ];
   
-  // Google Places API Key
-  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+  // Google Places API Key - using AppConstants
   
   // Image picker
   final ImagePicker _picker = ImagePicker();
@@ -284,7 +284,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
                         controller: _businessAddressController,
                         hintText: "Business Address",
                         icon: Icons.location_on_outlined,
-                        apiKey: _googleApiKey,
+                        apiKey: AppConstants.googleApiKey,
                       ),
                       const SizedBox(height: 25),
                       CanadianProvincesAutocomplete(

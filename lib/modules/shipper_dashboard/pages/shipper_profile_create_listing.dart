@@ -7,6 +7,7 @@ import '../../../models/product_listing.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/utils/google_places_autocomplete.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/app_constants.dart';
 
 // Helper class to represent images (either existing URL or new file)
 class _ImageItem {
@@ -53,8 +54,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
   List<String> _existingImageUrls = [];
   String? _existingVideoUrl;
 
-  // Google Places API Key
-  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+  // Google Places API Key - using AppConstants
 
   final List<String> conditions = [
     "New",
@@ -284,7 +284,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                   controller: _locationController,
                   hintText: "Location",
                   icon: Icons.location_on,
-                  apiKey: _googleApiKey,
+                  apiKey: AppConstants.googleApiKey,
                 ),
                 const SizedBox(height: 16),
 

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../../providers/app_state_provider.dart';
 import '../../../../../core/firebase_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'academy_admin_panel.dart';
 
 class AppSettingsPage extends StatefulWidget {
   const AppSettingsPage({super.key});
@@ -545,6 +546,77 @@ class _AppSettingsPageState extends State<AppSettingsPage> {
                         ),
                         filled: true,
                         fillColor: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Academy Management
+                    const Text(
+                      'Academy Management',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF186230),
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF43975A), width: 2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF186230).withOpacity(0.1),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF186230).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            Icons.school,
+                            color: Color(0xFF186230),
+                            size: 28,
+                          ),
+                        ),
+                        title: const Text(
+                          'Manage Academy Content',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Color(0xFF186230),
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Add, edit, and manage videos and documents',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 12,
+                            color: Colors.black54,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Icons.arrow_forward_ios,
+                          color: Color(0xFF186230),
+                          size: 18,
+                        ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const AcademyAdminPanel(),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 30),

@@ -10,6 +10,7 @@ import '../../../core/firebase_service.dart';
 import '../../../core/utils/google_places_autocomplete.dart';
 import '../../../core/utils/canadian_provinces_autocomplete.dart';
 import '../../../core/utils/multi_select_dialog.dart';
+import '../../../core/constants/app_constants.dart';
 
 class ShipperDashboard2 extends StatefulWidget {
   const ShipperDashboard2({super.key});
@@ -71,8 +72,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
     'Other',
   ];
   
-  // Google Places API Key
-  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+  // Google Places API Key - using AppConstants
   
   // Image picker
   final ImagePicker _picker = ImagePicker();
@@ -216,7 +216,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                         controller: _businessAddressController,
                         hintText: "Business Address",
                         icon: Icons.location_on_outlined,
-                        apiKey: _googleApiKey,
+                        apiKey: AppConstants.googleApiKey,
                       ),
                       const SizedBox(height: 25),
                       CanadianProvincesAutocomplete(

@@ -1,4 +1,5 @@
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/app_settings_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/profile_document_management.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_boost_my_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_my_preference.dart';
@@ -6,6 +7,7 @@ import 'package:Remiles/modules/shipper_dashboard/pages/shipper_payment_page.dar
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_account_details_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_settings_page.dart';
 import 'package:Remiles/modules/shipper_dashboard/pages/shipper_help_legal_page.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -678,6 +680,23 @@ class _ShipperProfileState extends State<ShipperProfile>
                     },
                   ),
                   const SizedBox(height: 12),
+                   // App Settings - only visible in debug mode
+                if (kDebugMode) ...[
+                  const SizedBox(height: 12),
+                  _buildModernProfileOption(
+                    'App Settings',
+                    Icons.admin_panel_settings_rounded,
+                    'Developer settings',
+                    () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AppSettingsPage(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
                   _buildModernProfileOption(
                     'Help & Legal',
                     Icons.help_outline_rounded,

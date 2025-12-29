@@ -8,6 +8,7 @@ import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
 import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import '../../../core/utils/google_places_autocomplete.dart';
+import '../../../core/constants/app_constants.dart';
 
 class ShipperDashboardPostLoad extends StatefulWidget {
   final Map<String, dynamic>? editLoadData;
@@ -54,8 +55,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
   String? _previousDocumentName;
   bool _isPreviousDocumentImage = false;
   
-  // Google Places API Key
-  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+  // Google Places API Key - using AppConstants
   
   // Load Type Options
   static const List<String> _loadTypeOptions = [
@@ -406,17 +406,49 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
                     const SizedBox(height: 35),
                     Row(
                       children: [
-                         Text(
-                        widget.editLoadData != null ? 'Edit Load' : 'Post a New Load',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 26,
-                            color: Colors.black,
-                            fontWeight: FontWeight.w800,
+                        // Back Button
+                        GestureDetector(
+                          onTap: () => Navigator.of(context).pop(),
+                          child: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Color.fromRGBO(183, 123, 40, 0.44),
+                                  blurRadius: 2.8,
+                                  spreadRadius: 1,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.black,
+                              size: 24,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Image.asset('assets/yellow_trolly.png', width: 30, height: 30),
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Text(
+                                widget.editLoadData != null ? 'Edit Load' : 'Post a New Load',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 26,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Image.asset('assets/yellow_trolly.png', width: 30, height: 30),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 25),
@@ -427,7 +459,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
                             controller: _originAddressController,
                             hintText: 'Origin Address',
                             icon: Icons.location_on,
-                            apiKey: _googleApiKey,
+                            apiKey: AppConstants.googleApiKey,
                           ),
                         ),
                         const SizedBox(width: 15),
@@ -436,7 +468,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad> wit
                             controller: _destinationAddressController,
                             hintText: 'Destination Address',
                             icon: Icons.location_on,
-                            apiKey: _googleApiKey,
+                            apiKey: AppConstants.googleApiKey,
                           ),
                         ),
                       ],

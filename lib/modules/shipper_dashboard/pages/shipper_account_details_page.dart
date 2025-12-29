@@ -6,6 +6,7 @@ import '../../../providers/app_state_provider.dart';
 import '../../../core/firebase_service.dart';
 import '../../../core/utils/google_places_autocomplete.dart';
 import '../../../core/utils/multi_select_dialog.dart';
+import '../../../core/constants/app_constants.dart';
 
 class ShipperAccountDetailsPage extends StatefulWidget {
   const ShipperAccountDetailsPage({super.key});
@@ -56,8 +57,7 @@ class _ShipperAccountDetailsPageState extends State<ShipperAccountDetailsPage> {
     'Other',
   ];
   
-  // Google Places API Key
-  static const String _googleApiKey = 'AIzaSyAOZKD90SxW5dwOZVEe-nCm8dA6jXs-5AQ';
+  // Google Places API Key - using AppConstants
 
   @override
   void initState() {
@@ -355,7 +355,7 @@ class _ShipperAccountDetailsPageState extends State<ShipperAccountDetailsPage> {
                       controller: _addressController,
                       hintText: 'Address',
                       icon: Icons.location_on,
-                      apiKey: _googleApiKey,
+                      apiKey: AppConstants.googleApiKey,
                       onAddressComponents: (AddressComponents components) {
                         setState(() {
                           if (components.address != null) {

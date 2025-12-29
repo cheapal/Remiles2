@@ -36,6 +36,9 @@ dependencies:
   # Image Picker
   image_picker: ^1.0.7
   
+  # File Picker
+  file_picker: ^10.3.5
+  
   # Photo Viewer
   photo_view: ^0.15.0
   
@@ -44,7 +47,7 @@ dependencies:
   pdf: ^3.11.1
   
   # Sharing
-  share_plus: ^10.1.2
+  share_plus: ^10.1.2 
   
   # Speech to Text
   speech_to_text: ^7.0.0

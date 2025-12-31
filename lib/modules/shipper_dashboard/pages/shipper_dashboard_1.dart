@@ -113,7 +113,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
         body: Row(
           children: [
             // Conditionally show the SideNavDrawer on wide screens
-            if (isWide) const SideNavDrawer(),
+            // if (isWide) const SideNavDrawer(),
             Expanded(
               child: Stack(
                 children: [
@@ -125,7 +125,7 @@ class _ShipperDashboard1State extends State<ShipperDashboard1>
                         // Top section with progress bar
                         GestureDetector(
                           onTap: () {
-                            if (!isWide) {
+                             {
                               _scaffoldKey.currentState?.openDrawer();
 
                               ///navigate to business form screen

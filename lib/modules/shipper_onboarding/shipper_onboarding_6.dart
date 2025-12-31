@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -125,10 +126,28 @@ class _ShipperOnboarding6ScreenState extends State<ShipperOnboarding6Screen> {
                   ),
                 ),
               ),
+              if (!kIsWeb)
               Positioned(
                 top: 188 * scale,
                 left: 0,
                 right: 0,
+                child: Center(
+                  child: Text(
+                    'Do you track shipments in real time or \nonly after delivery?',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
+                  ),
+                ),
+              ),
+              if (kIsWeb)
+              Positioned(
+                top: 180.5 * scale,
+                left: 52 * scale,
                 child: Center(
                   child: Text(
                     'Do you track shipments in real time or \nonly after delivery?',
@@ -230,6 +249,8 @@ class _ShipperOnboarding6ScreenState extends State<ShipperOnboarding6Screen> {
                   ),
                 ),
               ),
+
+              if (!kIsWeb)
               Positioned(
                 bottom: 0,
                 left: 0,

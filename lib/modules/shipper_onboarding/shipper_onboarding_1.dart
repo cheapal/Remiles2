@@ -1,4 +1,5 @@
 // import removed duplicate
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';
@@ -154,10 +155,30 @@ class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
               ),
 
               // Title text
+              
+              if (!kIsWeb)
               Positioned(
                 top: 183.5 * scale,
                 left: 0,
                 right: 20,
+                child: Center(
+                  child: Text(
+                    'What type of freight do you typically \nship?',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
+                  ),
+                ),
+              ),
+
+              if (kIsWeb)
+              Positioned(
+                top: 180.5 * scale,
+                left: 52 * scale,
                 child: Center(
                   child: Text(
                     'What type of freight do you typically \nship?',
@@ -274,6 +295,8 @@ class _ShipperOnboarding1ScreenState extends State<ShipperOnboarding1Screen> {
               ),
 
               // Bottom image positioned to touch the bottom and side edges
+              
+              if (!kIsWeb)
               Positioned(
                 bottom: 0,
                 left: 0,

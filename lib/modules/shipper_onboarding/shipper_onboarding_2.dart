@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:remiles/modules/shipper_onboarding/shipper_onboarding_1.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -129,10 +130,30 @@ class _ShipperOnboarding2ScreenState extends State<ShipperOnboarding2Screen> {
                   ),
                 ),
               ),
+
+              if (!kIsWeb)
               Positioned(
                 top: 184 * scale,
                 left: 0,
                 right: 20,
+                child: Center(
+                  child: Text(
+                    'What’s your biggest challenge when \ntrying to find a truck for your freight?',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
+                  ),
+                ),
+              ),
+
+              if (kIsWeb)
+              Positioned(
+                top: 180.5 * scale,
+                left: 52 * scale,
                 child: Center(
                   child: Text(
                     'What’s your biggest challenge when \ntrying to find a truck for your freight?',
@@ -238,6 +259,8 @@ class _ShipperOnboarding2ScreenState extends State<ShipperOnboarding2Screen> {
                   ),
                 ),
               ),
+              
+              if (!kIsWeb)
               Positioned(
                 bottom: 0,
                 left: 0,

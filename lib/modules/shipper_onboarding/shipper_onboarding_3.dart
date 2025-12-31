@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -126,10 +127,29 @@ class _ShipperOnboarding3ScreenState extends State<ShipperOnboarding3Screen> {
                   ),
                 ),
               ),
+              
+              if (!kIsWeb)
               Positioned(
                 top: 186 * scale,
                 left: 0,
                 right: 25,
+                child: Center(
+                  child: Text(
+                    'How do you currently book trucks or \npost loads?',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
+                  ),
+                ),
+              ),
+              if (kIsWeb)
+              Positioned(
+                top: 180.5 * scale,
+                left: 52 * scale,
                 child: Center(
                   child: Text(
                     'How do you currently book trucks or \npost loads?',
@@ -234,6 +254,8 @@ class _ShipperOnboarding3ScreenState extends State<ShipperOnboarding3Screen> {
                   ),
                 ),
               ),
+
+              if (!kIsWeb)
               Positioned(
                 bottom: 0,
                 left: 0,

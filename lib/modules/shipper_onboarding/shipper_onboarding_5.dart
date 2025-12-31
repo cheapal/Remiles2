@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:remiles/modules/shipper_onboarding/shipper_onboarding_4.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -126,10 +127,30 @@ class _ShipperOnboarding5ScreenState extends State<ShipperOnboarding5Screen> {
                   ),
                 ),
               ),
+
+              if (!kIsWeb)
               Positioned(
                 top: 186 * scale,
                 left: 0,
                 right: 20,
+                child: Center(
+                  child: Text(
+                    'Have you ever lost time or money \nbecause of a late or missed delivery?',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
+                  ),
+                ),
+              ),
+
+              if (kIsWeb)
+              Positioned(
+                top: 180.5 * scale,
+                left: 52 * scale,
                 child: Center(
                   child: Text(
                     'Have you ever lost time or money \nbecause of a late or missed delivery?',
@@ -230,6 +251,8 @@ class _ShipperOnboarding5ScreenState extends State<ShipperOnboarding5Screen> {
                   ),
                 ),
               ),
+
+              if (!kIsWeb)
               Positioned(
                 bottom: 0,
                 left: 0,

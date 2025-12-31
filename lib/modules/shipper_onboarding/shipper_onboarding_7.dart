@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../../core/firebase_service.dart';
 import '../../providers/auth_provider.dart';
@@ -223,6 +224,8 @@ class _ShipperOnboarding7ScreenState extends State<ShipperOnboarding7Screen> {
               ),
 
               // Bottom image positioned to touch the bottom and side edges
+             
+              if (!kIsWeb)
               Positioned(
                 bottom: 0,
                 left: 0,

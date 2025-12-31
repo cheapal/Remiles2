@@ -1,4 +1,4 @@
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_load_ai_match.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 

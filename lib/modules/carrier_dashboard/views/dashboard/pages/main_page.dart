@@ -1,7 +1,7 @@
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/bottom_navigation_bar.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/profile.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_Screen.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/bottom_navigation_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/profile.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_market_place_Screen.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
 import 'package:flutter/material.dart';
 
 import 'carrier_dashboard.dart';

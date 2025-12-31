@@ -17,7 +17,7 @@ import 'help_legal_page.dart';
 import 'carrier_boost_my_profile.dart';
 import 'carrier_payment_page.dart';
 import 'app_settings_page.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/profile_document_management.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/profile_document_management.dart';
 
 class Profile extends StatefulWidget {
   const Profile({super.key});

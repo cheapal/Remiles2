@@ -1,4 +1,4 @@
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../providers/auth_provider.dart';

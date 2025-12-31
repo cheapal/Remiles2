@@ -12,7 +12,6 @@ build/
 pubspec.lock
 coverage/
 gen/
-lib/generated_plugin_registrant.dart
 
 # iOS/Xcode related
 **/ios/Flutter/.last_build_id

@@ -1,22 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:Remiles/core/firebase_service.dart';
+import 'package:remiles/core/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:Remiles/core/theme/colors.dart';
-import 'package:Remiles/models/chat_model.dart';
-import 'package:Remiles/models/offer_model.dart';
-import 'package:Remiles/models/user_model.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/negotiation_timer.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/offer_dialog.dart';
-import 'package:Remiles/modules/shipper_dashboard/widgets/counter_offer_dialog.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
-import 'package:Remiles/models/load_model.dart';
+import 'package:remiles/core/theme/colors.dart';
+import 'package:remiles/models/chat_model.dart';
+import 'package:remiles/models/offer_model.dart';
+import 'package:remiles/models/user_model.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/negotiation_timer.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/offer_dialog.dart';
+import 'package:remiles/modules/shipper_dashboard/widgets/counter_offer_dialog.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
+import 'package:remiles/models/load_model.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_details_page.dart';
-import 'package:Remiles/services/conversation_tracker.dart';
+import 'package:remiles/providers/auth_provider.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_load_details_page.dart';
+import 'package:remiles/services/conversation_tracker.dart';
 
 class ChatScreen extends StatefulWidget {
   final String conversationId;

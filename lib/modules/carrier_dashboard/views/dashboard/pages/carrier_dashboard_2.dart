@@ -1,16 +1,16 @@
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/core/utils/canadian_provinces_autocomplete.dart';
-import 'package:Remiles/core/utils/google_places_autocomplete.dart';
-import 'package:Remiles/core/utils/multi_select_dialog.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_3.dart';
-import 'package:Remiles/providers/auth_provider.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/core/utils/canadian_provinces_autocomplete.dart';
+import 'package:remiles/core/utils/google_places_autocomplete.dart';
+import 'package:remiles/core/utils/multi_select_dialog.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_3.dart';
+import 'package:remiles/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
-import 'package:Remiles/core/constants/app_constants.dart';
+import 'package:remiles/core/constants/app_constants.dart';
 
 class CarrierDashboard2 extends StatefulWidget {
   const CarrierDashboard2({super.key});

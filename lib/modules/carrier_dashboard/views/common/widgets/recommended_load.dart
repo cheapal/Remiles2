@@ -1,7 +1,7 @@
-import 'package:Remiles/core/theme/colors.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/load_model.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
+import 'package:remiles/core/theme/colors.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/load_model.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 
@@ -128,13 +128,16 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
 
             /// Weight
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children:  [
                 SvgPicture.asset("assets/truck.svg",
                     width: 18, height: 18, color: primaryColor),
                 const SizedBox(width: 6),
                 Text("${widget.load.weight.toStringAsFixed(0)} lb",style: TextStyle(fontWeight: FontWeight.w800,color:primaryColor),),
                 const Spacer(),
-                Text("Equipment: ${widget.load.equipmentNeeded}",style: TextStyle(fontWeight: FontWeight.w500,color:primaryColor),),
+                Flexible(
+                  child: Text("Equipment: ${widget.load.equipmentNeeded}",style: TextStyle(fontWeight: FontWeight.w500,color:primaryColor), overflow: TextOverflow.ellipsis,),
+                ),
               ],
             ),
 

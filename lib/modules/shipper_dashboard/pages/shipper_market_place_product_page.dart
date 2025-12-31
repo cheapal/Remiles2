@@ -1,12 +1,12 @@
-import 'package:Remiles/core/theme/colors.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_profile_create_listing.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
-import 'package:Remiles/models/product_listing.dart';
-import 'package:Remiles/core/firebase_service.dart';
+import 'package:remiles/core/theme/colors.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_profile_create_listing.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
+import 'package:remiles/models/product_listing.dart';
+import 'package:remiles/core/firebase_service.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
+import 'package:remiles/providers/auth_provider.dart';
 import 'package:photo_view/photo_view.dart';
 
 import 'package:flutter/material.dart';

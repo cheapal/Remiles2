@@ -1,4 +1,4 @@
-import 'package:Remiles/core/theme/colors.dart';
+import 'package:remiles/core/theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
@@ -7,9 +7,9 @@ import '../../common/widgets/top_navigation_bar.dart';
 import '../../common/widgets/recommended_load.dart';
 import 'manage_load.dart';
 import 'carrier_payment_page.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/load_model.dart';
-import 'package:Remiles/models/carrier_model.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/load_model.dart';
+import 'package:remiles/models/carrier_model.dart';
 import 'dart:io';
 
 class CarrierDashboardScreen extends StatefulWidget {

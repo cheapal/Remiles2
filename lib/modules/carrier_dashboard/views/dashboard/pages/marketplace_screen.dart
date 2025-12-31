@@ -1,6 +1,6 @@
 
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/custom_progress_bar.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/custom_progress_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
@@ -10,20 +10,20 @@ import 'dart:math' as math;
 import 'dart:io';
 import 'package:google_polyline_algorithm/google_polyline_algorithm.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/load_model.dart';
+import 'package:remiles/providers/auth_provider.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/load_model.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/support.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
-import 'package:Remiles/models/user_model.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/support.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
+import 'package:remiles/models/user_model.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:signature/signature.dart';
-import 'package:Remiles/core/constants/app_constants.dart';
+import 'package:remiles/core/constants/app_constants.dart';
 
 class MarketplaceScreen extends StatefulWidget {
   final String? initialLoadId;

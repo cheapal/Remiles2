@@ -1,6 +1,6 @@
 import 'dart:ui';
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_2.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_dashboard_2.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/ai_miley_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

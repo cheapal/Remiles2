@@ -1,12 +1,12 @@
 
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/academy.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/messages_page.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/notification.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/support.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/academy.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/messages_page.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/notification.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/support.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/notification_provider.dart';
+import 'package:remiles/providers/notification_provider.dart';
 
 
 Widget TopNavigationBar(BuildContext context) {

@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/custom_progress_bar.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/carrier_model.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/custom_progress_bar.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/carrier_model.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -16,11 +16,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'delivery_details_page.dart';
-import 'package:Remiles/core/stripe_service.dart';
-import 'package:Remiles/modules/shipper_dashboard/widgets/escrow_payment_dialog.dart';
-import 'package:Remiles/modules/shipper_dashboard/widgets/escrow_payment_status.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
-import 'package:Remiles/models/user_model.dart';
+import 'package:remiles/core/stripe_service.dart';
+import 'package:remiles/modules/shipper_dashboard/widgets/escrow_payment_dialog.dart';
+import 'package:remiles/modules/shipper_dashboard/widgets/escrow_payment_status.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
+import 'package:remiles/models/user_model.dart';
 
 class ShipperLoadDetailsPage extends StatefulWidget {
   final Map<String, dynamic> load;

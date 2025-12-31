@@ -16,12 +16,19 @@
           "fileOutput": "ios/Runner/GoogleService-Info.plist"
         }
       },
+      "web": {
+        "default": {
+          "projectId": "re-miles-dfm",
+          "appId": "1:60865903848:web:de7bf9f344f97cf48a5d5d"
+        }
+      },
       "dart": {
         "lib/firebase_options.dart": {
           "projectId": "re-miles-dfm",
           "configurations": {
             "android": "1:60865903848:android:6fda31291f05b6598a5d5d",
-            "ios": "1:60865903848:ios:4cf36ad5290196fe8a5d5d"
+            "ios": "1:60865903848:ios:4cf36ad5290196fe8a5d5d",
+            "web": "1:60865903848:web:de7bf9f344f97cf48a5d5d"
           }
         }
       }

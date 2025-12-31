@@ -1,4 +1,4 @@
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

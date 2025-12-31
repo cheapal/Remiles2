@@ -1,6 +1,7 @@
-import 'package:Remiles/modules/auth/pages/login_screen.dart';
-import 'package:Remiles/modules/carrier_onboarding/carrier_signup.dart';
+import 'package:remiles/modules/auth/pages/login_screen.dart';
+import 'package:remiles/modules/carrier_onboarding/carrier_signup.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'dart:ui';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -37,8 +38,10 @@ void main() async {
       final analytics = FirebaseAnalytics.instance;
       await analytics.setAnalyticsCollectionEnabled(AppConfig.enableAnalytics);
       
-      // Set session timeout (30 minutes as per official docs)
-      await analytics.setSessionTimeoutDuration(const Duration(minutes: 30));
+      // Set session timeout (30 minutes) - only on non-web platforms
+      if (!kIsWeb) {
+        await analytics.setSessionTimeoutDuration(const Duration(minutes: 30));
+      }
       
       if (AppConfig.enableDebugLogging) {
         print('Firebase Analytics initialized successfully');
@@ -53,10 +56,12 @@ void main() async {
     // Initialize Firebase Crashlytics according to official docs
     try {
       final crashlytics = FirebaseCrashlytics.instance;
-      await crashlytics.setCrashlyticsCollectionEnabled(AppConfig.enableCrashlytics);
-      
-      // Set user identifier for better crash reporting
-      await crashlytics.setUserIdentifier('app_user_${DateTime.now().millisecondsSinceEpoch}');
+      // Crashlytics is not fully supported on Web; guard initialization there
+      if (!kIsWeb) {
+        await crashlytics.setCrashlyticsCollectionEnabled(AppConfig.enableCrashlytics);
+        // Set user identifier for better crash reporting (web guarded)
+        await crashlytics.setUserIdentifier('app_user_${DateTime.now().millisecondsSinceEpoch}');
+      }
       
       if (AppConfig.enableDebugLogging) {
         print('Firebase Crashlytics initialized successfully');

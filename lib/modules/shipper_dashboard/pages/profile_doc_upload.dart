@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
-import 'package:Remiles/providers/auth_provider.dart';
-import 'package:Remiles/models/user_model.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/providers/app_state_provider.dart';
+import 'package:remiles/providers/auth_provider.dart';
+import 'package:remiles/models/user_model.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/providers/app_state_provider.dart';
 
 class ProfileDocUpload extends StatefulWidget {
   const ProfileDocUpload({super.key});

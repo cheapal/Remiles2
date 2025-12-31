@@ -1,6 +1,6 @@
-import 'package:Remiles/core/stripe_service.dart';
-import 'package:Remiles/core/payment_logo_service.dart';
-import 'package:Remiles/providers/payment_methods_provider.dart';
+import 'package:remiles/core/stripe_service.dart';
+import 'package:remiles/core/payment_logo_service.dart';
+import 'package:remiles/providers/payment_methods_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 

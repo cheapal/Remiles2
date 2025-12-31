@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:Remiles/core/theme/colors.dart';
+import 'package:remiles/core/theme/colors.dart';
 
 class OfferDialog extends StatefulWidget {
   final double currentPrice;

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:Remiles/core/theme/colors.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/shipper_model.dart';
-import 'package:Remiles/models/carrier_model.dart';
-import 'package:Remiles/models/user_model.dart';
+import 'package:remiles/core/theme/colors.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/shipper_model.dart';
+import 'package:remiles/models/carrier_model.dart';
+import 'package:remiles/models/user_model.dart';
 
 class UserProfileDialog extends StatefulWidget {
   final String userId;

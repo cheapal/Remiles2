@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/chat_model.dart';
-import 'package:Remiles/models/offer_model.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/chat_model.dart';
+import 'package:remiles/models/offer_model.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
+import 'package:remiles/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 
 enum ConversationFilter {

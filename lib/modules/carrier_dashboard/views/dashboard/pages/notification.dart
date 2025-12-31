@@ -1,9 +1,9 @@
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/notification_provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
-import 'package:Remiles/models/notification_model.dart';
+import 'package:remiles/providers/notification_provider.dart';
+import 'package:remiles/providers/auth_provider.dart';
+import 'package:remiles/models/notification_model.dart';
 import 'package:intl/intl.dart';
 
 class NoNotificationPage extends StatefulWidget {

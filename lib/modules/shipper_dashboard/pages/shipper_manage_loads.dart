@@ -1,9 +1,9 @@
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/filter_manage_loads.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_dashboard_post_load.dart';
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_load_details_page.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/providers/auth_provider.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/filter_manage_loads.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_dashboard_post_load.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_load_details_page.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';

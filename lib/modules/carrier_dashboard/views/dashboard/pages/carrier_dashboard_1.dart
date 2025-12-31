@@ -1,6 +1,6 @@
 import 'dart:ui';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_2.dart';
-import 'package:Remiles/providers/auth_provider.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_2.dart';
+import 'package:remiles/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';

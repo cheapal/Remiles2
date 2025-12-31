@@ -1,4 +1,4 @@
-import 'package:Remiles/modules/shipper_onboarding/shipper_onboarding_1.dart';
+import 'package:remiles/modules/shipper_onboarding/shipper_onboarding_1.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/services.dart';

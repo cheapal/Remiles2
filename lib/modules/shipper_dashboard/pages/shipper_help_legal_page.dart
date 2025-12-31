@@ -1,10 +1,10 @@
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:Remiles/providers/auth_provider.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
+import 'package:remiles/providers/auth_provider.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 
 class ShipperHelpLegalPage extends StatelessWidget {
   const ShipperHelpLegalPage({super.key});

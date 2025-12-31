@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
@@ -355,17 +356,13 @@ class FirebaseService {
   // Sign in with Google
   static Future<UserCredential?> signInWithGoogle() async {
     try {
-      // Web client ID from google-services.json (client_type: 3)
-      // This is required for Google Sign-In to work properly on Android
-      // On iOS, this is also needed to get the idToken for Firebase Auth
-      const String serverClientId = '60865903848-qufrm62v42k4kuh30jr022dr2mjcim5i.apps.googleusercontent.com';
+      // Web client ID for Google Sign-In (use the web client ID from Google Console / Firebase)
+      const String clientId = '60865903848-qufrm62v42k4kuh30jr022dr2mjcim5i.apps.googleusercontent.com';
       
-      // Create GoogleSignIn instance with serverClientId
-      // serverClientId is the web client ID required for Firebase Auth on both platforms
-      final GoogleSignIn googleSignIn = GoogleSignIn(
-        scopes: ['email', 'profile'],
-        serverClientId: serverClientId,
-      );
+      // Platform-aware GoogleSignIn: web uses clientId, others use severClientId
+      final GoogleSignIn googleSignIn = kIsWeb
+          ? GoogleSignIn(scopes: ['email','profile'], clientId: clientId)
+          : GoogleSignIn(scopes: ['email','profile'], serverClientId: clientId);
 
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();

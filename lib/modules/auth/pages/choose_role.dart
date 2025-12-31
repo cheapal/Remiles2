@@ -1,5 +1,7 @@
-import 'package:Remiles/modules/carrier_onboarding/carrier_signup.dart';
+import 'package:remiles/core/theme/colors.dart';
+import 'package:remiles/modules/carrier_onboarding/carrier_signup.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'joiningoption.dart';
 import 'shipper_signup.dart'; // Import the new ShipperSignUpScreen
@@ -92,100 +94,105 @@ class RoleSelectionScreen extends StatelessWidget {
         child: SafeArea(
           top: false, // flush to the very top (no white gap)
           bottom: false, // flush to the very bottom (no white gap)
-          child: Stack(
-            children: [
-              // Background leather texture — full bleed
-              Positioned.fill(
-                child: Image.asset(
-                  'assets/leather_rectangle.png',
-                  fit: BoxFit.cover,
-                ),
-              ),
-
-              // White panel (rectangle_6) centered horizontally
-              Positioned(
-                left: panelLeft,
-                top: 0,
-                width: panelW,
-                height: panelH,
-                child: Image.asset(
-                  'assets/white_rectangle.png',
-                  fit: BoxFit.fill,
-                ),
-              ),
-
-              // Back button with press animation
-              Positioned(
-                top: 50 * scale,
-                left: 10 * scale,
-                child: IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.black,
-                    size: 40 * scale,
+          child: Container(
+            color: backgroundColor,
+            child: Stack(
+              children: [
+                // Background leather texture — full bleed (hidden on web)
+                if (!kIsWeb)
+                  Positioned.fill(
+                    child: Image.asset(
+                      'assets/leather_rectangle.png',
+                      fit: BoxFit.cover,
+                    ),
                   ),
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      _createFadePageRoute(const SignScreen(nextScreen: Text("Login Screen Placeholder"))),
-                    );
-                  },
+            
+                // White panel (rectangle_6) centered horizontally
+              if (!kIsWeb)
+                Positioned(
+                  left: panelLeft,
+                  top: 0,
+                  width: panelW,
+                  height: panelH,
+                  child: Image.asset(
+                    'assets/white_rectangle.png',
+                    fit: BoxFit.fill,
+                  ),
                 ),
-              ),
-
-              // Title centered at ~120dp from the top
-              Positioned(
-                top: titleTop,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Text(
-                    'Choose your role',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: sx(29, scale),
-                      fontWeight: FontWeight.w600,
+            
+                // Back button with press animation
+                Positioned(
+                  top: 50 * scale,
+                  left: 10 * scale,
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
                       color: Colors.black,
-                      height: 38 / 32, // line height mapping
+                      size: 40 * scale,
+                    ),
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        _createFadePageRoute(const SignScreen(nextScreen: Text("Login Screen Placeholder"))),
+                      );
+                    },
+                  ),
+                ),
+            
+                // Title centered at ~120dp from the top
+                Positioned(
+                  top: titleTop,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Text(
+                      'Choose your role',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: sx(29, scale),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black,
+                        height: 38 / 32, // line height mapping
+                      ),
                     ),
                   ),
                 ),
-              ),
-
-              // Top card (Carrier)
-              Positioned(
-                left: cardX,
-
-                top: card1Top,
-                width: cardW+40,
-                height: cardH,
-                child: _RoleCard(
-                  title: 'Carrier',
-                  imageUrl: 'assets/carrier_icon.png',
-                  scale: scale,
-                  imgSize: imgBox,
-                  imgTop: imgTopPadding + sy(15.0, scale), // Pushed down for spacing
-                  onTap: () => onRoleTap('Carrier'),
+            
+                // Top card (Carrier)
+                Positioned(
+                  left: cardX,
+            
+                  top: card1Top,
+                  width: cardW+40,
+                  height: cardH,
+                  child: _RoleCard(
+                    title: 'Carrier',
+                    imageUrl: 'assets/carrier_icon.png',
+                    scale: scale,
+                    imgSize: imgBox,
+                    imgTop: imgTopPadding + sy(15.0, scale), // Pushed down for spacing
+                    onTap: () => onRoleTap('Carrier'),
+                  ),
                 ),
-              ),
-
-              // Bottom card (Shipper)
-              Positioned(
-                left: cardX,
-                top: card2Top,
-                width: cardW+40,
-                height: cardH,
-                child: _RoleCard(
-                  title: 'Shipper',
-                  imageUrl: 'assets/shipper_icon.png',
-                  scale: scale,
-                  imgSize: imgBox,
-                  imgTop: imgTopPadding + sy(-15.0, scale), // Pushed down for spacing
-                  onTap: () => onRoleTap('Shipper'),
+            
+                // Bottom card (Shipper)
+                Positioned(
+                  left: cardX,
+                  top: card2Top,
+                  width: cardW+40,
+                  height: cardH,
+                  child: _RoleCard(
+                    title: 'Shipper',
+                    imageUrl: 'assets/shipper_icon.png',
+                    scale: scale,
+                    imgSize: imgBox,
+                    imgTop: imgTopPadding + sy(-15.0, scale), // Pushed down for spacing
+                    onTap: () => onRoleTap('Shipper'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

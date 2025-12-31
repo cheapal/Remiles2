@@ -1,7 +1,7 @@
-import 'package:Remiles/core/theme/colors.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/load_model.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/load_card_info.dart';
+import 'package:remiles/core/theme/colors.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/load_model.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/load_card_info.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:io';

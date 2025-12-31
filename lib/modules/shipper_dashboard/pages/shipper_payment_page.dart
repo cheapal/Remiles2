@@ -1,7 +1,7 @@
-import 'package:Remiles/modules/shipper_dashboard/pages/shipper_add_payment_method.dart';
-import 'package:Remiles/providers/payment_methods_provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
-import 'package:Remiles/core/payment_logo_service.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/shipper_add_payment_method.dart';
+import 'package:remiles/providers/payment_methods_provider.dart';
+import 'package:remiles/providers/auth_provider.dart';
+import 'package:remiles/core/payment_logo_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/svg.dart';

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:Remiles/core/theme/colors.dart';
-import 'package:Remiles/core/stripe_service.dart';
-import 'package:Remiles/core/firebase_service.dart';
+import 'package:remiles/core/theme/colors.dart';
+import 'package:remiles/core/stripe_service.dart';
+import 'package:remiles/core/firebase_service.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
+import 'package:remiles/providers/auth_provider.dart';
 
 class EscrowPaymentDialog extends StatefulWidget {
   final String loadId;

@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/chat_model.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/chat_model.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
+import 'package:remiles/providers/auth_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
-import 'package:Remiles/services/conversation_tracker.dart';
+import 'package:remiles/services/conversation_tracker.dart';
 
 class SupportChatScreen extends StatefulWidget {
   final String conversationId;

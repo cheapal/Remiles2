@@ -6,7 +6,7 @@ import 'dart:io';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import '../../../core/utils/google_places_autocomplete.dart';
 import '../../../core/constants/app_constants.dart';
 

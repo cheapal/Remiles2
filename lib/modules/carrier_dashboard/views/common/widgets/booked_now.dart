@@ -1,10 +1,10 @@
-import 'package:Remiles/core/theme/colors.dart';
-import 'package:Remiles/core/firebase_service.dart';
-import 'package:Remiles/models/load_model.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/dashboard/pages/marketplace_screen.dart';
-import 'package:Remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
-import 'package:Remiles/models/user_model.dart';
+import 'package:remiles/core/theme/colors.dart';
+import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/models/load_model.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/marketplace_screen.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
+import 'package:remiles/models/user_model.dart';
 import 'package:flutter/material.dart';
 
 class BookedNow extends StatefulWidget {

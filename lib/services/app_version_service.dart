@@ -1,4 +1,6 @@
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../core/firebase_service.dart';
 import '../core/app_config.dart';
@@ -7,11 +9,23 @@ import '../core/app_config.dart';
 class AppVersionService {
   static const String _settingsCollection = 'app_settings';
   static const String _settingsDocument = 'settings';
+  // Helper to determine if a user is authenticated
+  static bool _isUserAuthenticated() {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    return currentUser != null;
+  }
   
   /// Check if app update is required
   /// Returns true if current version is less than minimum required version
   static Future<bool> isUpdateRequired() async {
     try {
+      // Platform guard: on Web, skip remote checks to avoid web-specific permission issues
+      if (kIsWeb) {
+        if (AppConfig.enableDebugLogging) {
+          print('AppVersionService: Web platform detected; skipping update check');
+        }
+        return false;
+      }
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
@@ -108,6 +122,13 @@ class AppVersionService {
   /// Check if app is in maintenance mode
   static Future<bool> isMaintenanceMode() async {
     try {
+      // Platform guard: skip on Web
+      if (kIsWeb) {
+        if (AppConfig.enableDebugLogging) {
+          print('AppVersionService: Web platform detected; skipping maintenance check');
+        }
+        return false;
+      }
       final settingsDoc = await FirebaseService.firestore
           .collection(_settingsCollection)
           .doc(_settingsDocument)
@@ -171,6 +192,13 @@ class AppVersionService {
   /// Get app store URLs for update
   static Future<Map<String, String?>> getAppStoreUrls() async {
     try {
+      // Platform guard: skip on Web
+      if (kIsWeb) {
+        if (AppConfig.enableDebugLogging) {
+          print('AppVersionService: Web platform detected; no app store URLs on web');
+        }
+        return {};
+      }
       final settingsDoc = await FirebaseService.firestore
           .collection(_settingsCollection)
           .doc(_settingsDocument)
@@ -242,6 +270,13 @@ class AppVersionService {
   /// Store current app version in Firestore settings
   /// This allows you to track the current published version
   static Future<void> storeCurrentVersionInFirestore() async {
+    // Guard: ensure there is an authenticated user before writing
+    if (!_isUserAuthenticated()) {
+      if (AppConfig.enableDebugLogging) {
+        print('AppVersionService: No authenticated user; skipping storeCurrentVersionInFirestore');
+      }
+      return;
+    }
     try {
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
@@ -275,6 +310,13 @@ class AppVersionService {
   /// Get current app version from Firestore (the stored/published version)
   static Future<Map<String, dynamic>?> getStoredVersionFromFirestore() async {
     try {
+      // Platform guard: skip on Web
+      if (kIsWeb) {
+        if (AppConfig.enableDebugLogging) {
+          print('AppVersionService: Web platform detected; cannot fetch stored version');
+        }
+        return null;
+      }
       final settingsDoc = await FirebaseService.firestore
           .collection(_settingsCollection)
           .doc(_settingsDocument)

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'package:Remiles/providers/notification_provider.dart';
-import 'package:Remiles/providers/auth_provider.dart';
-import 'package:Remiles/models/notification_model.dart';
+import 'package:remiles/providers/notification_provider.dart';
+import 'package:remiles/providers/auth_provider.dart';
+import 'package:remiles/models/notification_model.dart';
 import 'package:intl/intl.dart';
 
 void main() {

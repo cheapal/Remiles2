@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import 'package:Remiles/core/stripe_service.dart';
-import 'package:Remiles/core/firebase_service.dart';
+import 'package:remiles/core/stripe_service.dart';
+import 'package:remiles/core/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Provider to manage payment methods with caching

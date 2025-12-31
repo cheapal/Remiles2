@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -326,7 +327,8 @@ class _LoginScreenState extends State<LoginScreen> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             // Leather Image from joiningoption.dart
-                            SizedBox(
+                            if (!kIsWeb) ...[
+                           SizedBox(
                               width: double.infinity,
                               height: 250 * scale, // Adjust height as needed
                               child: Image.asset(
@@ -335,6 +337,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                 alignment: Alignment.topCenter,
                               ),
                             ),
+                            ],
+                          if(kIsWeb) ...[
+                            SizedBox(height: 200),
+                            ],
                             // Remiles Logo
                             SizedBox(height: 1 * scale),
                             SizedBox(

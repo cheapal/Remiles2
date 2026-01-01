@@ -1,3 +1,4 @@
+// (Top-level bottom navigation is still used in web/mobile layouts; keep imports if needed elsewhere)
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/bottom_navigation_bar.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/more.dart';
 import 'package:remiles/modules/shipper_dashboard/pages/shipper_market_place_Screen.dart';
@@ -829,167 +830,165 @@ const Color offWhite = Color(0xFFFFF6E1);
 // /// A stateful Drawer widget with a custom header for the Re-Miles app.
 // /// It features a white background, black text, and highlights the selected
 // /// and hovered item with a green background and white text.
-// class SideNavDrawer extends StatefulWidget {
-//   const SideNavDrawer({super.key});
-//
-//   @override
-//   State<SideNavDrawer> createState() => _SideNavDrawerState();
-// }
-//
-// class _SideNavDrawerState extends State<SideNavDrawer> {
-//   int _selectedIndex = 0; // Tracks the selected item index
-//
-//   // Color constants for easy modification
-//   static const Color selectedColor = Color(0xFF386544); // Green for selection
-//   static const Color defaultColor = Colors.black87; // Black for text/icons
-//   static const Color hoverColor =
-//   Color(0xFFE8F5E9); // Light green for hover
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     return Drawer(
-//       // The overall background of the drawer is white
-//       backgroundColor: Colors.white,
-//       elevation: 1, // A subtle shadow to distinguish from the main content
-//       child: ListView(
-//         padding: EdgeInsets.zero,
-//         children: <Widget>[
-//           // Custom Drawer Header
-//           Container(
-//             padding: const EdgeInsets.only(
-//                 top: 50.0, left: 20.0, right: 20.0, bottom: 20.0),
-//             child: Row(
-//               children: [
-//                 // ### UPDATED LOGO ###
-//                 const CircleAvatar(
-//                   backgroundColor: Colors.transparent, // Avoid color clash
-//                   backgroundImage: AssetImage('assets/remiles.png'),
-//                 ),
-//                 const SizedBox(width: 15),
-//                 Expanded(
-//                   child: Column(
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: const [
-//
-//                       // // ### UPDATED APP NAME ###
-//                       // Text(
-//                       //   'Re-Miles',
-//                       //   style: TextStyle(
-//                       //     color: Colors.black,
-//                       //     fontSize: 18,
-//                       //     fontWeight: FontWeight.bold,
-//                       //   ),
-//                       // ),
-//                     ],
-//                   ),
-//                 ),
-//               ],
-//             ),
-//           ),
-//           // Menu Section
-//           _buildSectionHeader('Menus'),
-//           _buildDrawerItem(
-//               icon: Icons.dashboard, text: 'Dashboard', index: 0),
-//           _buildDrawerItem(icon: Icons.task_alt, text: 'My Task', index: 1),
-//           _buildDrawerItem(
-//               icon: Icons.calendar_today, text: 'Calendar', index: 2),
-//           _buildDrawerItem(icon: Icons.mail_outline, text: 'Mail', index: 3),
-//           _buildDrawerItem(icon: Icons.history, text: 'Activity', index: 4),
-//           const Divider(
-//               height: 20, thickness: 1, indent: 20, endIndent: 20),
-//           // Service Section
-//           _buildSectionHeader('Service'),
-//           _buildDrawerItem(
-//               icon: Icons.analytics_outlined, text: 'SEO', index: 5),
-//           _buildDrawerItem(
-//               icon: Icons.web_outlined, text: 'Web Design', index: 6),
-//           _buildDrawerItem(
-//               icon: Icons.design_services_outlined,
-//               text: 'Logo Design',
-//               index: 7),
-//           // This pushes the footer to the bottom
-//           const SizedBox(height: 50),
-//           // Footer Button
-//           Padding(
-//             padding: const EdgeInsets.all(20.0),
-//             child: ElevatedButton.icon(
-//               icon: const Icon(Icons.add, color: Colors.white),
-//               label: const Text('Create new task',
-//                   style: TextStyle(color: Colors.white)),
-//               onPressed: () {},
-//               style: ElevatedButton.styleFrom(
-//                 backgroundColor: const Color(0xFF386544),
-//                 shape: RoundedRectangleBorder(
-//                   borderRadius: BorderRadius.circular(12),
-//                 ),
-//                 padding: const EdgeInsets.symmetric(vertical: 15),
-//               ),
-//             ),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-//
-//   // Helper widget for section headers
-//   Widget _buildSectionHeader(String title) {
-//     return Padding(
-//       padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
-//       child: Text(
-//         title,
-//         style: const TextStyle(
-//           color: Colors.black54,
-//           fontSize: 12,
-//           fontWeight: FontWeight.bold,
-//         ),
-//       ),
-//     );
-//   }
-//
-//
-//
-//
-//
-//   // Helper widget for drawer list items
-//   Widget _buildDrawerItem(
-//       {required IconData icon, required String text, required int index}) {
-//     final bool isSelected = _selectedIndex == index;
-//     return Padding(
-//       padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-//       child: ListTile(
-//         selected: isSelected,
-//         // The background color when the item is selected.
-//         selectedTileColor: selectedColor,
-//         // The color when the user hovers over the item.
-//         hoverColor: selectedColor.withOpacity(0.9),
-//         shape: RoundedRectangleBorder(
-//           borderRadius: BorderRadius.circular(10.0),
-//         ),
-//         leading: Icon(
-//           icon,
-//           // Icon color is white if selected, otherwise black.
-//           color: isSelected ? Colors.white : defaultColor,
-//         ),
-//         title: Text(
-//           text,
-//           style: TextStyle(
-//             // Text color is white if selected, otherwise black.
-//             color: isSelected ? Colors.white : defaultColor,
-//             fontSize: 14,
-//             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-//           ),
-//         ),
-//         onTap: () {
-//           setState(() {
-//             _selectedIndex = index;
-//           });
-//           // Add any navigation logic here, e.g., Navigator.pop(context);
-//         },
-//         dense: true,
-//       ),
-//     );
-//   }
-// }
+class SideNavDrawer extends StatefulWidget {
+  const SideNavDrawer({super.key});
+
+  @override
+  State<SideNavDrawer> createState() => _SideNavDrawerState();
+}
+
+class _SideNavDrawerState extends State<SideNavDrawer> {
+  int _selectedIndex = 0; // Tracks the selected item index
+
+  // Color constants for easy modification
+  static const Color selectedColor = Color(0xFF386544); // Green for selection
+  static const Color defaultColor = Colors.black87; // Black for text/icons
+
+  @override
+  Widget build(BuildContext context) {
+    return Drawer(
+      // The overall background of the drawer is white
+      backgroundColor: Colors.white,
+      elevation: 1, // A subtle shadow to distinguish from the main content
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: <Widget>[
+          // Custom Drawer Header
+          Container(
+            padding: const EdgeInsets.only(
+                top: 50.0, left: 20.0, right: 20.0, bottom: 20.0),
+            child: Row(
+              children: [
+                // ### UPDATED LOGO ###
+                const CircleAvatar(
+                  backgroundColor: Colors.transparent, // Avoid color clash
+                  backgroundImage: AssetImage('assets/remiles.png'),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+
+                      // // ### UPDATED APP NAME ###
+                      // Text(
+                      //   'Re-Miles',
+                      //   style: TextStyle(
+                      //     color: Colors.black,
+                      //     fontSize: 18,
+                      //     fontWeight: FontWeight.bold,
+                      //   ),
+                      // ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Menu Section
+          _buildSectionHeader('Menus'),
+          _buildDrawerItem(
+              icon: Icons.dashboard, text: 'Dashboard', index: 0),
+          _buildDrawerItem(icon: Icons.task_alt, text: 'My Task', index: 1),
+          _buildDrawerItem(
+              icon: Icons.calendar_today, text: 'Calendar', index: 2),
+          _buildDrawerItem(icon: Icons.mail_outline, text: 'Mail', index: 3),
+          _buildDrawerItem(icon: Icons.history, text: 'Activity', index: 4),
+          const Divider(
+              height: 20, thickness: 1, indent: 20, endIndent: 20),
+          // Service Section
+          _buildSectionHeader('Service'),
+          _buildDrawerItem(
+              icon: Icons.analytics_outlined, text: 'SEO', index: 5),
+          _buildDrawerItem(
+              icon: Icons.web_outlined, text: 'Web Design', index: 6),
+          _buildDrawerItem(
+              icon: Icons.design_services_outlined,
+              text: 'Logo Design',
+              index: 7),
+          // This pushes the footer to the bottom
+          const SizedBox(height: 50),
+          // Footer Button
+          Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: ElevatedButton.icon(
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text('Create new task',
+                  style: TextStyle(color: Colors.white)),
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF386544),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper widget for section headers
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.black54,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+
+
+
+
+  // Helper widget for drawer list items
+  Widget _buildDrawerItem(
+      {required IconData icon, required String text, required int index}) {
+    final bool isSelected = _selectedIndex == index;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+      child: ListTile(
+        selected: isSelected,
+        // The background color when the item is selected.
+        selectedTileColor: selectedColor,
+        // The color when the user hovers over the item.
+        hoverColor: selectedColor.withOpacity(0.9),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.0),
+        ),
+        leading: Icon(
+          icon,
+          // Icon color is white if selected, otherwise black.
+          color: isSelected ? Colors.white : defaultColor,
+        ),
+        title: Text(
+          text,
+          style: TextStyle(
+            // Text color is white if selected, otherwise black.
+            color: isSelected ? Colors.white : defaultColor,
+            fontSize: 14,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        onTap: () {
+          setState(() {
+            _selectedIndex = index;
+          });
+          // Add any navigation logic here, e.g., Navigator.pop(context);
+        },
+        dense: true,
+      ),
+    );
+  }
+}
 
 
 
@@ -1032,11 +1031,17 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
       _isOnAiMileyPage = false; // Reset when switching tabs
     });
   }
+  
 
   @override
   Widget build(BuildContext context) {
     const Color green = Color(0xFF497A57);
-    
+        final media = MediaQuery.of(context);
+    final screenW = media.size.width;
+    final bool isWide = screenW >= 900;
+//     // Drag bounds
+  // Drag bounds removed for web layout simplification
+
     return WillPopScope(
       // handle Android back button
       onWillPop: () async {
@@ -1051,72 +1056,144 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
         return true;
       },
       child: Scaffold(
-        body: Stack(
-          children: [
-            IndexedStack(
-              index: _index,
-              children: [
-                _buildTabNavigator(_tabKeys[0],  ShipperDashboardHomePage()),
-                _buildTabNavigator(_tabKeys[1], const ShipperManageLoadsScreen()),
-                _buildTabNavigator(_tabKeys[2], const ShipperMarketplaceScreen()),
-                _buildTabNavigator(_tabKeys[3],  ShipperProfile()),
-                _buildTabNavigator(_tabKeys[4], More()//ShipperMoreOptions()
-                ),
-              ],
-            ),
-            // AI Miley floating button - only show when not on AI Miley page
-            if (!_isOnAiMileyPage)
-              Positioned(
-                bottom: 35, // Position above the bottom navigation bar
-                right: 20,
-                child: GestureDetector(
-                  onTap: () {
-                    final currentNavigator = _tabKeys[_index].currentState;
-                    if (currentNavigator != null) {
-                      setState(() {
-                        _isOnAiMileyPage = true; // Hide button when navigating to AI Miley
-                      });
-                      Navigator.push(
-                        currentNavigator.context,
-                        MaterialPageRoute(
-                          builder: (context) => const AiMileyScreen(),
+        body: isWide
+            ? Row(
+                children: [
+                  SizedBox(width: 304, child: SideNavDrawer()),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        IndexedStack(
+                          index: _index,
+                          children: [
+                            _buildTabNavigator(_tabKeys[0],  ShipperDashboardHomePage()),
+                            _buildTabNavigator(_tabKeys[1], const ShipperManageLoadsScreen()),
+                            _buildTabNavigator(_tabKeys[2], const ShipperMarketplaceScreen()),
+                            _buildTabNavigator(_tabKeys[3],  ShipperProfile()),
+                            _buildTabNavigator(_tabKeys[4], More()//ShipperMoreOptions()
+                            ),
+                          ],
                         ),
-                      ).then((_) {
-                        // Show button again when returning from AI Miley page
-                        setState(() {
-                          _isOnAiMileyPage = false;
-                        });
-                      });
-                    }
-                  },
-                  child: Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      color: green,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: green.withOpacity(0.25),
-                          blurRadius: 12,
-                          offset: const Offset(0, 6),
-                        )
+                        // AI Miley floating button - only show when not on AI Miley page
+                        if (!_isOnAiMileyPage)
+                          Positioned(
+                            bottom: 35, // Position above the bottom navigation bar
+                            right: 20,
+                            child: GestureDetector(
+                              onTap: () {
+                                final currentNavigator = _tabKeys[_index].currentState;
+                                if (currentNavigator != null) {
+                                  setState(() {
+                                    _isOnAiMileyPage = true; // Hide button when navigating to AI Miley
+                                  });
+                                  Navigator.push(
+                                    currentNavigator.context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const AiMileyScreen(),
+                                    ),
+                                  ).then((_) {
+                                    // Show button again when returning from AI Miley page
+                                    setState(() {
+                                      _isOnAiMileyPage = false;
+                                    });
+                                  });
+                                }
+                              },
+                              child: Container(
+                                width: 72,
+                                height: 72,
+                                decoration: BoxDecoration(
+                                  color: green,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: green.withOpacity(0.25),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 6),
+                                    )
+                                  ],
+                                ),
+                                child: const Image(
+                                    image: AssetImage('assets/miley_icon.png'),
+                                    width: 72,
+                                    height: 72,
+                                  ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
-                    child: const Image(
-                        image: AssetImage('assets/miley_icon.png'),
-                        width: 72,
-                        height: 72,
-                      ),
                   ),
-                ),
+                ],
+              )
+            : Stack(
+                children: [
+                  IndexedStack(
+                    index: _index,
+                    children: [
+                      _buildTabNavigator(_tabKeys[0],  ShipperDashboardHomePage()),
+                      _buildTabNavigator(_tabKeys[1], const ShipperManageLoadsScreen()),
+                      _buildTabNavigator(_tabKeys[2], const ShipperMarketplaceScreen()),
+                      _buildTabNavigator(_tabKeys[3],  ShipperProfile()),
+                      _buildTabNavigator(_tabKeys[4], More()//ShipperMoreOptions()
+                      ),
+                    ],
+                  ),
+                  // AI Miley floating button - only show when not on AI Miley page
+                  if (!_isOnAiMileyPage)
+                    Positioned(
+                      bottom: 35, // Position above the bottom navigation bar
+                      right: 20,
+                      child: GestureDetector(
+                        onTap: () {
+                          final currentNavigator = _tabKeys[_index].currentState;
+                          if (currentNavigator != null) {
+                            setState(() {
+                              _isOnAiMileyPage = true; // Hide button when navigating to AI Miley
+                            });
+                            Navigator.push(
+                              currentNavigator.context,
+                              MaterialPageRoute(
+                                builder: (context) => const AiMileyScreen(),
+                              ),
+                            ).then((_) {
+                              // Show button again when returning from AI Miley page
+                              setState(() {
+                                _isOnAiMileyPage = false;
+                              });
+                            });
+                          }
+                        },
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: green,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: green.withOpacity(0.25),
+                                blurRadius: 12,
+                                offset: const Offset(0, 6),
+                              )
+                            ],
+                          ),
+                          child: const Image(
+                              image: AssetImage('assets/miley_icon.png'),
+                              width: 72,
+                              height: 72,
+                            ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
-        bottomNavigationBar: BottomNavigationBarTab(
+     
+       bottomNavigationBar: !isWide ? BottomNavigationBarTab(
           currentIndex: _index,
           onTap: _onTap,
-        ),
+        ):null,
+        drawer: isWide ? SideNavDrawer() : null,
       ),
     );
   }

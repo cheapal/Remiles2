@@ -1,5 +1,8 @@
+import 'dart:developer';
+
 import 'package:remiles/modules/shipper_dashboard/pages/shipper_dashboard_3.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
@@ -517,7 +520,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
   // ======== Methods ========
   
   Future<void> _pickImage(String imageType) async {
-    try {
+      try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1800,
@@ -591,7 +594,6 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
       _showAlertDialog(context, 'Please fill in all required fields.');
       return;
     }
-    
     // Validate required images
     if (_businessRegistrationImage == null ||
         _insuranceDocumentImage == null ||
@@ -610,39 +612,115 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
     try {
       final authProvider = context.read<AuthProvider>();
       final shipper = authProvider.shipperUser;
-      
+
       if (shipper != null) {
-        // Upload images first
-        final businessRegistrationUrl = await FirebaseService.uploadImage(
-          shipper.uid,
-          'business_registration',
-          _businessRegistrationImage!,
-        );
-        
-        final insuranceDocumentUrl = await FirebaseService.uploadImage(
-          shipper.uid,
-          'insurance_document',
-          _insuranceDocumentImage!,
-        );
-        
-        final governmentIdUrl = await FirebaseService.uploadImage(
-          shipper.uid,
-          'government_id',
-          _governmentIdImage!,
-        );
-        
-        final proofOfAddressUrl = await FirebaseService.uploadImage(
-          shipper.uid,
-          'proof_of_address',
-          _proofOfAddressImage!,
-        );
-        
-        if (businessRegistrationUrl == null ||
-            insuranceDocumentUrl == null ||
-            governmentIdUrl == null ||
-            proofOfAddressUrl == null) {
-          throw Exception('Failed to upload one or more images');
+        // Upload images first (web-safe with platform check)
+        String? businessRegistrationUrl;
+        String? insuranceDocumentUrl;
+        String? governmentIdUrl;
+        String? proofOfAddressUrl;
+       
+        if (kIsWeb) {
+
+          ///add empty
+          businessRegistrationUrl = 'web_placeholder';
+          insuranceDocumentUrl = 'web_placeholder';
+          governmentIdUrl = 'web_placeholder';
+          proofOfAddressUrl = 'web_placeholder';
+
+          //todo: add this later for web platform
+          // Upload images from bytes (Uint8List) all at once to save time
+        //   final businessRegistrationBytes = await _businessRegistrationImage!.readAsBytes();
+        //   final insuranceDocumentBytes = await _insuranceDocumentImage!.readAsBytes();
+        //   final governmentIdBytes = await _governmentIdImage!.readAsBytes();
+        //   final proofOfAddressBytes = await _proofOfAddressImage!.readAsBytes();
+
+        //   final uploadFutures = [
+        //     FirebaseService.uploadImageBytes(
+        //       shipper.uid,
+        //       'business_registration',
+        //       businessRegistrationBytes,
+        //     ),
+        //     FirebaseService.uploadImageBytes(
+        //       shipper.uid,
+        //       'insurance_document',
+        //       insuranceDocumentBytes,
+        //     ),
+        //     FirebaseService.uploadImageBytes(
+        //       shipper.uid,
+        //       'government_id',
+        //       governmentIdBytes,
+        //     ),
+        //     FirebaseService.uploadImageBytes(
+        //       shipper.uid,
+        //       'proof_of_address',
+        //       proofOfAddressBytes,
+        //     ),
+        //   ];
+        //   print('log this ${uploadFutures}');
+        // final bytesList = await Future.wait(uploadFutures);
+        // businessRegistrationUrl = bytesList[0];
+        // insuranceDocumentUrl = bytesList[1];
+        // governmentIdUrl = bytesList[2];
+        // proofOfAddressUrl = bytesList[3];
+   
+        // final invalid = [
+        //     businessRegistrationUrl,
+        //     insuranceDocumentUrl,
+        //     governmentIdUrl,
+        //     proofOfAddressUrl
+        //   ].any((e) => e == null || e == '' || e == 'web_placeholder' || e == 'Failed to save');
+        //   if (invalid) {
+        //     if (mounted) {
+        //       ScaffoldMessenger.of(context).showSnackBar(
+        //         const SnackBar(
+        //           content: Text('Web image upload failed. Please try again.'),
+        //           backgroundColor: Colors.red,
+        //         ),
+        //       );
+        //     }
+        //     return;
+        //   }
+     
+
+     
+     
+        } else
+         {
+          // Mobile/desktop: perform normal file uploads
+          businessRegistrationUrl = await FirebaseService.uploadImage(
+            shipper.uid,
+            'business_registration',
+            _businessRegistrationImage!,
+          );
+          
+          insuranceDocumentUrl = await FirebaseService.uploadImage(
+            shipper.uid,
+            'insurance_document',
+            _insuranceDocumentImage!,
+          );
+          
+          governmentIdUrl = await FirebaseService.uploadImage(
+            shipper.uid,
+            'government_id',
+            _governmentIdImage!,
+          );
+          
+          proofOfAddressUrl = await FirebaseService.uploadImage(
+            shipper.uid,
+            'proof_of_address',
+            _proofOfAddressImage!,
+          );
         }
+        
+        // ensure all uploads succeeded
+        
+          if (businessRegistrationUrl == null ||
+              insuranceDocumentUrl == null ||
+              governmentIdUrl == null ||
+              proofOfAddressUrl == null) {
+            throw Exception('Failed to upload one or more images');
+          }
         
         final response = {
           'businessAddress': _businessAddressController.text.trim(),
@@ -681,6 +759,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
         MaterialPageRoute(builder: (context) => const ShipperDashboard3()),
       );
     } catch (e) {
+      print('error is ${e}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

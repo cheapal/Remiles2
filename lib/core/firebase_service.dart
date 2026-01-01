@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:typed_data';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -1022,9 +1023,10 @@ class FirebaseService {
   static Future<String?> uploadImage(
     String shipperUid,
     String imageType,
-    File imageFile,
+    dynamic imageFile,
   ) async {
     try {
+      // On mobile, imageFile is a File. On web, this path should not be used.
       final ref = _storage.ref().child('shippers/$shipperUid/documents/$imageType.jpg');
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
@@ -1032,6 +1034,31 @@ class FirebaseService {
       return downloadUrl;
     } catch (e) {
       await recordError(e, StackTrace.current, reason: 'Failed to upload image');
+      return null;
+    }
+  }
+
+  // Web-friendly: upload from bytes (Uint8List)
+  static Future<String?> uploadImageBytes(
+    String shipperUid,
+    String imageType,
+    Uint8List bytes, {
+    String mimeType = 'image/jpeg',
+  }) async {
+    print('log this $bytes');
+    // Guard against empty byte arrays to avoid cloud storage errors on web
+    if (bytes.isEmpty) {
+      // You can log here if you want
+      return null;
+    }
+    try {
+      final ref = _storage.ref().child('shippers/$shipperUid/documents/$imageType.jpg');
+      final uploadTask = ref.putData(bytes, SettableMetadata(contentType: mimeType));
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      return downloadUrl;
+    } catch (e) {
+      await recordError(e, StackTrace.current, reason: 'Failed to upload image bytes');
       return null;
     }
   }

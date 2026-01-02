@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:remiles/core/theme/colors.dart';
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
@@ -23,7 +24,8 @@ class ShipperProfileScreen extends StatefulWidget {
 
 class _ShipperProfileScreenState extends State<ShipperProfileScreen>
     with TickerProviderStateMixin {
-  int _selectedTab = 0; // 0: My Listings, 1: Saved Items, 2: Inbox, 3: Reviews, 4: Recently Viewed
+  int _selectedTab =
+      0; // 0: My Listings, 1: Saved Items, 2: Inbox, 3: Reviews, 4: Recently Viewed
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -58,7 +60,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
     final bool isWide = screenW >= 900;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFEF6),
+      backgroundColor: Colors.orange,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
         child: SingleChildScrollView(
@@ -120,14 +122,10 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
               color: brandColor,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(
-              Icons.arrow_back,
-              color: Colors.white,
-              size: 20,
-            ),
+            child: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
           ),
         ),
-      
+
         Expanded(
           child: Text(
             "$userName",
@@ -176,18 +174,16 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
                         child: const Center(
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
                           ),
                         ),
                       );
                     },
                   ),
                 )
-              : const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 24,
-                ),
+              : const Icon(Icons.person, color: Colors.white, size: 24),
         ),
       ],
     );
@@ -244,7 +240,12 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
     );
   }
 
-  Widget _buildTabButton(String text, int index, IconData icon, {bool isActive = false}) {
+  Widget _buildTabButton(
+    String text,
+    int index,
+    IconData icon, {
+    bool isActive = false,
+  }) {
     return Expanded(
       child: GestureDetector(
         onTap: () {
@@ -275,11 +276,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
             mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                color: isActive ? Colors.white : brandGreen,
-                size: 20,
-              ),
+              Icon(icon, color: isActive ? Colors.white : brandGreen, size: 20),
               const SizedBox(width: 6),
               Flexible(
                 child: Text(
@@ -389,7 +386,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final user = authProvider.currentUser;
         final otherUserId = conversation.getOtherParticipant(user?.uid ?? '');
-        
+
         return _ConversationCard(
           conversation: conversation,
           otherUserId: otherUserId,
@@ -400,7 +397,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
                 builder: (context) => ChatScreen(
                   conversationId: conversation.id,
                   otherUserId: otherUserId,
-                  otherUserName: conversation.participants.contains(otherUserId) 
+                  otherUserName: conversation.participants.contains(otherUserId)
                       ? 'User' // You might want to fetch the actual name
                       : 'Unknown User',
                   listingTitle: conversation.listingTitle,
@@ -490,11 +487,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Colors.red.shade300,
-            ),
+            Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
             const SizedBox(height: 16),
             Text(
               _errorMessage ?? 'Something went wrong',
@@ -533,11 +526,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
+            Icon(icon, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
             Text(
               title,
@@ -550,10 +539,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
             const SizedBox(height: 8),
             Text(
               subtitle,
-              style: const TextStyle(
-                fontSize: 14,
-                color: Colors.grey,
-              ),
+              style: const TextStyle(fontSize: 14, color: Colors.grey),
               textAlign: TextAlign.center,
             ),
             if (actionText != null && onAction != null) ...[
@@ -563,7 +549,10 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
                 style: ElevatedButton.styleFrom(
                   backgroundColor: brandColor,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                 ),
                 child: Text(actionText),
               ),
@@ -593,8 +582,10 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
       }
 
       // Load user's listings
-      final listings = await FirebaseService.getProductListings(shipperUid: user.uid);
-      
+      final listings = await FirebaseService.getProductListings(
+        shipperUid: user.uid,
+      );
+
       if (mounted) {
         setState(() {
           _myListings = listings;
@@ -615,7 +606,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user == null) {
         setState(() {
           _errorMessage = 'User not logged in';
@@ -638,7 +629,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user == null) {
         setState(() {
           _errorMessage = 'User not logged in';
@@ -646,7 +637,9 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
         return;
       }
 
-      final conversations = await FirebaseService.getUserConversations(user.uid);
+      final conversations = await FirebaseService.getUserConversations(
+        user.uid,
+      );
       setState(() {
         _conversations = conversations;
       });
@@ -686,10 +679,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
 
 /// Listing card widget
 class _ListingCard extends StatelessWidget {
-  const _ListingCard({
-    required this.listing,
-    required this.onTap,
-  });
+  const _ListingCard({required this.listing, required this.onTap});
 
   final ProductListing listing;
   final VoidCallback onTap;
@@ -735,7 +725,7 @@ class _ListingCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Price - More prominent
                       Text(
                         '\$${listing.price.toStringAsFixed(0)}',
@@ -746,7 +736,7 @@ class _ListingCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Description
                       Text(
                         listing.description,
@@ -759,7 +749,7 @@ class _ListingCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
-                      
+
                       // Location and Condition row
                       Row(
                         children: [
@@ -791,9 +781,9 @@ class _ListingCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                
+
                 const SizedBox(width: 16),
-                
+
                 // Right side - Product image
                 Container(
                   width: 100,
@@ -809,7 +799,11 @@ class _ListingCard extends StatelessWidget {
                             listing.imageUrls.first,
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.image, size: 40, color: Colors.white);
+                              return const Icon(
+                                Icons.image,
+                                size: 40,
+                                color: Colors.white,
+                              );
                             },
                           ),
                         )
@@ -853,11 +847,19 @@ class _SkeletonListingCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _SkeletonLine(width: double.infinity, height: 16, radius: 6),
+                    _SkeletonLine(
+                      width: double.infinity,
+                      height: 16,
+                      radius: 6,
+                    ),
                     const SizedBox(height: 8),
                     _SkeletonLine(width: 80, height: 18, radius: 6),
                     const SizedBox(height: 8),
-                    _SkeletonLine(width: double.infinity, height: 13, radius: 6),
+                    _SkeletonLine(
+                      width: double.infinity,
+                      height: 13,
+                      radius: 6,
+                    ),
                     const SizedBox(height: 4),
                     _SkeletonLine(width: 200, height: 13, radius: 6),
                     const SizedBox(height: 8),
@@ -890,7 +892,11 @@ class _SkeletonListingCard extends StatelessWidget {
     );
   }
 
-  Widget _SkeletonLine({required double width, required double height, double radius = 4}) {
+  Widget _SkeletonLine({
+    required double width,
+    required double height,
+    double radius = 4,
+  }) {
     return Container(
       width: width,
       height: height,
@@ -1016,10 +1022,7 @@ class _ConversationCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     conversation.lastMessage?.content ?? 'No messages yet',
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 14,
-                    ),
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1045,7 +1048,7 @@ class _ConversationCard extends StatelessWidget {
   String _formatTime(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
-    
+
     if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {

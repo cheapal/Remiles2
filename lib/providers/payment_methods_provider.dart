@@ -15,8 +15,10 @@ class PaymentMethodsProvider with ChangeNotifier {
   static const Duration _cacheValidDuration = Duration(minutes: 5);
 
   // Getters
-  List<Map<String, dynamic>> get paymentMethods => List.unmodifiable(_paymentMethods);
-  List<Map<String, dynamic>> get transactions => List.unmodifiable(_transactions);
+  List<Map<String, dynamic>> get paymentMethods =>
+      List.unmodifiable(_paymentMethods);
+  List<Map<String, dynamic>> get transactions =>
+      List.unmodifiable(_transactions);
   bool get isLoading => _isLoading;
   bool get isRefreshing => _isRefreshing;
   bool get hasPaymentMethods => _paymentMethods.isNotEmpty;
@@ -25,13 +27,15 @@ class PaymentMethodsProvider with ChangeNotifier {
   /// Check if payment methods cache is still valid
   bool get _isPaymentMethodsCacheValid {
     if (_lastPaymentMethodsFetch == null) return false;
-    return DateTime.now().difference(_lastPaymentMethodsFetch!) < _cacheValidDuration;
+    return DateTime.now().difference(_lastPaymentMethodsFetch!) <
+        _cacheValidDuration;
   }
 
   /// Check if transactions cache is still valid
   bool get _isTransactionsCacheValid {
     if (_lastTransactionsFetch == null) return false;
-    return DateTime.now().difference(_lastTransactionsFetch!) < _cacheValidDuration;
+    return DateTime.now().difference(_lastTransactionsFetch!) <
+        _cacheValidDuration;
   }
 
   /// Load payment methods (with caching)
@@ -40,29 +44,37 @@ class PaymentMethodsProvider with ChangeNotifier {
     // Check if user changed - if so, clear cache immediately
     final currentUser = FirebaseService.currentUser;
     final currentUserId = currentUser?.uid;
-    
-    if (currentUserId != null && _currentUserId != null && _currentUserId != currentUserId) {
+
+    if (currentUserId != null &&
+        _currentUserId != null &&
+        _currentUserId != currentUserId) {
       // User changed - clear all data immediately
-      debugPrint('User changed from $_currentUserId to $currentUserId - clearing payment methods cache');
+      debugPrint(
+        'User changed from $_currentUserId to $currentUserId - clearing payment methods cache',
+      );
       clear();
     }
-    
+
     // Update tracked user ID
     _currentUserId = currentUserId;
-    
+
     // If no user is logged in, clear data and return
     if (currentUserId == null) {
       clear();
       return;
     }
-    
+
     // Return cached data if valid and not forcing refresh
-    if (!forceRefresh && _isPaymentMethodsCacheValid && _paymentMethods.isNotEmpty) {
+    if (!forceRefresh &&
+        _isPaymentMethodsCacheValid &&
+        _paymentMethods.isNotEmpty) {
       // Log cache hit
       await FirebaseService.logEvent(
         'payment_methods_cache_hit',
         parameters: FirebaseService.convertParameters({
-          'cache_age_minutes': DateTime.now().difference(_lastPaymentMethodsFetch!).inMinutes,
+          'cache_age_minutes': DateTime.now()
+              .difference(_lastPaymentMethodsFetch!)
+              .inMinutes,
         }),
       );
       return;
@@ -79,15 +91,22 @@ class PaymentMethodsProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      await FirebaseService.log('Loading payment methods${forceRefresh ? ' (force refresh)' : ''}');
-      
+      await FirebaseService.log(
+        'Loading payment methods${forceRefresh ? ' (force refresh)' : ''}',
+      );
+
       final methods = await StripeService.listPaymentMethods();
       _paymentMethods = methods;
       _lastPaymentMethodsFetch = DateTime.now();
 
       // Log success
-      await FirebaseService.log('Payment methods loaded successfully - Count: ${methods.length}');
-      await FirebaseService.setCustomKey('payment_methods_count', methods.length);
+      await FirebaseService.log(
+        'Payment methods loaded successfully - Count: ${methods.length}',
+      );
+      await FirebaseService.setCustomKey(
+        'payment_methods_count',
+        methods.length,
+      );
       await FirebaseService.logEvent(
         'payment_methods_loaded',
         parameters: FirebaseService.convertParameters({
@@ -103,7 +122,10 @@ class PaymentMethodsProvider with ChangeNotifier {
         reason: 'Failed to load payment methods',
       );
       await FirebaseService.log('Payment methods load failed: $e');
-      await FirebaseService.setCustomKey('payment_methods_load_error', e.toString());
+      await FirebaseService.setCustomKey(
+        'payment_methods_load_error',
+        e.toString(),
+      );
       await FirebaseService.logEvent(
         'payment_methods_load_failed',
         parameters: FirebaseService.convertParameters({
@@ -127,16 +149,18 @@ class PaymentMethodsProvider with ChangeNotifier {
       final methods = await StripeService.listPaymentMethods();
       _paymentMethods = methods;
       _lastPaymentMethodsFetch = DateTime.now();
-      
+
       // Log background refresh success
-      await FirebaseService.log('Payment methods background refresh successful - Count: ${methods.length}');
+      await FirebaseService.log(
+        'Payment methods background refresh successful - Count: ${methods.length}',
+      );
       await FirebaseService.logEvent(
         'payment_methods_background_refresh',
         parameters: FirebaseService.convertParameters({
           'count': methods.length,
         }),
       );
-      
+
       notifyListeners();
     } catch (e, stackTrace) {
       debugPrint('Background refresh failed: $e');
@@ -145,7 +169,9 @@ class PaymentMethodsProvider with ChangeNotifier {
         stackTrace,
         reason: 'Background payment methods refresh failed',
       );
-      await FirebaseService.log('Payment methods background refresh failed: $e');
+      await FirebaseService.log(
+        'Payment methods background refresh failed: $e',
+      );
       // Don't show error for background refresh
     } finally {
       _isRefreshing = false;
@@ -162,24 +188,30 @@ class PaymentMethodsProvider with ChangeNotifier {
     // Check if user changed - if so, clear cache immediately
     final currentUser = FirebaseService.currentUser;
     final currentUserId = currentUser?.uid;
-    
-    if (currentUserId != null && _currentUserId != null && _currentUserId != currentUserId) {
+
+    if (currentUserId != null &&
+        _currentUserId != null &&
+        _currentUserId != currentUserId) {
       // User changed - clear all data immediately
-      debugPrint('User changed from $_currentUserId to $currentUserId - clearing transactions cache');
+      debugPrint(
+        'User changed from $_currentUserId to $currentUserId - clearing transactions cache',
+      );
       clear();
     }
-    
+
     // Update tracked user ID
     _currentUserId = currentUserId;
-    
+
     // If no user is logged in, clear data and return
     if (currentUserId == null) {
       clear();
       return;
     }
-    
+
     // Return cached data if valid and not forcing refresh
-    if (!forceRefresh && _isTransactionsCacheValid && _transactions.isNotEmpty) {
+    if (!forceRefresh &&
+        _isTransactionsCacheValid &&
+        _transactions.isNotEmpty) {
       return;
     }
 
@@ -204,26 +236,29 @@ class PaymentMethodsProvider with ChangeNotifier {
             .limit(100);
 
         final paymentIntentsSnapshot = await paymentIntentsQuery.get();
-        allTransactions.addAll(paymentIntentsSnapshot.docs.map((doc) {
-          final data = (doc.data() ?? <String, dynamic>{}) as Map<String, dynamic>;
-          return {
-            'id': doc.id,
-            'type': 'payment_intent',
-            'paymentIntentId': data['paymentIntentId'] ?? 'N/A',
-            'amount': data['amount'] ?? 0,
-            'currency': data['currency'] ?? 'usd',
-            'status': data['status'] ?? 'unknown',
-            'carrierId': data['carrierId'],
-            'carrierName': data['carrierName'],
-            'loadId': data['loadId'],
-            'loadNumber': data['loadNumber'],
-            'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
-            'succeededAt': (data['succeededAt'] as Timestamp?)?.toDate(),
-            'failedAt': (data['failedAt'] as Timestamp?)?.toDate(),
-            'failureReason': data['failureReason'],
-            'metadata': data['metadata'],
-          };
-        }));
+        allTransactions.addAll(
+          paymentIntentsSnapshot.docs.map((doc) {
+            final data =
+                (doc.data() ?? <String, dynamic>{}) as Map<String, dynamic>;
+            return {
+              'id': doc.id,
+              'type': 'payment_intent',
+              'paymentIntentId': data['paymentIntentId'] ?? 'N/A',
+              'amount': data['amount'] ?? 0,
+              'currency': data['currency'] ?? 'usd',
+              'status': data['status'] ?? 'unknown',
+              'carrierId': data['carrierId'],
+              'carrierName': data['carrierName'],
+              'loadId': data['loadId'],
+              'loadNumber': data['loadNumber'],
+              'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
+              'succeededAt': (data['succeededAt'] as Timestamp?)?.toDate(),
+              'failedAt': (data['failedAt'] as Timestamp?)?.toDate(),
+              'failureReason': data['failureReason'],
+              'metadata': data['metadata'],
+            };
+          }),
+        );
       } catch (e) {
         debugPrint('Error loading payment_intents: $e');
       }
@@ -237,61 +272,25 @@ class PaymentMethodsProvider with ChangeNotifier {
             .limit(200);
 
         final transfersSnapshot = await transfersQuery.get();
-        allTransactions.addAll(transfersSnapshot.docs.map((doc) {
-          final data = (doc.data() ?? <String, dynamic>{}) as Map<String, dynamic>;
-          // Convert amount: amountInCents is in cents, amount is in dollars
-          final amountInCents = data['amountInCents'] as int?;
-          final amountDollars = data['amount'] as num?;
-          final amount = amountInCents ?? 
-              (amountDollars != null ? (amountDollars * 100).toInt() : 0);
-          
-          return {
-            'id': doc.id,
-            'type': 'transfer',
-            'transferId': data['stripeTransferId'] ?? doc.id,
-            'paymentIntentId': data['stripePaymentIntentId'] ?? 
-                              data['stripeTransferId'] ?? 
-                              doc.id,
-            'amount': amount,
-            'currency': data['currency'] ?? 'usd',
-            'status': data['status'] ?? 'completed',
-            'carrierId': data['carrierId'],
-            'carrierName': data['carrierName'],
-            'loadId': data['loadId'],
-            'loadNumber': data['loadNumber'],
-            'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
-            'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
-            'succeededAt': (data['succeededAt'] as Timestamp?)?.toDate() ?? 
-                          (data['completedAt'] as Timestamp?)?.toDate() ??
-                          (data['createdAt'] as Timestamp?)?.toDate(),
-            'metadata': data,
-          };
-        }));
-      } catch (e) {
-        debugPrint('Error loading transfers: $e');
-        // If query fails (e.g., missing index), try without orderBy
-        try {
-          final transfersSnapshot = await FirebaseService.firestore
-              .collection('transfers')
-              .where('shipperId', isEqualTo: currentUser.uid)
-              .limit(200)
-              .get();
-          
-          allTransactions.addAll(transfersSnapshot.docs.map((doc) {
-            final data = doc.data();
+        allTransactions.addAll(
+          transfersSnapshot.docs.map((doc) {
+            final data =
+                (doc.data() ?? <String, dynamic>{}) as Map<String, dynamic>;
             // Convert amount: amountInCents is in cents, amount is in dollars
             final amountInCents = data['amountInCents'] as int?;
             final amountDollars = data['amount'] as num?;
-            final amount = amountInCents ?? 
+            final amount =
+                amountInCents ??
                 (amountDollars != null ? (amountDollars * 100).toInt() : 0);
-            
+
             return {
               'id': doc.id,
               'type': 'transfer',
               'transferId': data['stripeTransferId'] ?? doc.id,
-              'paymentIntentId': data['stripePaymentIntentId'] ?? 
-                                data['stripeTransferId'] ?? 
-                                doc.id,
+              'paymentIntentId':
+                  data['stripePaymentIntentId'] ??
+                  data['stripeTransferId'] ??
+                  doc.id,
               'amount': amount,
               'currency': data['currency'] ?? 'usd',
               'status': data['status'] ?? 'completed',
@@ -301,12 +300,59 @@ class PaymentMethodsProvider with ChangeNotifier {
               'loadNumber': data['loadNumber'],
               'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
               'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
-              'succeededAt': (data['succeededAt'] as Timestamp?)?.toDate() ?? 
-                            (data['completedAt'] as Timestamp?)?.toDate() ??
-                            (data['createdAt'] as Timestamp?)?.toDate(),
+              'succeededAt':
+                  (data['succeededAt'] as Timestamp?)?.toDate() ??
+                  (data['completedAt'] as Timestamp?)?.toDate() ??
+                  (data['createdAt'] as Timestamp?)?.toDate(),
               'metadata': data,
             };
-          }));
+          }),
+        );
+      } catch (e) {
+        debugPrint('Error loading transfers: $e');
+        // If query fails (e.g., missing index), try without orderBy
+        try {
+          final transfersSnapshot = await FirebaseService.firestore
+              .collection('transfers')
+              .where('shipperId', isEqualTo: currentUser.uid)
+              .limit(200)
+              .get();
+
+          allTransactions.addAll(
+            transfersSnapshot.docs.map((doc) {
+              final data = doc.data();
+              // Convert amount: amountInCents is in cents, amount is in dollars
+              final amountInCents = data['amountInCents'] as int?;
+              final amountDollars = data['amount'] as num?;
+              final amount =
+                  amountInCents ??
+                  (amountDollars != null ? (amountDollars * 100).toInt() : 0);
+
+              return {
+                'id': doc.id,
+                'type': 'transfer',
+                'transferId': data['stripeTransferId'] ?? doc.id,
+                'paymentIntentId':
+                    data['stripePaymentIntentId'] ??
+                    data['stripeTransferId'] ??
+                    doc.id,
+                'amount': amount,
+                'currency': data['currency'] ?? 'usd',
+                'status': data['status'] ?? 'completed',
+                'carrierId': data['carrierId'],
+                'carrierName': data['carrierName'],
+                'loadId': data['loadId'],
+                'loadNumber': data['loadNumber'],
+                'createdAt': (data['createdAt'] as Timestamp?)?.toDate(),
+                'completedAt': (data['completedAt'] as Timestamp?)?.toDate(),
+                'succeededAt':
+                    (data['succeededAt'] as Timestamp?)?.toDate() ??
+                    (data['completedAt'] as Timestamp?)?.toDate() ??
+                    (data['createdAt'] as Timestamp?)?.toDate(),
+                'metadata': data,
+              };
+            }),
+          );
         } catch (e2) {
           debugPrint('Error loading transfers (fallback): $e2');
         }
@@ -316,7 +362,7 @@ class PaymentMethodsProvider with ChangeNotifier {
       // prefer the transfer (it has more complete info about carrier payments)
       final Map<String, Map<String, dynamic>> uniqueTransactions = {};
       final Set<String> transferPaymentIntentIds = {};
-      
+
       // First pass: collect all transfer paymentIntentIds
       for (final transaction in allTransactions) {
         if (transaction['type'] == 'transfer') {
@@ -331,7 +377,7 @@ class PaymentMethodsProvider with ChangeNotifier {
           }
         }
       }
-      
+
       // Second pass: add payment_intents only if they don't have a matching transfer
       for (final transaction in allTransactions) {
         if (transaction['type'] == 'payment_intent') {
@@ -356,26 +402,29 @@ class PaymentMethodsProvider with ChangeNotifier {
 
       // Sort all transactions by date (most recent first)
       allTransactions.sort((a, b) {
-        final dateA = a['succeededAt'] as DateTime? ?? 
-                     a['completedAt'] as DateTime? ?? 
-                     a['createdAt'] as DateTime? ?? 
-                     DateTime(1970);
-        final dateB = b['succeededAt'] as DateTime? ?? 
-                     b['completedAt'] as DateTime? ?? 
-                     b['createdAt'] as DateTime? ?? 
-                     DateTime(1970);
+        final dateA =
+            a['succeededAt'] as DateTime? ??
+            a['completedAt'] as DateTime? ??
+            a['createdAt'] as DateTime? ??
+            DateTime(1970);
+        final dateB =
+            b['succeededAt'] as DateTime? ??
+            b['completedAt'] as DateTime? ??
+            b['createdAt'] as DateTime? ??
+            DateTime(1970);
         return dateB.compareTo(dateA);
       });
 
       // Apply date filters in memory (respecting time component)
       if (fromDate != null || toDate != null) {
         allTransactions = allTransactions.where((transaction) {
-          final transactionDate = transaction['succeededAt'] as DateTime? ??
-                                transaction['completedAt'] as DateTime? ??
-                                transaction['createdAt'] as DateTime?;
-          
+          final transactionDate =
+              transaction['succeededAt'] as DateTime? ??
+              transaction['completedAt'] as DateTime? ??
+              transaction['createdAt'] as DateTime?;
+
           if (transactionDate == null) return false;
-          
+
           // For fromDate: transaction must be on or after the selected date/time
           if (fromDate != null) {
             // Compare dates and times, but allow same day if time is equal or later
@@ -383,7 +432,7 @@ class PaymentMethodsProvider with ChangeNotifier {
               return false;
             }
           }
-          
+
           // For toDate: transaction must be on or before the selected date/time
           if (toDate != null) {
             // Compare dates and times exactly, including the time component
@@ -391,17 +440,22 @@ class PaymentMethodsProvider with ChangeNotifier {
               return false;
             }
           }
-          
+
           return true;
         }).toList();
       }
 
       _transactions = allTransactions;
       _lastTransactionsFetch = DateTime.now();
-      
+
       // Log success
-      await FirebaseService.log('Transactions loaded successfully - Count: ${_transactions.length}');
-      await FirebaseService.setCustomKey('transactions_count', _transactions.length);
+      await FirebaseService.log(
+        'Transactions loaded successfully - Count: ${_transactions.length}',
+      );
+      await FirebaseService.setCustomKey(
+        'transactions_count',
+        _transactions.length,
+      );
       await FirebaseService.logEvent(
         'transactions_loaded',
         parameters: FirebaseService.convertParameters({
@@ -410,7 +464,7 @@ class PaymentMethodsProvider with ChangeNotifier {
           'has_date_filter': (fromDate != null || toDate != null) ? 1 : 0,
         }),
       );
-      
+
       notifyListeners();
     } catch (e, stackTrace) {
       debugPrint('Error loading transactions: $e');
@@ -420,7 +474,10 @@ class PaymentMethodsProvider with ChangeNotifier {
         reason: 'Failed to load transactions',
       );
       await FirebaseService.log('Transactions load failed: $e');
-      await FirebaseService.setCustomKey('transactions_load_error', e.toString());
+      await FirebaseService.setCustomKey(
+        'transactions_load_error',
+        e.toString(),
+      );
       await FirebaseService.logEvent(
         'transactions_load_failed',
         parameters: FirebaseService.convertParameters({
@@ -440,7 +497,11 @@ class PaymentMethodsProvider with ChangeNotifier {
 
     _isRefreshing = true;
     try {
-      await loadTransactions(forceRefresh: true, fromDate: fromDate, toDate: toDate);
+      await loadTransactions(
+        forceRefresh: true,
+        fromDate: fromDate,
+        toDate: toDate,
+      );
     } catch (e) {
       debugPrint('Background transactions refresh failed: $e');
     } finally {
@@ -465,7 +526,10 @@ class PaymentMethodsProvider with ChangeNotifier {
 
         // Log success
         await FirebaseService.log('Payment method added successfully');
-        await FirebaseService.setCustomKey('payment_methods_count', _paymentMethods.length);
+        await FirebaseService.setCustomKey(
+          'payment_methods_count',
+          _paymentMethods.length,
+        );
         await FirebaseService.logEvent(
           'payment_method_added',
           parameters: FirebaseService.convertParameters({
@@ -481,7 +545,10 @@ class PaymentMethodsProvider with ChangeNotifier {
         reason: 'Failed to add payment method',
       );
       await FirebaseService.log('Payment method add failed: $e');
-      await FirebaseService.setCustomKey('payment_method_add_error', e.toString());
+      await FirebaseService.setCustomKey(
+        'payment_method_add_error',
+        e.toString(),
+      );
       await FirebaseService.logEvent(
         'payment_method_add_failed',
         parameters: FirebaseService.convertParameters({
@@ -492,10 +559,35 @@ class PaymentMethodsProvider with ChangeNotifier {
     }
   }
 
+  /// Add payment method for Web
+  Future<bool> addPaymentMethodWeb() async {
+    try {
+      await FirebaseService.log('Adding payment method (Web)');
+
+      final clientSecret = await StripeService.createSetupIntent();
+      await StripeService.confirmWebSetup(clientSecret);
+
+      // Invalidate cache and reload
+      _lastPaymentMethodsFetch = null;
+      await loadPaymentMethods(forceRefresh: true);
+
+      return true;
+    } catch (e, stackTrace) {
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Failed to add payment method (Web)',
+      );
+      rethrow;
+    }
+  }
+
   /// Set default payment method (optimistic update)
   Future<void> setDefaultPaymentMethod(String paymentMethodId) async {
     try {
-      await FirebaseService.log('Setting default payment method: $paymentMethodId');
+      await FirebaseService.log(
+        'Setting default payment method: $paymentMethodId',
+      );
       await FirebaseService.logEvent(
         'payment_method_set_default_attempted',
         parameters: FirebaseService.convertParameters({
@@ -505,10 +597,7 @@ class PaymentMethodsProvider with ChangeNotifier {
 
       // Optimistic update
       _paymentMethods = _paymentMethods.map((method) {
-        return {
-          ...method,
-          'isDefault': method['id'] == paymentMethodId,
-        };
+        return {...method, 'isDefault': method['id'] == paymentMethodId};
       }).toList();
       notifyListeners();
 
@@ -519,7 +608,10 @@ class PaymentMethodsProvider with ChangeNotifier {
 
       // Log success
       await FirebaseService.log('Default payment method set successfully');
-      await FirebaseService.setCustomKey('default_payment_method_id', paymentMethodId);
+      await FirebaseService.setCustomKey(
+        'default_payment_method_id',
+        paymentMethodId,
+      );
       await FirebaseService.logEvent(
         'payment_method_set_default',
         parameters: FirebaseService.convertParameters({
@@ -535,7 +627,10 @@ class PaymentMethodsProvider with ChangeNotifier {
         reason: 'Failed to set default payment method',
       );
       await FirebaseService.log('Set default payment method failed: $e');
-      await FirebaseService.setCustomKey('set_default_payment_method_error', e.toString());
+      await FirebaseService.setCustomKey(
+        'set_default_payment_method_error',
+        e.toString(),
+      );
       await FirebaseService.logEvent(
         'payment_method_set_default_failed',
         parameters: FirebaseService.convertParameters({
@@ -584,7 +679,10 @@ class PaymentMethodsProvider with ChangeNotifier {
 
       // Log success
       await FirebaseService.log('Payment method deleted successfully');
-      await FirebaseService.setCustomKey('payment_methods_count', _paymentMethods.length);
+      await FirebaseService.setCustomKey(
+        'payment_methods_count',
+        _paymentMethods.length,
+      );
       await FirebaseService.logEvent(
         'payment_method_deleted',
         parameters: FirebaseService.convertParameters({
@@ -603,7 +701,10 @@ class PaymentMethodsProvider with ChangeNotifier {
         reason: 'Failed to delete payment method',
       );
       await FirebaseService.log('Delete payment method failed: $e');
-      await FirebaseService.setCustomKey('delete_payment_method_error', e.toString());
+      await FirebaseService.setCustomKey(
+        'delete_payment_method_error',
+        e.toString(),
+      );
       await FirebaseService.logEvent(
         'payment_method_delete_failed',
         parameters: FirebaseService.convertParameters({
@@ -631,4 +732,3 @@ class PaymentMethodsProvider with ChangeNotifier {
     notifyListeners();
   }
 }
-

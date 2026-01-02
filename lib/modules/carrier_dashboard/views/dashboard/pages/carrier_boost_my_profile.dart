@@ -10,6 +10,8 @@ import '../../../../../providers/app_state_provider.dart';
 import '../../../../../core/firebase_service.dart';
 import '../../../../../core/stripe_service.dart';
 import '../../common/widgets/top_navigation_bar.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class CarrierBoostMyProfile extends StatefulWidget {
   const CarrierBoostMyProfile({super.key});
@@ -36,20 +38,22 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
-        final carrierDoc = await FirebaseService.carriers.doc(carrier.uid).get();
-        
+        final carrierDoc = await FirebaseService.carriers
+            .doc(carrier.uid)
+            .get();
+
         if (carrierDoc.exists) {
           final data = carrierDoc.data() as Map<String, dynamic>?;
           if (data != null) {
             final boostType = data['profileBoostType'] as String?;
             final boostEndDateStr = data['profileBoostEndDate'] as String?;
             final boostStartDateStr = data['profileBoostStartDate'] as String?;
-            
+
             DateTime? endDate;
             DateTime? startDate;
-            
+
             if (boostEndDateStr != null) {
               try {
                 endDate = DateTime.parse(boostEndDateStr);
@@ -67,7 +71,7 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                 debugPrint('Error parsing boost end date: $e');
               }
             }
-            
+
             if (boostStartDateStr != null) {
               try {
                 startDate = DateTime.parse(boostStartDateStr);
@@ -75,7 +79,7 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                 debugPrint('Error parsing boost start date: $e');
               }
             }
-            
+
             setState(() {
               _activeBoostType = boostType;
               _boostEndDate = endDate;
@@ -92,15 +96,15 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
   String _formatRemainingTime(DateTime endDate) {
     final now = DateTime.now();
     final difference = endDate.difference(now);
-    
+
     if (difference.isNegative) {
       return 'Expired';
     }
-    
+
     final days = difference.inDays;
     final hours = difference.inHours % 24;
     final minutes = difference.inMinutes % 60;
-    
+
     return '${days}d ${hours}h ${minutes}m left';
   }
 
@@ -118,7 +122,7 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
     final now = DateTime.now();
     final total = endDate.difference(startDate).inMilliseconds;
     final elapsed = now.difference(startDate).inMilliseconds;
-    
+
     if (total <= 0) return 0.0;
     return (elapsed / total).clamp(0.0, 1.0);
   }
@@ -138,7 +142,7 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
 
   Future<void> _purchaseBoost(String boostType) async {
     if (_isLoading) return;
-    
+
     setState(() {
       _isLoading = true;
       _selectedBoostType = boostType;
@@ -165,7 +169,7 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
       int price = 0;
       int durationDays = 0;
       String boostName = '';
-      
+
       switch (boostType) {
         case 'basic':
           price = 999; // $9.99 CAD in cents
@@ -187,21 +191,49 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
       // Store data before async operations to avoid context issues
       final carrierUid = carrier.uid;
       final carrierEmail = carrier.email;
-      
+
       // Process payment - don't show loading dialog as Stripe sheet will handle UI
       if (!mounted) return;
-      
-      final paymentSuccess = await StripeService.processPayment(
-        amountInCents: price,
-        currency: 'cad',
-        metadata: {
-          'carrier_id': carrierUid,
-          'carrier_email': carrierEmail,
-          'boost_type': boostType,
-          'boost_name': boostName,
-          'amount': (price / 100).toString(),
-        },
-      );
+
+      bool paymentSuccess = false;
+
+      final metadata = {
+        'carrier_id': carrierUid,
+        'carrier_email': carrierEmail,
+        'boost_type': boostType,
+        'boost_name': boostName,
+        'amount': (price / 100).toString(),
+      };
+
+      if (kIsWeb) {
+        // Web Payment Flow
+        final clientSecret = await StripeService.createPaymentIntent(
+          amountInCents: price,
+          currency: 'cad',
+          metadata: metadata,
+        );
+
+        if (!mounted) return;
+
+        final result = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => WebPurchaseDialog(
+            clientSecret: clientSecret,
+            amount: price ~/ 100,
+            planName: boostName,
+          ),
+        );
+
+        paymentSuccess = result ?? false;
+      } else {
+        // Native Payment Flow
+        paymentSuccess = await StripeService.processPayment(
+          amountInCents: price,
+          currency: 'cad',
+          metadata: metadata,
+        );
+      }
 
       // Check mounted after async operation
       if (!mounted) return;
@@ -225,11 +257,13 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
       // Calculate boost end date
       final now = DateTime.now();
       final boostEndDate = now.add(Duration(days: durationDays));
-      
+
       // If there's an active boost, extend it
       DateTime finalEndDate = boostEndDate;
       DateTime? previousEndDate;
-      if (_activeBoostType != null && _boostEndDate != null && _boostEndDate!.isAfter(now)) {
+      if (_activeBoostType != null &&
+          _boostEndDate != null &&
+          _boostEndDate!.isAfter(now)) {
         // Extend from current end date
         previousEndDate = _boostEndDate;
         finalEndDate = _boostEndDate!.add(Duration(days: durationDays));
@@ -237,14 +271,14 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
 
       // Check mounted before continuing
       if (!mounted) return;
-      
+
       // Get current boost data to save to history
       final carrierDoc = await FirebaseService.carriers.doc(carrierUid).get();
       final currentData = carrierDoc.data() as Map<String, dynamic>?;
-      
+
       // Prepare history entry from current boost (if exists and different)
       Map<String, dynamic>? historyEntry;
-      if (currentData != null && 
+      if (currentData != null &&
           currentData['profileBoostType'] != null &&
           currentData['profileBoostType'] != boostType) {
         // Only save to history if it's different from the new boost
@@ -253,7 +287,9 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
           'boostName': _getBoostName(currentData['profileBoostType']),
           'price': _getBoostPrice(currentData['profileBoostType']),
           'startDate': currentData['profileBoostStartDate'],
-          'endDate': previousEndDate?.toIso8601String() ?? DateTime.now().toIso8601String(),
+          'endDate':
+              previousEndDate?.toIso8601String() ??
+              DateTime.now().toIso8601String(),
           'changedAt': DateTime.now().toIso8601String(),
           'reason': 'boost_change',
         };
@@ -266,32 +302,34 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
         'profileBoostStartDate': now.toIso8601String(),
         'profileBoostLastUpdated': now.toIso8601String(),
       };
-      
+
       if (historyEntry != null) {
         // Get existing history or initialize empty array
-        final existingHistory = currentData?['profileBoostHistory'] as List<dynamic>? ?? [];
-        
+        final existingHistory =
+            currentData?['profileBoostHistory'] as List<dynamic>? ?? [];
+
         // Add current boost to history array
         final updatedHistory = List<Map<String, dynamic>>.from(
-          existingHistory.map((e) => e as Map<String, dynamic>)
+          existingHistory.map((e) => e as Map<String, dynamic>),
         );
         updatedHistory.add(historyEntry);
-        
+
         // Store updated history
         updates['profileBoostHistory'] = updatedHistory;
-      } else if (currentData != null && currentData['profileBoostHistory'] == null) {
+      } else if (currentData != null &&
+          currentData['profileBoostHistory'] == null) {
         // Initialize empty history array if it doesn't exist
         updates['profileBoostHistory'] = [];
       }
-      
+
       // Check mounted before updating
       if (!mounted) return;
-      
+
       await FirebaseService.updateCarrier(carrierUid, updates);
 
       // Check mounted before logging
       if (!mounted) return;
-      
+
       // Log analytics
       await FirebaseService.logEvent(
         'carrier_profile_boost_purchased',
@@ -321,16 +359,16 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
     } catch (e, stackTrace) {
       // Check mounted before accessing context
       if (!mounted) return;
-      
+
       final appStateProvider = context.read<AppStateProvider>();
       appStateProvider.showError('Failed to purchase boost. Please try again.');
-      
+
       await FirebaseService.recordError(
         e,
         stackTrace,
         reason: 'Carrier profile boost purchase failed',
       );
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -391,13 +429,13 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                       ],
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // Remaining Time Section
                     if (_activeBoostType != null && _boostEndDate != null)
                       _buildRemainingTimeSection(),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Basic Boost Card
                     _buildBoostCard(
                       boostType: 'basic',
@@ -416,7 +454,7 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                       isLoading: _isLoading && _selectedBoostType == 'basic',
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Premium Boost Card
                     _buildBoostCard(
                       boostType: 'premium',
@@ -435,7 +473,7 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                       isLoading: _isLoading && _selectedBoostType == 'premium',
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Monthly Boost Card
                     _buildBoostCard(
                       boostType: 'monthly',
@@ -455,9 +493,11 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                       isLoading: _isLoading && _selectedBoostType == 'monthly',
                     ),
                     const SizedBox(height: 30),
-                    
+
                     // Extend Boost Button
-                    if (_activeBoostType != null && _boostEndDate != null && _boostEndDate!.isAfter(DateTime.now()))
+                    if (_activeBoostType != null &&
+                        _boostEndDate != null &&
+                        _boostEndDate!.isAfter(DateTime.now()))
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF43975A),
@@ -467,17 +507,21 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                           ),
                           elevation: 4,
                         ),
-                        onPressed: _isLoading ? null : () {
-                          // Show dialog to select boost to extend with
-                          _showExtendBoostDialog();
-                        },
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                // Show dialog to select boost to extend with
+                                _showExtendBoostDialog();
+                              },
                         child: _isLoading
                             ? const SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
                             : const Text(
@@ -501,10 +545,10 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
 
   Widget _buildRemainingTimeSection() {
     if (_boostEndDate == null) return const SizedBox.shrink();
-    
+
     final remainingTime = _formatRemainingTime(_boostEndDate!);
     final progress = _getProgressPercentage(_boostEndDate!);
-    
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -554,7 +598,9 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
               value: progress,
               minHeight: 8,
               backgroundColor: Colors.grey.shade200,
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF43975A)),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFF43975A),
+              ),
             ),
           ),
         ],
@@ -605,13 +651,10 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
         decoration: BoxDecoration(
           color: cardBackgroundColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: borderColor,
-            width: borderWidth,
-          ),
+          border: Border.all(color: borderColor, width: borderWidth),
           boxShadow: [
             BoxShadow(
-              color: isSelected 
+              color: isSelected
                   ? const Color(0xFF43975A).withOpacity(0.3)
                   : Colors.black.withOpacity(0.1),
               blurRadius: isSelected ? 8 : 4,
@@ -623,105 +666,110 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
           padding: const EdgeInsets.all(16),
           child: Stack(
             children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        title,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF186230),
+                          ),
+                        ),
+                      ),
+                      if (isActive)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF43975A),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Text(
+                            'Currently Active',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    duration,
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    benefit,
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      color: Colors.black54,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (originalPrice != null) ...[
+                        Text(
+                          originalPrice,
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                            decoration: TextDecoration.lineThrough,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        price,
                         style: const TextStyle(
                           fontFamily: 'Roboto',
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF186230),
                         ),
                       ),
-                    ),
-                    if (isActive)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF43975A),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'Currently Active',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  duration,
-                  style: const TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    color: Colors.black87,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  benefit,
-                  style: const TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    color: Colors.black54,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (originalPrice != null) ...[
-                      Text(
-                        originalPrice,
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                          decoration: TextDecoration.lineThrough,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
                     ],
-                    Text(
-                      price,
-                      style: const TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF186230),
+                  ),
+                ],
+              ),
+              if (isLoading)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Color(0xFF43975A),
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
-            if (isLoading)
-              Positioned.fill(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF43975A)),
-                    ),
                   ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
@@ -752,7 +800,10 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
             GestureDetector(
               onTap: () => Navigator.of(context).pop(),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: const Text(
                   'Cancel',
                   style: TextStyle(
@@ -769,7 +820,10 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                 _purchaseBoost('basic');
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: const Text(
                   'Basic Boost',
                   style: TextStyle(
@@ -787,7 +841,10 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                 _purchaseBoost('premium');
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: const Text(
                   'Premium Boost',
                   style: TextStyle(
@@ -805,7 +862,10 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                 _purchaseBoost('monthly');
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 child: const Text(
                   'Monthly Boost',
                   style: TextStyle(
@@ -852,23 +912,25 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
   Future<void> _showSubscriptionHistory() async {
     final authProvider = context.read<AuthProvider>();
     final carrier = authProvider.carrierUser;
-    
+
     // Reload fresh data from Firestore to ensure history is up to date
     Map<String, dynamic>? currentBoost;
     List<Map<String, dynamic>> boostHistory = [];
-    
+
     if (carrier != null) {
       try {
-        final carrierDoc = await FirebaseService.carriers.doc(carrier.uid).get();
+        final carrierDoc = await FirebaseService.carriers
+            .doc(carrier.uid)
+            .get();
         if (carrierDoc.exists) {
           final data = carrierDoc.data() as Map<String, dynamic>?;
           if (data != null) {
             // Get current active boost
-            if (data['profileBoostType'] != null && 
+            if (data['profileBoostType'] != null &&
                 data['profileBoostEndDate'] != null) {
               final endDateStr = data['profileBoostEndDate'] as String;
               final endDate = DateTime.parse(endDateStr);
-              
+
               // Only show as active if not expired
               if (endDate.isAfter(DateTime.now())) {
                 currentBoost = {
@@ -881,12 +943,12 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
                 };
               }
             }
-            
+
             // Get fresh boost history from Firestore
             final history = data['profileBoostHistory'] as List<dynamic>?;
             if (history != null) {
               boostHistory = List<Map<String, dynamic>>.from(
-                history.map((e) => e as Map<String, dynamic>)
+                history.map((e) => e as Map<String, dynamic>),
               );
             }
           }
@@ -895,21 +957,19 @@ class _CarrierBoostMyProfileState extends State<CarrierBoostMyProfile> {
         debugPrint('Error loading boost history: $e');
       }
     }
-    
+
     // Combine current with history (newest first)
     final allBoosts = <Map<String, dynamic>>[];
     if (currentBoost != null) {
       allBoosts.add(currentBoost);
     }
     allBoosts.addAll(boostHistory.reversed);
-    
+
     // Navigate to full screen
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => CarrierBoostHistoryScreen(
-          boosts: allBoosts,
-          carrier: carrier,
-        ),
+        builder: (context) =>
+            CarrierBoostHistoryScreen(boosts: allBoosts, carrier: carrier),
       ),
     );
   }
@@ -951,7 +1011,11 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
               children: [
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                   tooltip: 'Back',
                 ),
                 const SizedBox(width: 12),
@@ -982,7 +1046,11 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.history, size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.history,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'No boost history available',
@@ -996,9 +1064,7 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                     ),
                   )
                 : Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                    ),
+                    decoration: BoxDecoration(color: Colors.grey.shade50),
                     child: ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: boosts.length,
@@ -1007,7 +1073,12 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                         final isActive = boost['status'] == 'active';
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildHistoryItem(context, boost, isActive, carrier),
+                          child: _buildHistoryItem(
+                            context,
+                            boost,
+                            isActive,
+                            carrier,
+                          ),
                         );
                       },
                     ),
@@ -1030,9 +1101,9 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
     final endDate = boost['endDate'];
     final changedAt = boost['changedAt'] ?? startDate;
     final status = isActive ? 'Active' : 'Ended';
-    
+
     final receiptText = _formatReceipt(boost, carrier);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1057,7 +1128,7 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: isActive 
+                colors: isActive
                     ? [Colors.green.shade50, Colors.green.shade100]
                     : [Colors.grey.shade50, Colors.grey.shade100],
                 begin: Alignment.topLeft,
@@ -1079,7 +1150,9 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                         children: [
                           Icon(
                             isActive ? Icons.rocket_launch : Icons.history,
-                            color: isActive ? Colors.green.shade700 : Colors.grey.shade600,
+                            color: isActive
+                                ? Colors.green.shade700
+                                : Colors.grey.shade600,
                             size: 24,
                           ),
                           const SizedBox(width: 8),
@@ -1089,7 +1162,9 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
-                                color: isActive ? Colors.green.shade900 : Colors.grey.shade800,
+                                color: isActive
+                                    ? Colors.green.shade900
+                                    : Colors.grey.shade800,
                               ),
                             ),
                           ),
@@ -1097,16 +1172,23 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: isActive ? Colors.green.shade700 : Colors.grey.shade600,
+                          color: isActive
+                              ? Colors.green.shade700
+                              : Colors.grey.shade600,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isActive ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                              isActive
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
                               color: Colors.white,
                               size: 16,
                             ),
@@ -1148,19 +1230,33 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                         color: Colors.blue,
                         onPressed: () => _copyReceipt(context, receiptText),
                       ),
-                      Container(width: 1, height: 40, color: Colors.grey.shade300),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.grey.shade300,
+                      ),
                       _buildActionButton(
                         icon: Icons.print,
                         label: 'Print',
                         color: Colors.green,
-                        onPressed: () => _printReceipt(context, receiptText, boostName, carrier),
+                        onPressed: () => _printReceipt(
+                          context,
+                          receiptText,
+                          boostName,
+                          carrier,
+                        ),
                       ),
-                      Container(width: 1, height: 40, color: Colors.grey.shade300),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.grey.shade300,
+                      ),
                       _buildActionButton(
                         icon: Icons.share,
                         label: 'Share',
                         color: Colors.orange,
-                        onPressed: () => _shareReceipt(context, receiptText, boostName),
+                        onPressed: () =>
+                            _shareReceipt(context, receiptText, boostName),
                       ),
                     ],
                   ),
@@ -1223,7 +1319,11 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.calendar_today, size: 18, color: Colors.grey.shade700),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 18,
+                            color: Colors.grey.shade700,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Boost Timeline',
@@ -1237,17 +1337,37 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       if (startDate != null)
-                        _buildDateRow('Start Date', _formatDate(startDate), Icons.play_circle, Colors.green),
+                        _buildDateRow(
+                          'Start Date',
+                          _formatDate(startDate),
+                          Icons.play_circle,
+                          Colors.green,
+                        ),
                       if (endDate != null) ...[
                         const SizedBox(height: 8),
-                        _buildDateRow('End Date', _formatDate(endDate), Icons.stop_circle, Colors.red),
+                        _buildDateRow(
+                          'End Date',
+                          _formatDate(endDate),
+                          Icons.stop_circle,
+                          Colors.red,
+                        ),
                       ],
                       if (changedAt != null && !isActive) ...[
                         const SizedBox(height: 8),
-                        _buildDateRow('Changed At', _formatDate(changedAt), Icons.swap_horiz, Colors.orange),
+                        _buildDateRow(
+                          'Changed At',
+                          _formatDate(changedAt),
+                          Icons.swap_horiz,
+                          Colors.orange,
+                        ),
                       ],
                       const SizedBox(height: 8),
-                      _buildDateRow('Print Date', _formatDate(DateTime.now().toIso8601String()), Icons.print, Colors.blue),
+                      _buildDateRow(
+                        'Print Date',
+                        _formatDate(DateTime.now().toIso8601String()),
+                        Icons.print,
+                        Colors.blue,
+                      ),
                     ],
                   ),
                 ),
@@ -1300,10 +1420,7 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
         ),
         Text(
@@ -1325,7 +1442,7 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
     final endDate = boost['endDate'];
     final changedAt = boost['changedAt'] ?? startDate;
     final status = boost['status'] == 'active' ? 'Active' : 'Ended';
-    
+
     final buffer = StringBuffer();
     buffer.writeln('═══════════════════════════════════');
     buffer.writeln('        BOOST RECEIPT');
@@ -1351,12 +1468,14 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
       buffer.writeln('Changed At: ${_formatDate(changedAt)}');
     }
     buffer.writeln('');
-    buffer.writeln('Print Date: ${_formatDate(DateTime.now().toIso8601String())}');
+    buffer.writeln(
+      'Print Date: ${_formatDate(DateTime.now().toIso8601String())}',
+    );
     buffer.writeln('');
     buffer.writeln('═══════════════════════════════════');
     buffer.writeln('Thank you for using Remiles!');
     buffer.writeln('═══════════════════════════════════');
-    
+
     return buffer.toString();
   }
 
@@ -1381,11 +1500,17 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _printReceipt(BuildContext context, String receiptText, String boostName, dynamic carrier) async {
+  Future<void> _printReceipt(
+    BuildContext context,
+    String receiptText,
+    String boostName,
+    dynamic carrier,
+  ) async {
     try {
       // Show print dialog
       await Printing.layoutPdf(
-        onLayout: (format) async => await _generateReceiptPDF(receiptText, boostName, carrier),
+        onLayout: (format) async =>
+            await _generateReceiptPDF(receiptText, boostName, carrier),
       );
     } catch (e) {
       if (context.mounted) {
@@ -1400,10 +1525,14 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
     }
   }
 
-  Future<Uint8List> _generateReceiptPDF(String receiptText, String boostName, dynamic carrier) async {
+  Future<Uint8List> _generateReceiptPDF(
+    String receiptText,
+    String boostName,
+    dynamic carrier,
+  ) async {
     final pdf = pw.Document();
     final lines = receiptText.split('\n');
-    
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -1415,57 +1544,52 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
               if (line.trim().isEmpty) {
                 return pw.SizedBox(height: 8);
               }
-              
+
               // Style headers and separators
               pw.TextStyle textStyle = pw.TextStyle(
                 fontSize: 12,
                 color: PdfColors.black,
               );
-              
+
               if (line.contains('════') || line.contains('───')) {
-                textStyle = pw.TextStyle(
-                  fontSize: 10,
-                  color: PdfColors.grey,
-                );
-              } else if (line.contains('BOOST RECEIPT') || 
-                         line.contains('Boost Details:')) {
+                textStyle = pw.TextStyle(fontSize: 10, color: PdfColors.grey);
+              } else if (line.contains('BOOST RECEIPT') ||
+                  line.contains('Boost Details:')) {
                 textStyle = pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
                   color: PdfColors.black,
                 );
-              } else if (line.contains('Boost:') || 
-                         line.contains('Status:') || 
-                         line.contains('Price:')) {
+              } else if (line.contains('Boost:') ||
+                  line.contains('Status:') ||
+                  line.contains('Price:')) {
                 textStyle = pw.TextStyle(
                   fontSize: 14,
                   fontWeight: pw.FontWeight.bold,
                   color: PdfColors.black,
                 );
               }
-              
+
               return pw.Padding(
                 padding: const pw.EdgeInsets.only(bottom: 4),
-                child: pw.Text(
-                  line,
-                  style: textStyle,
-                ),
+                child: pw.Text(line, style: textStyle),
               );
             }).toList(),
           );
         },
       ),
     );
-    
+
     return pdf.save();
   }
 
-  Future<void> _shareReceipt(BuildContext context, String receiptText, String boostName) async {
+  Future<void> _shareReceipt(
+    BuildContext context,
+    String receiptText,
+    String boostName,
+  ) async {
     try {
-      await Share.share(
-        receiptText,
-        subject: 'Boost Receipt - $boostName',
-      );
+      await Share.share(receiptText, subject: 'Boost Receipt - $boostName');
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1480,3 +1604,98 @@ class CarrierBoostHistoryScreen extends StatelessWidget {
   }
 }
 
+class WebPurchaseDialog extends StatefulWidget {
+  final String clientSecret;
+  final int amount;
+  final String planName;
+
+  const WebPurchaseDialog({
+    super.key,
+    required this.clientSecret,
+    required this.amount,
+    required this.planName,
+  });
+
+  @override
+  State<WebPurchaseDialog> createState() => _WebPurchaseDialogState();
+}
+
+class _WebPurchaseDialogState extends State<WebPurchaseDialog> {
+  bool _isComplete = false;
+  bool _isLoading = false;
+
+  Future<void> _handlePay() async {
+    setState(() => _isLoading = true);
+    try {
+      await StripeService.confirmWebPayment(widget.clientSecret);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Payment failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Pay \$${widget.amount}'),
+      content: SizedBox(
+        width: 500,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Purchasing: ${widget.planName}'),
+            const SizedBox(height: 20),
+            const Text('Enter your card details securely via Stripe.'),
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: CardField(
+                onCardChanged: (details) {
+                  setState(() {
+                    _isComplete = details?.complete ?? false;
+                  });
+                },
+                style: const TextStyle(fontSize: 16, color: Colors.black),
+                decoration: const InputDecoration(border: InputBorder.none),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (_isComplete && !_isLoading) ? _handlePay : null,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Pay Now'),
+        ),
+      ],
+    );
+  }
+}

@@ -1,4 +1,3 @@
-
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/custom_progress_bar.dart';
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
@@ -25,28 +24,29 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:signature/signature.dart';
 import 'package:remiles/core/constants/app_constants.dart';
 
-class MarketplaceScreen extends StatefulWidget {
+class CarrierManageLoadScreen extends StatefulWidget {
   final String? initialLoadId;
-  
-  const MarketplaceScreen({super.key, this.initialLoadId});
+
+  const CarrierManageLoadScreen({super.key, this.initialLoadId});
 
   @override
-  State<MarketplaceScreen> createState() => _MarketplaceScreenState();
+  State<CarrierManageLoadScreen> createState() =>
+      _CarrierManageLoadScreenState();
 }
 
-class _MarketplaceScreenState extends State<MarketplaceScreen> {
+class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
   // Colors chosen to visually match the screenshot.
   static const Color green = Color(0xFF2E9340);
   static const Color blue = Color(0xFF2265A6);
 
   // Map controller
   GoogleMapController? _mapController;
-  
+
   // Load data
   List<LoadModel> _bookedLoads = [];
   LoadModel? _selectedLoad;
   bool _isLoadingLoads = true;
-  
+
   // Location data (will be populated from selected load)
   String _shipperName = "";
   String _shipperPhone = "";
@@ -55,37 +55,37 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   bool _isLoadingShipperInfo = false;
   bool _isLoadingPickupAddress = false;
   bool _isLoadingDeliveryAddress = false;
-  
+
   // Coordinates
   LatLng? _shipperLocation;
   LatLng? _pickupLocation;
   LatLng? _deliveryLocation;
   LatLng? _currentLocation;
-  
+
   // Route data
   Set<Polyline> _polylines = {};
   Set<Marker> _markers = {};
   List<LatLng> _routePoints = [];
-  
+
   // Active location (for highlighting)
   String? _activeLocation; // 'shipper', 'pickup', 'delivery'
-  
+
   // Progress calculation
   double _progress = 0.75; // 0.0 to 1.0
-  
+
   // Loading state
   bool _isLoadingMap = true;
   String? _errorMessage;
-  
+
   // Pickup confirmation data
   Map<String, dynamic>? _pickupConfirmationData;
-  
+
   // Delivery confirmation data
   Map<String, dynamic>? _deliveryConfirmationData;
 
   // Escrow payment data
   Map<String, dynamic>? _escrowPaymentData;
-  
+
   // Description read more state
   bool _isDescriptionExpanded = false;
 
@@ -99,13 +99,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Future<void> _loadBookedLoads() async {
     try {
       // Log analytics event
-      await FirebaseService.logEvent('load_booked_loads_started', parameters: {
-        'screen': 'marketplace',
-      });
+      await FirebaseService.logEvent(
+        'load_booked_loads_started',
+        parameters: {'screen': 'marketplace'},
+      );
 
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier == null) {
         await FirebaseService.recordError(
           Exception('Carrier not found'),
@@ -127,20 +128,23 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       if (mounted) {
         // Filter to ensure only loads booked by this carrier are shown
         final allLoads = result['loads'] as List<LoadModel>? ?? [];
-        final filteredLoads = allLoads.where((load) => 
-          load.bookedByCarrierId == carrier.uid
-        ).toList();
-        
+        final filteredLoads = allLoads
+            .where((load) => load.bookedByCarrierId == carrier.uid)
+            .toList();
+
         // Log analytics
-        await FirebaseService.logEvent('loads_loaded', parameters: {
-          'screen': 'marketplace',
-          'total_loads': filteredLoads.length,
-        });
-        
+        await FirebaseService.logEvent(
+          'loads_loaded',
+          parameters: {
+            'screen': 'marketplace',
+            'total_loads': filteredLoads.length,
+          },
+        );
+
         setState(() {
           _bookedLoads = filteredLoads;
           _isLoadingLoads = false;
-          
+
           // Select load based on initialLoadId if provided, otherwise select first load
           if (_bookedLoads.isNotEmpty) {
             if (widget.initialLoadId != null) {
@@ -168,12 +172,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         stackTrace,
         reason: 'Failed to load booked loads in marketplace screen',
       );
-      
-      await FirebaseService.logEvent('loads_load_error', parameters: {
-        'screen': 'marketplace',
-        'error': e.toString(),
-      });
-      
+
+      await FirebaseService.logEvent(
+        'loads_load_error',
+        parameters: {'screen': 'marketplace', 'error': e.toString()},
+      );
+
       if (mounted) {
         setState(() {
           _isLoadingLoads = false;
@@ -185,16 +189,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   void _updateLoadData() async {
     if (_selectedLoad == null) return;
-    
+
     final load = _selectedLoad!;
-    
+
     // Reset map state first and update location data
     setState(() {
       // Update location data immediately
       _shipperName = load.shipperName;
-      _pickupAddress = "${load.originAddress}, ${load.originCity}, ${load.originState}";
-      _deliveryAddress = "${load.destinationAddress}, ${load.destinationCity}, ${load.destinationState}";
-      
+      _pickupAddress =
+          "${load.originAddress}, ${load.originCity}, ${load.originState}";
+      _deliveryAddress =
+          "${load.destinationAddress}, ${load.destinationCity}, ${load.destinationState}";
+
       // Reset map state
       _isLoadingMap = true;
       _errorMessage = null;
@@ -210,26 +216,28 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       _pickupConfirmationData = null; // Reset pickup confirmation
       _deliveryConfirmationData = null; // Reset delivery confirmation
       _escrowPaymentData = null; // Reset escrow payment
-      
+
       // Set loading states
       _isLoadingShipperInfo = true;
       // Addresses come directly from load data, so they're immediately available (not loading)
       _isLoadingPickupAddress = false;
       _isLoadingDeliveryAddress = false;
     });
-    
+
     // Load pickup and delivery confirmation data
     _loadPickupConfirmationData();
     _loadDeliveryConfirmationData();
     // Load escrow payment data
     _loadEscrowPaymentData(load.id);
-    
+
     // Fetch shipper phone number
     try {
       final shipper = await FirebaseService.getShipper(load.shipperUid);
       if (mounted) {
         setState(() {
-          if (shipper != null && shipper.phoneNumber != null && shipper.phoneNumber!.isNotEmpty) {
+          if (shipper != null &&
+              shipper.phoneNumber != null &&
+              shipper.phoneNumber!.isNotEmpty) {
             _shipperPhone = shipper.phoneNumber!;
           } else {
             _shipperPhone = "";
@@ -246,14 +254,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         });
       }
     }
-    
+
     // Initialize map with new load data
     _initializeMap();
   }
 
   Future<void> _loadPickupConfirmationData() async {
     if (_selectedLoad == null) return;
-    
+
     try {
       final querySnapshot = await FirebaseService.firestore
           .collection('pickup_confirmations')
@@ -282,7 +290,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   Future<void> _loadDeliveryConfirmationData() async {
     if (_selectedLoad == null) return;
-    
+
     try {
       final querySnapshot = await FirebaseService.firestore
           .collection('delivery_confirmations')
@@ -330,14 +338,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Future<void> _initializeMap() async {
     try {
       // Log analytics event
-      await FirebaseService.logEvent('map_initialization_started', parameters: {
-        'screen': 'marketplace',
-        'load_id': _selectedLoad?.id ?? 'none',
-      });
+      await FirebaseService.logEvent(
+        'map_initialization_started',
+        parameters: {
+          'screen': 'marketplace',
+          'load_id': _selectedLoad?.id ?? 'none',
+        },
+      );
 
       // Geocode addresses to get coordinates
       await _geocodeAddresses();
-      
+
       // Only proceed if we have valid locations
       if (_pickupLocation == null || _deliveryLocation == null) {
         await FirebaseService.recordError(
@@ -345,31 +356,39 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           StackTrace.current,
           reason: 'Geocoding failed in marketplace screen',
         );
-        await FirebaseService.logEvent('geocoding_failed', parameters: {
-          'screen': 'marketplace',
-          'load_id': _selectedLoad?.id ?? 'none',
-        });
-        
+        await FirebaseService.logEvent(
+          'geocoding_failed',
+          parameters: {
+            'screen': 'marketplace',
+            'load_id': _selectedLoad?.id ?? 'none',
+          },
+        );
+
         setState(() {
           _errorMessage = 'Failed to geocode addresses';
           _isLoadingMap = false;
         });
         return;
       }
-      
+
       // Get route directions
       await _getRouteDirections();
-      
+
       // Calculate progress based on load status
       _calculateProgress();
-      
+
       // Log successful map initialization
-      await FirebaseService.logEvent('map_initialized', parameters: {
-        'screen': 'marketplace',
-        'load_id': _selectedLoad?.id ?? 'none',
-        'has_route': _routePoints.isNotEmpty ? 1 : 0, // Convert bool to int for analytics
-      });
-      
+      await FirebaseService.logEvent(
+        'map_initialized',
+        parameters: {
+          'screen': 'marketplace',
+          'load_id': _selectedLoad?.id ?? 'none',
+          'has_route': _routePoints.isNotEmpty
+              ? 1
+              : 0, // Convert bool to int for analytics
+        },
+      );
+
       setState(() {
         _isLoadingMap = false;
       });
@@ -381,12 +400,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         stackTrace,
         reason: 'Failed to initialize map in marketplace screen',
       );
-      
-      await FirebaseService.logEvent('map_initialization_error', parameters: {
-        'screen': 'marketplace',
-        'error': e.toString(),
-      });
-      
+
+      await FirebaseService.logEvent(
+        'map_initialization_error',
+        parameters: {'screen': 'marketplace', 'error': e.toString()},
+      );
+
       setState(() {
         _errorMessage = 'Failed to load map: ${e.toString()}';
         _isLoadingMap = false;
@@ -398,7 +417,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     try {
       // Geocode pickup address
       try {
-        List<Location> pickupLocations = await locationFromAddress(_pickupAddress);
+        List<Location> pickupLocations = await locationFromAddress(
+          _pickupAddress,
+        );
         if (pickupLocations.isNotEmpty) {
           _pickupLocation = LatLng(
             pickupLocations.first.latitude,
@@ -410,10 +431,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         // Use fallback coordinates
         _pickupLocation = const LatLng(46.0878, -64.7782); // Moncton, NB
       }
-      
+
       // Geocode delivery address
       try {
-        List<Location> deliveryLocations = await locationFromAddress(_deliveryAddress);
+        List<Location> deliveryLocations = await locationFromAddress(
+          _deliveryAddress,
+        );
         if (deliveryLocations.isNotEmpty) {
           _deliveryLocation = LatLng(
             deliveryLocations.first.latitude,
@@ -425,7 +448,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         // Use fallback coordinates
         _deliveryLocation = const LatLng(43.6532, -79.3832); // Toronto, ON
       }
-      
+
       // Ensure we have at least fallback coordinates
       if (_pickupLocation == null) {
         _pickupLocation = const LatLng(46.0878, -64.7782); // Moncton, NB
@@ -433,13 +456,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       if (_deliveryLocation == null) {
         _deliveryLocation = const LatLng(43.6532, -79.3832); // Toronto, ON
       }
-      
+
       // For shipper location, use pickup location as default (or geocode separately)
       _shipperLocation = _pickupLocation;
-      
+
       // Get current location
       await _getCurrentLocation();
-      
     } catch (e) {
       print('Geocoding error: $e');
       // Fallback coordinates if geocoding fails
@@ -453,34 +475,34 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   Future<void> _getRouteDirections() async {
     if (_pickupLocation == null || _deliveryLocation == null) return;
-    
+
     try {
       // Use the same API key as Google Maps
       // NOTE: This API key must have "Directions API" enabled in Google Cloud Console
       // Go to: https://console.cloud.google.com/apis/library/directions-backend.googleapis.com
       // Make sure the API is enabled for your project
       const String apiKey = AppConstants.googleApiKey;
-      
+
       // Use driving mode to get actual road route
-      final String url = 
+      final String url =
           'https://maps.googleapis.com/maps/api/directions/json?'
           'origin=${_pickupLocation!.latitude},${_pickupLocation!.longitude}'
           '&destination=${_deliveryLocation!.latitude},${_deliveryLocation!.longitude}'
           '&mode=driving'
           '&alternatives=false'
           '&key=$apiKey';
-      
+
       try {
         final response = await http.get(Uri.parse(url));
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['status'] == 'OK' && data['routes'].isNotEmpty) {
             final route = data['routes'][0];
-            
+
             // Use detailed polyline from route steps for accurate road following
             // This gives us the actual road path, not just overview
             List<LatLng> allRoutePoints = [];
-            
+
             // Get detailed polyline from each step in the route
             if (route['legs'] != null && route['legs'].isNotEmpty) {
               final legs = route['legs'] as List;
@@ -488,11 +510,17 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 if (leg['steps'] != null) {
                   final steps = leg['steps'] as List;
                   for (var step in steps) {
-                    if (step['polyline'] != null && step['polyline']['points'] != null) {
+                    if (step['polyline'] != null &&
+                        step['polyline']['points'] != null) {
                       final stepPolyline = step['polyline']['points'];
                       final decodedStepPoints = decodePolyline(stepPolyline);
                       final stepLatLngs = decodedStepPoints
-                          .map((point) => LatLng(point[0].toDouble(), point[1].toDouble()))
+                          .map(
+                            (point) => LatLng(
+                              point[0].toDouble(),
+                              point[1].toDouble(),
+                            ),
+                          )
                           .toList();
                       allRoutePoints.addAll(stepLatLngs);
                     }
@@ -500,54 +528,74 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                 }
               }
             }
-            
+
             // If we got detailed points, use them; otherwise fall back to overview
             if (allRoutePoints.isNotEmpty) {
               _routePoints = allRoutePoints;
-            } else if (route['overview_polyline'] != null && route['overview_polyline']['points'] != null) {
+            } else if (route['overview_polyline'] != null &&
+                route['overview_polyline']['points'] != null) {
               // Fallback to overview polyline if detailed steps aren't available
               final polyline = route['overview_polyline']['points'];
               final decodedPoints = decodePolyline(polyline);
               _routePoints = decodedPoints
-                  .map((point) => LatLng(point[0].toDouble(), point[1].toDouble()))
+                  .map(
+                    (point) => LatLng(point[0].toDouble(), point[1].toDouble()),
+                  )
                   .toList();
             } else {
               // Last resort: straight line
               _routePoints = [_pickupLocation!, _deliveryLocation!];
             }
-            
+
             // Log successful route fetch
-            await FirebaseService.logEvent('route_fetched', parameters: {
-              'screen': 'marketplace',
-              'load_id': _selectedLoad?.id ?? 'none',
-              'route_points_count': _routePoints.length,
-              'route_type': allRoutePoints.isNotEmpty ? 'detailed' : 'overview',
-            });
+            await FirebaseService.logEvent(
+              'route_fetched',
+              parameters: {
+                'screen': 'marketplace',
+                'load_id': _selectedLoad?.id ?? 'none',
+                'route_points_count': _routePoints.length,
+                'route_type': allRoutePoints.isNotEmpty
+                    ? 'detailed'
+                    : 'overview',
+              },
+            );
           } else {
             // Log API error with detailed information
             final errorStatus = data['status']?.toString() ?? 'UNKNOWN';
-            final errorMessage = data['error_message']?.toString() ?? 'No error message';
-            
+            final errorMessage =
+                data['error_message']?.toString() ?? 'No error message';
+
             print('Google Directions API error: $errorStatus - $errorMessage');
-            await FirebaseService.log('Google Directions API error: $errorStatus - $errorMessage');
-            await FirebaseService.logEvent('route_api_error', parameters: {
-              'screen': 'marketplace',
-              'status': errorStatus,
-              'error_message': errorMessage,
-            });
-            
+            await FirebaseService.log(
+              'Google Directions API error: $errorStatus - $errorMessage',
+            );
+            await FirebaseService.logEvent(
+              'route_api_error',
+              parameters: {
+                'screen': 'marketplace',
+                'status': errorStatus,
+                'error_message': errorMessage,
+              },
+            );
+
             // Show user-friendly error message for common issues
             if (errorStatus == 'REQUEST_DENIED') {
-              print('⚠️ Directions API is not enabled. Enable it at: https://console.cloud.google.com/apis/library/directions-backend.googleapis.com');
+              print(
+                '⚠️ Directions API is not enabled. Enable it at: https://console.cloud.google.com/apis/library/directions-backend.googleapis.com',
+              );
             } else if (errorStatus == 'OVER_QUERY_LIMIT') {
-              print('⚠️ Directions API quota exceeded. Check billing at: https://console.cloud.google.com/billing');
+              print(
+                '⚠️ Directions API quota exceeded. Check billing at: https://console.cloud.google.com/billing',
+              );
             }
-            
+
             // Don't use straight line fallback - show error instead
             _routePoints = [];
           }
         } else {
-          await FirebaseService.log('Route API HTTP error: ${response.statusCode}');
+          await FirebaseService.log(
+            'Route API HTTP error: ${response.statusCode}',
+          );
           _routePoints = [];
         }
       } catch (e, stackTrace) {
@@ -560,7 +608,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         );
         _routePoints = [];
       }
-      
+
       // Only create polyline if we have route points
       if (_routePoints.isNotEmpty) {
         if (mounted) {
@@ -588,10 +636,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           });
         }
       }
-      
+
       // Create markers
       _createMarkers();
-      
+
       // Update map bounds after route is created
       if (mounted) {
         // Use a small delay to ensure map is ready
@@ -600,7 +648,6 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           _fitBoundsToMarkers();
         }
       }
-      
     } catch (e, stackTrace) {
       // Log error to Crashlytics
       await FirebaseService.log('Route directions error: $e');
@@ -609,7 +656,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         stackTrace,
         reason: 'Failed to get route directions in marketplace screen',
       );
-      
+
       // Clear route on error
       if (mounted) {
         setState(() {
@@ -618,7 +665,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         });
       }
       _createMarkers();
-      
+
       // Update map bounds
       if (mounted) {
         await Future.delayed(const Duration(milliseconds: 200));
@@ -631,7 +678,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   void _createMarkers() {
     _markers = {};
-    
+
     if (_shipperLocation != null) {
       _markers.add(
         Marker(
@@ -639,12 +686,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           position: _shipperLocation!,
           infoWindow: InfoWindow(title: 'Shipper', snippet: _shipperName),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            _activeLocation == 'shipper' ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueGreen,
+            _activeLocation == 'shipper'
+                ? BitmapDescriptor.hueOrange
+                : BitmapDescriptor.hueGreen,
           ),
         ),
       );
     }
-    
+
     if (_pickupLocation != null) {
       _markers.add(
         Marker(
@@ -652,12 +701,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           position: _pickupLocation!,
           infoWindow: InfoWindow(title: 'Pickup', snippet: _pickupAddress),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            _activeLocation == 'pickup' ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueBlue,
+            _activeLocation == 'pickup'
+                ? BitmapDescriptor.hueOrange
+                : BitmapDescriptor.hueBlue,
           ),
         ),
       );
     }
-    
+
     if (_deliveryLocation != null) {
       _markers.add(
         Marker(
@@ -665,22 +716,26 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           position: _deliveryLocation!,
           infoWindow: InfoWindow(title: 'Delivery', snippet: _deliveryAddress),
           icon: BitmapDescriptor.defaultMarkerWithHue(
-            _activeLocation == 'delivery' ? BitmapDescriptor.hueOrange : BitmapDescriptor.hueRed,
+            _activeLocation == 'delivery'
+                ? BitmapDescriptor.hueOrange
+                : BitmapDescriptor.hueRed,
           ),
         ),
       );
     }
-    
+
     // Current location marker (if different from others)
-    if (_currentLocation != null && 
-        _currentLocation != _pickupLocation && 
+    if (_currentLocation != null &&
+        _currentLocation != _pickupLocation &&
         _currentLocation != _deliveryLocation) {
       _markers.add(
         Marker(
           markerId: const MarkerId('current'),
           position: _currentLocation!,
           infoWindow: const InfoWindow(title: 'Current Location'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueYellow),
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueYellow,
+          ),
         ),
       );
     }
@@ -692,9 +747,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       _progress = 0.0;
       return;
     }
-    
+
     final status = _selectedLoad!.status.toLowerCase();
-    
+
     // Map status to progress percentage (aligned with shipper view)
     switch (status) {
       case 'booked':
@@ -705,7 +760,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         if (_routePoints.isNotEmpty && _currentLocation != null) {
           double totalDistance = 0.0;
           double completedDistance = 0.0;
-          
+
           for (int i = 0; i < _routePoints.length - 1; i++) {
             double segmentDistance = _calculateDistance(
               _routePoints[i].latitude,
@@ -714,7 +769,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               _routePoints[i + 1].longitude,
             );
             totalDistance += segmentDistance;
-            
+
             double distToStart = _calculateDistance(
               _currentLocation!.latitude,
               _currentLocation!.longitude,
@@ -727,14 +782,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               _routePoints[i + 1].latitude,
               _routePoints[i + 1].longitude,
             );
-            
+
             if (distToStart < segmentDistance && distToEnd < segmentDistance) {
               completedDistance += segmentDistance - distToEnd;
             } else if (distToEnd < distToStart) {
               completedDistance += segmentDistance;
             }
           }
-          
+
           if (totalDistance > 0) {
             _progress = (completedDistance / totalDistance).clamp(0.2, 0.9);
           } else {
@@ -752,13 +807,21 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double earthRadius = 6371; // km
     double dLat = _toRadians(lat2 - lat1);
     double dLon = _toRadians(lon2 - lon1);
-    double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_toRadians(lat1)) * math.cos(_toRadians(lat2)) *
-        math.sin(dLon / 2) * math.sin(dLon / 2);
+    double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_toRadians(lat1)) *
+            math.cos(_toRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
     double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
     return earthRadius * c;
   }
@@ -768,10 +831,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   Future<void> _getCurrentLocation() async {
     try {
       // Log analytics event
-      await FirebaseService.logEvent('location_permission_requested', parameters: {
-        'screen': 'marketplace',
-        'load_id': _selectedLoad?.id ?? 'none',
-      });
+      await FirebaseService.logEvent(
+        'location_permission_requested',
+        parameters: {
+          'screen': 'marketplace',
+          'load_id': _selectedLoad?.id ?? 'none',
+        },
+      );
 
       // Check location permission
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -782,12 +848,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           StackTrace.current,
           reason: 'Location services disabled in marketplace screen',
         );
-        
+
         // Log analytics
-        await FirebaseService.logEvent('location_service_disabled', parameters: {
-          'screen': 'marketplace',
-        });
-        
+        await FirebaseService.logEvent(
+          'location_service_disabled',
+          parameters: {'screen': 'marketplace'},
+        );
+
         // Use pickup location as fallback
         if (mounted) {
           setState(() {
@@ -808,12 +875,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
             StackTrace.current,
             reason: 'User denied location permission in marketplace screen',
           );
-          
+
           // Log analytics
-          await FirebaseService.logEvent('location_permission_denied', parameters: {
-            'screen': 'marketplace',
-          });
-          
+          await FirebaseService.logEvent(
+            'location_permission_denied',
+            parameters: {'screen': 'marketplace'},
+          );
+
           if (mounted) {
             setState(() {
               _currentLocation = _pickupLocation;
@@ -828,14 +896,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         await FirebaseService.recordError(
           Exception('Location permission denied forever'),
           StackTrace.current,
-          reason: 'User permanently denied location permission in marketplace screen',
+          reason:
+              'User permanently denied location permission in marketplace screen',
         );
-        
+
         // Log analytics
-        await FirebaseService.logEvent('location_permission_denied_forever', parameters: {
-          'screen': 'marketplace',
-        });
-        
+        await FirebaseService.logEvent(
+          'location_permission_denied_forever',
+          parameters: {'screen': 'marketplace'},
+        );
+
         if (mounted) {
           setState(() {
             _currentLocation = _pickupLocation;
@@ -850,22 +920,25 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       );
 
       // Log successful location retrieval
-      await FirebaseService.logEvent('location_retrieved', parameters: {
-        'screen': 'marketplace',
-        'load_id': _selectedLoad?.id ?? 'none',
-        'latitude': position.latitude,
-        'longitude': position.longitude,
-        'accuracy': position.accuracy,
-      });
+      await FirebaseService.logEvent(
+        'location_retrieved',
+        parameters: {
+          'screen': 'marketplace',
+          'load_id': _selectedLoad?.id ?? 'none',
+          'latitude': position.latitude,
+          'longitude': position.longitude,
+          'accuracy': position.accuracy,
+        },
+      );
 
       if (mounted) {
         setState(() {
           _currentLocation = LatLng(position.latitude, position.longitude);
         });
-        
+
         // Update markers with current location
         _createMarkers();
-        
+
         // Update map bounds to include current location
         if (mounted) {
           await Future.delayed(const Duration(milliseconds: 200));
@@ -882,13 +955,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         stackTrace,
         reason: 'Failed to get current location in marketplace screen',
       );
-      
+
       // Log analytics
-      await FirebaseService.logEvent('location_error', parameters: {
-        'screen': 'marketplace',
-        'error': e.toString(),
-      });
-      
+      await FirebaseService.logEvent(
+        'location_error',
+        parameters: {'screen': 'marketplace', 'error': e.toString()},
+      );
+
       // Use pickup location as fallback
       if (mounted) {
         setState(() {
@@ -914,7 +987,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     try {
       // Remove any non-digit characters except + for international numbers
       final phoneNumber = _shipperPhone.replaceAll(RegExp(r'[^\d+]'), '');
-      
+
       if (phoneNumber.isEmpty) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -926,16 +999,18 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         }
         return;
       }
-      
+
       final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
-      
+
       if (await canLaunchUrl(phoneUri)) {
         await launchUrl(phoneUri, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Cannot make phone call. Please check if your device supports phone calls.'),
+              content: Text(
+                'Cannot make phone call. Please check if your device supports phone calls.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -960,7 +1035,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final user = authProvider.currentUser;
-      
+
       if (user == null) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1014,7 +1089,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       if (context.mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
-      
+
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1030,41 +1105,41 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     if (_selectedLoad == null) {
       return const SizedBox.shrink();
     }
-    
+
     final status = _selectedLoad!.status.toLowerCase();
-    
+
     // Determine which status pills should be active based on load status
     bool enRouteActive = status == 'booked' || status == 'in-transit';
     bool pickupActive = status == 'in-transit' || status == 'completed';
     bool inTransitActive = status == 'in-transit';
     bool deliveredActive = status == 'completed';
-    
+
     return Row(
       children: [
         Expanded(
           child: _StatusPill(
-            label: "En Route", 
+            label: "En Route",
             color: enRouteActive ? green : Colors.grey,
           ),
         ),
         const SizedBox(width: 6),
         Expanded(
           child: _StatusPill(
-            label: "Pickup", 
+            label: "Pickup",
             color: pickupActive ? green : Colors.grey,
           ),
         ),
         const SizedBox(width: 6),
         Expanded(
           child: _StatusPill(
-            label: "In Transit", 
+            label: "In Transit",
             color: inTransitActive ? blue : Colors.grey,
           ),
         ),
         const SizedBox(width: 6),
         Expanded(
           child: _StatusPill(
-            label: "Delivered", 
+            label: "Delivered",
             color: deliveredActive ? green : Colors.grey,
           ),
         ),
@@ -1090,10 +1165,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-            ),
+            style: const TextStyle(fontSize: 14, color: Colors.black87),
           ),
         ),
       ],
@@ -1115,10 +1187,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
           stops: const [0.0, 0.5, 1.0],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.orange.shade200,
-          width: 1.5,
-        ),
+        border: Border.all(color: Colors.orange.shade200, width: 1.5),
         boxShadow: [
           BoxShadow(
             color: Colors.orange.shade200.withOpacity(0.4),
@@ -1288,7 +1357,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                   borderRadius: BorderRadius.circular(2),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.orange.shade400.withOpacity(0.6),
+                                      color: Colors.orange.shade400.withOpacity(
+                                        0.6,
+                                      ),
                                       blurRadius: 4,
                                       spreadRadius: 1,
                                     ),
@@ -1312,12 +1383,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   Widget _buildDescriptionRow() {
     if (_selectedLoad == null) return const SizedBox.shrink();
-    
-    final description = _selectedLoad!.description.isNotEmpty 
-        ? _selectedLoad!.description 
+
+    final description = _selectedLoad!.description.isNotEmpty
+        ? _selectedLoad!.description
         : 'No description provided';
-    final needsTruncation = description.length > 150 && description != 'No description provided';
-    
+    final needsTruncation =
+        description.length > 150 && description != 'No description provided';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1343,7 +1415,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                         Text(
                           description,
                           maxLines: _isDescriptionExpanded ? null : 3,
-                          overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                          overflow: _isDescriptionExpanded
+                              ? TextOverflow.visible
+                              : TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 14,
                             color: Colors.black87,
@@ -1384,12 +1458,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   void _viewShipperProfile() {
     if (_selectedLoad == null) return;
-    
+
     showDialog(
       context: context,
       builder: (context) => UserProfileDialog(
         userId: _selectedLoad!.shipperUid,
-        userName: _selectedLoad!.shipperName.isNotEmpty ? _selectedLoad!.shipperName : 'Shipper',
+        userName: _selectedLoad!.shipperName.isNotEmpty
+            ? _selectedLoad!.shipperName
+            : 'Shipper',
         userRole: UserRole.shipper,
       ),
     );
@@ -1397,11 +1473,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   String _getConfirmationTimeText() {
     if (_pickupConfirmationData == null) return '';
-    
+
     try {
       final confirmedAt = _pickupConfirmationData!['confirmedAt'];
       if (confirmedAt == null) return 'Confirmed';
-      
+
       DateTime confirmationDate;
       if (confirmedAt is Timestamp) {
         confirmationDate = confirmedAt.toDate();
@@ -1410,10 +1486,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       } else {
         return 'Confirmed';
       }
-      
+
       final now = DateTime.now();
       final difference = now.difference(confirmationDate);
-      
+
       if (difference.inDays > 0) {
         return 'Confirmed ${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
       } else if (difference.inHours > 0) {
@@ -1430,11 +1506,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   String _getDeliveryConfirmationTimeText() {
     if (_deliveryConfirmationData == null) return '';
-    
+
     try {
       final confirmedAt = _deliveryConfirmationData!['confirmedAt'];
       if (confirmedAt == null) return 'Confirmed';
-      
+
       DateTime confirmationDate;
       if (confirmedAt is Timestamp) {
         confirmationDate = confirmedAt.toDate();
@@ -1443,10 +1519,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       } else {
         return 'Confirmed';
       }
-      
+
       final now = DateTime.now();
       final difference = now.difference(confirmationDate);
-      
+
       if (difference.inDays > 0) {
         return 'Confirmed ${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
       } else if (difference.inHours > 0) {
@@ -1465,7 +1541,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     setState(() {
       _activeLocation = locationType;
     });
-    
+
     LatLng? targetLocation;
     switch (locationType) {
       case 'shipper':
@@ -1478,13 +1554,13 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         targetLocation = _deliveryLocation;
         break;
     }
-    
+
     if (targetLocation != null && _mapController != null) {
       _mapController!.animateCamera(
         CameraUpdate.newLatLngZoom(targetLocation, 14.0),
       );
     }
-    
+
     // Recreate markers with updated active state
     _createMarkers();
     setState(() {});
@@ -1492,7 +1568,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   void _onMapCreated(GoogleMapController controller) {
     _mapController = controller;
-    
+
     // Fit camera to show all markers including current location
     _fitBoundsToMarkers();
   }
@@ -1500,33 +1576,41 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   void _fitBoundsToMarkers() {
     // Check if widget is still mounted and controller is valid
     if (!mounted) return;
-    
+
     // Store controller reference to avoid race conditions
     final controller = _mapController;
     if (controller == null) return;
-    
+
     try {
       List<LatLng> allLocations = [];
-      
+
       if (_pickupLocation != null) allLocations.add(_pickupLocation!);
       if (_deliveryLocation != null) allLocations.add(_deliveryLocation!);
       if (_currentLocation != null) allLocations.add(_currentLocation!);
-      if (_shipperLocation != null && 
-          _shipperLocation != _pickupLocation && 
+      if (_shipperLocation != null &&
+          _shipperLocation != _pickupLocation &&
           _shipperLocation != _deliveryLocation) {
         allLocations.add(_shipperLocation!);
       }
-      
+
       if (allLocations.isEmpty) return;
-      
-      double minLat = allLocations.map((l) => l.latitude).reduce((a, b) => a < b ? a : b);
-      double maxLat = allLocations.map((l) => l.latitude).reduce((a, b) => a > b ? a : b);
-      double minLng = allLocations.map((l) => l.longitude).reduce((a, b) => a < b ? a : b);
-      double maxLng = allLocations.map((l) => l.longitude).reduce((a, b) => a > b ? a : b);
-      
+
+      double minLat = allLocations
+          .map((l) => l.latitude)
+          .reduce((a, b) => a < b ? a : b);
+      double maxLat = allLocations
+          .map((l) => l.latitude)
+          .reduce((a, b) => a > b ? a : b);
+      double minLng = allLocations
+          .map((l) => l.longitude)
+          .reduce((a, b) => a < b ? a : b);
+      double maxLng = allLocations
+          .map((l) => l.longitude)
+          .reduce((a, b) => a > b ? a : b);
+
       // Final check before using controller - must be mounted and controller must still be valid
       if (!mounted || _mapController != controller) return;
-      
+
       controller.animateCamera(
         CameraUpdate.newLatLngBounds(
           LatLngBounds(
@@ -1544,7 +1628,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   String _getConfirmButtonText() {
     if (_selectedLoad == null) return "Confirm Load\nDelivery";
-    
+
     switch (_activeLocation) {
       case 'pickup':
         // If pickup is already confirmed, show "View" instead
@@ -1566,9 +1650,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
 
   bool _isConfirmButtonEnabled() {
     if (_selectedLoad == null) return false;
-    
+
     final locationType = _activeLocation ?? 'delivery';
-    
+
     // Pickup confirmation requires escrow payment to be deposited
     if (locationType == 'pickup') {
       // Check if escrow payment is deposited
@@ -1578,9 +1662,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       }
       return true;
     }
-    
+
     // For delivery confirmation, pickup must be confirmed first
-    if (locationType == 'delivery' || locationType == 'shipper' || _activeLocation == null) {
+    if (locationType == 'delivery' ||
+        locationType == 'shipper' ||
+        _activeLocation == null) {
       // If delivery is already confirmed, allow viewing it
       if (_deliveryConfirmationData != null) {
         return true;
@@ -1588,16 +1674,16 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       // For confirming delivery, pickup must be confirmed first
       return _pickupConfirmationData != null;
     }
-    
+
     return true;
   }
 
   Future<void> _showConfirmationDialog() async {
     if (_selectedLoad == null) return;
-    
+
     final locationType = _activeLocation ?? 'delivery';
     final isPickup = locationType == 'pickup';
-    
+
     // Prevent pickup if escrow payment is not deposited
     if (isPickup) {
       final escrowStatus = _escrowPaymentData?['status'] as String?;
@@ -1605,7 +1691,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Cannot proceed with pickup. Shipper must deposit escrow payment first.'),
+              content: Text(
+                'Cannot proceed with pickup. Shipper must deposit escrow payment first.',
+              ),
               duration: Duration(seconds: 4),
               backgroundColor: Colors.orange,
             ),
@@ -1614,10 +1702,12 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
         return;
       }
     }
-    
+
     // Prevent confirming delivery if pickup is not confirmed
     // Allow viewing already confirmed delivery even if pickup data is missing
-    if (!isPickup && _pickupConfirmationData == null && _deliveryConfirmationData == null) {
+    if (!isPickup &&
+        _pickupConfirmationData == null &&
+        _deliveryConfirmationData == null) {
       // Show a message to the user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1629,7 +1719,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       }
       return;
     }
-    
+
     await Navigator.push(
       context,
       MaterialPageRoute(
@@ -1666,10 +1756,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
               const Expanded(
                 child: Text(
                   'Contact Support',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -1690,7 +1777,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   _callSupport();
                 },
                 icon: const Icon(Icons.phone, color: Colors.white),
-                label: const Text('Call Support', style: TextStyle( color: Colors.white,)),
+                label: const Text(
+                  'Call Support',
+                  style: TextStyle(color: Colors.white),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: green,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1707,7 +1797,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   _navigateToReport();
                 },
                 icon: const Icon(Icons.report_problem, color: Colors.white),
-                label: const Text('Report Issue', style: TextStyle( color: Colors.white,)),
+                label: const Text(
+                  'Report Issue',
+                  style: TextStyle(color: Colors.white),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: blue,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1723,8 +1816,14 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                   Navigator.of(dialogContext).pop();
                   _navigateToChatSupport();
                 },
-                icon: const Icon(Icons.chat_bubble_outline, color: Colors.white),
-                label: const Text('Chat Support', style: TextStyle( color: Colors.white,)),
+                icon: const Icon(
+                  Icons.chat_bubble_outline,
+                  color: Colors.white,
+                ),
+                label: const Text(
+                  'Chat Support',
+                  style: TextStyle(color: Colors.white),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.orange,
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -1750,18 +1849,21 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
   }
 
   Future<void> _callSupport() async {
-    const supportPhone = '+1-555-123-4567'; // Replace with actual support number
-    
+    const supportPhone =
+        '+1-555-123-4567'; // Replace with actual support number
+
     try {
       final Uri phoneUri = Uri(scheme: 'tel', path: supportPhone);
-      
+
       if (await canLaunchUrl(phoneUri)) {
         await launchUrl(phoneUri, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Cannot make phone call. Please check if your device supports phone calls.'),
+              content: Text(
+                'Cannot make phone call. Please check if your device supports phone calls.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -1784,9 +1886,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       // Navigate to support screen for reporting issues
       await Navigator.push(
         context,
-        MaterialPageRoute(
-          builder: (context) => const SupportScreen(),
-        ),
+        MaterialPageRoute(builder: (context) => const SupportScreen()),
       );
     } catch (e) {
       if (mounted) {
@@ -1804,7 +1904,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final user = authProvider.currentUser;
-      
+
       if (user == null) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1821,25 +1921,22 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const Center(
-          child: CircularProgressIndicator(),
-        ),
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
       // Create or get support conversation
-      final conversationId = await FirebaseService.createOrGetSupportConversation(user.uid);
-      
+      final conversationId =
+          await FirebaseService.createOrGetSupportConversation(user.uid);
+
       if (mounted) {
         Navigator.of(context).pop(); // Close loading dialog
-        
+
         // Navigate to support chat screen
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ChatScreen(
-              conversationId: conversationId,
-              isSupportChat: true,
-            ),
+            builder: (context) =>
+                ChatScreen(conversationId: conversationId, isSupportChat: true),
           ),
         );
       }
@@ -1885,57 +1982,62 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                     children: [
                       // Load ID Dropdown and Support Button
                       Padding(
-                        padding: const EdgeInsets.only( bottom: 20),
+                        padding: const EdgeInsets.only(bottom: 20),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const Text(
                               "Load ID: ",
-                          textAlign: TextAlign.left,
+                              textAlign: TextAlign.left,
                               style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                            height: 1.2,
-                          ),
-                        ),
-                          Expanded(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                                height: 1.2,
+                              ),
+                            ),
+                            Expanded(
                               child: _isLoadingLoads
                                   ? const Text(
-                                          "Loading loads...",
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey,
-                                          ),
-                                        )
+                                      "Loading loads...",
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey,
+                                      ),
+                                    )
                                   : _bookedLoads.isEmpty
-                                      ? const Text(
-                                          "No loads available",
-                                          style: TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey,
-                                          ),
-                                        )
-                                      : DropdownButton<LoadModel>(
-                                          value: _selectedLoad,
-                                          isExpanded: true,
-                                          underline: Container(),
-                                          icon: const Icon(Icons.arrow_drop_down),
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black,
-                            height: 1.2,
-                          ),
-                                          selectedItemBuilder: (BuildContext context) {
-                                            return _bookedLoads.map<Widget>((load) {
-                                              final shortId = load.id.length > 8 
-                                                  ? load.id.substring(0, 8) 
+                                  ? const Text(
+                                      "No loads available",
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey,
+                                      ),
+                                    )
+                                  : DropdownButton<LoadModel>(
+                                      value: _selectedLoad,
+                                      isExpanded: true,
+                                      underline: Container(),
+                                      icon: const Icon(Icons.arrow_drop_down),
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                        height: 1.2,
+                                      ),
+                                      selectedItemBuilder:
+                                          (BuildContext context) {
+                                            return _bookedLoads.map<Widget>((
+                                              load,
+                                            ) {
+                                              final shortId = load.id.length > 8
+                                                  ? load.id.substring(0, 8)
                                                   : load.id;
                                               return Padding(
-                                                padding: const EdgeInsets.only(top: 8.0),
+                                                padding: const EdgeInsets.only(
+                                                  top: 8.0,
+                                                ),
                                                 child: Text(
                                                   "#$shortId",
                                                   style: const TextStyle(
@@ -1943,39 +2045,40 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                                     fontWeight: FontWeight.bold,
                                                     color: Colors.black,
                                                   ),
-                                                  overflow: TextOverflow.ellipsis,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                   maxLines: 1,
                                                 ),
                                               );
                                             }).toList();
                                           },
-                                          items: _bookedLoads.map((load) {
-                                            final shortId = load.id.length > 8 
-                                                ? load.id.substring(0, 8) 
-                                                : load.id;
-                                            return DropdownMenuItem<LoadModel>(
-                                              value: load,
-                                              child: Text(
-                                                "#$shortId",
-                                                style: const TextStyle(
-                                                  fontSize: 28,
-                                                  fontWeight: FontWeight.bold,
-                                                  color: Colors.black,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                                maxLines: 1,
-                                              ),
-                                            );
-                                          }).toList(),
-                                          onChanged: (LoadModel? newLoad) {
-                                            if (newLoad != null) {
-                                              setState(() {
-                                                _selectedLoad = newLoad;
-                                              });
-                                              _updateLoadData();
-                                            }
-                                          },
-                                        ),
+                                      items: _bookedLoads.map((load) {
+                                        final shortId = load.id.length > 8
+                                            ? load.id.substring(0, 8)
+                                            : load.id;
+                                        return DropdownMenuItem<LoadModel>(
+                                          value: load,
+                                          child: Text(
+                                            "#$shortId",
+                                            style: const TextStyle(
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                            maxLines: 1,
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (LoadModel? newLoad) {
+                                        if (newLoad != null) {
+                                          setState(() {
+                                            _selectedLoad = newLoad;
+                                          });
+                                          _updateLoadData();
+                                        }
+                                      },
+                                    ),
                             ),
                             // Support Button
                             IconButton(
@@ -2010,7 +2113,11 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.info_outline, color: blue, size: 20),
+                                  Icon(
+                                    Icons.info_outline,
+                                    color: blue,
+                                    size: 20,
+                                  ),
                                   const SizedBox(width: 8),
                                   Text(
                                     'Load Details',
@@ -2023,7 +2130,10 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              _buildDetailRow('Load ID', '#${_selectedLoad!.id}'),
+                              _buildDetailRow(
+                                'Load ID',
+                                '#${_selectedLoad!.id}',
+                              ),
                               const SizedBox(height: 8),
                               // Price
                               _buildDetailRow(
@@ -2041,7 +2151,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                               const SizedBox(height: 8),
                               _buildDetailRow(
                                 'Pickup Time',
-                                DateFormat('MMM dd, yyyy • hh:mm a').format(_selectedLoad!.pickupDate),
+                                DateFormat(
+                                  'MMM dd, yyyy • hh:mm a',
+                                ).format(_selectedLoad!.pickupDate),
                               ),
                               const SizedBox(height: 8),
                               _buildDetailRow(
@@ -2051,39 +2163,48 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                               const SizedBox(height: 8),
                               _buildDetailRow(
                                 'Delivery Time',
-                                DateFormat('MMM dd, yyyy • hh:mm a').format(_selectedLoad!.deliveryDate),
+                                DateFormat(
+                                  'MMM dd, yyyy • hh:mm a',
+                                ).format(_selectedLoad!.deliveryDate),
                               ),
                               // Show delivery confirmation details if delivery is confirmed
                               if (_deliveryConfirmationData != null) ...[
                                 const SizedBox(height: 8),
-                                _buildDetailRow(
-                                  'Delivered',
-                                  'Yes',
-                                ),
+                                _buildDetailRow('Delivered', 'Yes'),
                                 const SizedBox(height: 8),
-                                if (_deliveryConfirmationData!['confirmedAt'] != null) ...[
+                                if (_deliveryConfirmationData!['confirmedAt'] !=
+                                    null) ...[
                                   _buildDetailRow(
                                     'Delivered Date',
                                     DateFormat('MMM dd, yyyy • hh:mm a').format(
-                                      (_deliveryConfirmationData!['confirmedAt'] as Timestamp).toDate(),
+                                      (_deliveryConfirmationData!['confirmedAt']
+                                              as Timestamp)
+                                          .toDate(),
                                     ),
                                   ),
                                   const SizedBox(height: 8),
                                 ],
                                 _buildDetailRow(
                                   'Delivery Status',
-                                  _deliveryConfirmationData!['completionStatus'] == 'complete' 
-                                      ? 'Complete' 
+                                  _deliveryConfirmationData!['completionStatus'] ==
+                                          'complete'
+                                      ? 'Complete'
                                       : 'Partial Success',
                                 ),
                               ],
                               if (_selectedLoad!.weight > 0) ...[
                                 const SizedBox(height: 8),
-                                _buildDetailRow('Weight', '${_selectedLoad!.weight} lbs'),
+                                _buildDetailRow(
+                                  'Weight',
+                                  '${_selectedLoad!.weight} lbs',
+                                ),
                               ],
                               if (_selectedLoad!.distance > 0) ...[
                                 const SizedBox(height: 8),
-                                _buildDetailRow('Distance', '${_selectedLoad!.distance.toStringAsFixed(1)} miles'),
+                                _buildDetailRow(
+                                  'Distance',
+                                  '${_selectedLoad!.distance.toStringAsFixed(1)} miles',
+                                ),
                               ],
                             ],
                           ),
@@ -2097,8 +2218,9 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       const SizedBox(height: 20),
 
                       // Escrow payment waiting message (only show if booked/in-transit and escrow not deposited)
-                      if (_selectedLoad != null && 
-                          (_selectedLoad!.status == 'booked' || _selectedLoad!.status == 'in-transit') &&
+                      if (_selectedLoad != null &&
+                          (_selectedLoad!.status == 'booked' ||
+                              _selectedLoad!.status == 'in-transit') &&
                           _escrowPaymentData?['status'] != 'deposited') ...[
                         _buildEscrowWaitingMessage(),
                         const SizedBox(height: 20),
@@ -2124,82 +2246,95 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                           child: _isLoadingMap
                               ? const Center(
                                   child: CircularProgressIndicator(
-                                    valueColor: AlwaysStoppedAnimation<Color>(green),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      green,
+                                    ),
                                   ),
                                 )
                               : _errorMessage != null
-                                  ? Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const Icon(Icons.error_outline, color: Colors.red),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            _errorMessage!,
-                                            style: const TextStyle(color: Colors.red),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ],
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.error_outline,
+                                        color: Colors.red,
                                       ),
-                                    )
-                                  : _selectedLoad == null
-                                      ? Center(
-                                          child: Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.inbox_outlined,
-                                                size: 48,
-                                                color: Colors.grey.shade400,
-                                              ),
-                                              const SizedBox(height: 12),
-                                              Text(
-                                                'No load selected',
-                                                style: TextStyle(
-                                                  color: Colors.grey.shade700,
-                                                  fontSize: 16,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            ],
-                                          ),
-                                        )
-                                      : _pickupLocation != null && _deliveryLocation != null
-                                          ? GoogleMap(
-                                              key: ValueKey('map_${_routePoints.length}_${_selectedLoad?.id}'), // Force rebuild when route changes
-                                              onMapCreated: _onMapCreated,
-                                              initialCameraPosition: CameraPosition(
-                                                target: _pickupLocation!,
-                                                zoom: 10.0,
-                                              ),
-                                              markers: _markers,
-                                              polylines: _polylines,
-                                              mapType: MapType.normal,
-                                              myLocationButtonEnabled: false,
-                                              zoomControlsEnabled: false,
-                                              compassEnabled: false,
-                                            )
-                                          : Center(
-                                              child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  const CircularProgressIndicator(
-                                                    valueColor: AlwaysStoppedAnimation<Color>(green),
-                                                  ),
-                                                  const SizedBox(height: 12),
-                                                  Text(
-                                                    'Loading route...',
-                                                    style: TextStyle(
-                                                      color: Colors.grey.shade700,
-                                                      fontSize: 16,
-                                                      fontWeight: FontWeight.w500,
-                                                    ),
-                                                    textAlign: TextAlign.center,
-                                                  ),
-                                                ],
-                                              ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _errorMessage!,
+                                        style: const TextStyle(
+                                          color: Colors.red,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : _selectedLoad == null
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.inbox_outlined,
+                                        size: 48,
+                                        color: Colors.grey.shade400,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'No load selected',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : _pickupLocation != null &&
+                                    _deliveryLocation != null
+                              ? GoogleMap(
+                                  key: ValueKey(
+                                    'map_${_routePoints.length}_${_selectedLoad?.id}',
+                                  ), // Force rebuild when route changes
+                                  onMapCreated: _onMapCreated,
+                                  initialCameraPosition: CameraPosition(
+                                    target: _pickupLocation!,
+                                    zoom: 10.0,
+                                  ),
+                                  markers: _markers,
+                                  polylines: _polylines,
+                                  mapType: MapType.normal,
+                                  myLocationButtonEnabled: false,
+                                  zoomControlsEnabled: false,
+                                  compassEnabled: false,
+                                )
+                              : Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const CircularProgressIndicator(
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              green,
                                             ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Loading route...',
+                                        style: TextStyle(
+                                          color: Colors.grey.shade700,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                         ),
                       ),
 
@@ -2223,100 +2358,143 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                 GestureDetector(
                                   onTap: () => _onLocationCardTap('shipper'),
                                   child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: _activeLocation == 'shipper' ? blue : green,
-                                        width: _activeLocation == 'shipper' ? 3 : 2,
+                                        color: _activeLocation == 'shipper'
+                                            ? blue
+                                            : green,
+                                        width: _activeLocation == 'shipper'
+                                            ? 3
+                                            : 2,
                                       ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                          color: (_activeLocation == 'shipper' ? blue : green).withOpacity(0.18),
-                                        blurRadius: 4,
-                                        spreadRadius: 0.5,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
-                                  ),
-                                    child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        "Shipper",
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 20,
-                                            color: _activeLocation == 'shipper' ? blue : Colors.black,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color:
+                                              (_activeLocation == 'shipper'
+                                                      ? blue
+                                                      : green)
+                                                  .withOpacity(0.18),
+                                          blurRadius: 4,
+                                          spreadRadius: 0.5,
+                                          offset: const Offset(0, 2),
                                         ),
-                                      ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          "Shipper",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 20,
+                                            color: _activeLocation == 'shipper'
+                                                ? blue
+                                                : Colors.black,
+                                          ),
+                                        ),
                                         const SizedBox(height: 8),
-                                      _isLoadingShipperInfo
-                                          ? Row(
-                                              children: [
-                                                SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(green),
+                                        _isLoadingShipperInfo
+                                            ? Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(green),
+                                                    ),
                                                   ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  'Loading shipper info...',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    color: Colors.grey.shade600,
-                                                    fontStyle: FontStyle.italic,
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Loading shipper info...',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
-                                            )
-                                          : _shipperName.isNotEmpty 
-                                              ? Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    GestureDetector(
-                                                      onTap: _selectedLoad != null ? _viewShipperProfile : null,
-                                                      child: Row(
-                                                        mainAxisSize: MainAxisSize.min,
-                                                        children: [
-                                                          Text(
-                                                            _shipperName,
-                                                            style: TextStyle(
-                                                              fontSize: 16,
-                                                              fontWeight: FontWeight.w600,
-                                                              color: _selectedLoad != null ? green : Colors.black,
-                                                              decoration: _selectedLoad != null ? TextDecoration.underline : null,
-                                                            ),
+                                                ],
+                                              )
+                                            : _shipperName.isNotEmpty
+                                            ? Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  GestureDetector(
+                                                    onTap: _selectedLoad != null
+                                                        ? _viewShipperProfile
+                                                        : null,
+                                                    child: Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Text(
+                                                          _shipperName,
+                                                          style: TextStyle(
+                                                            fontSize: 16,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color:
+                                                                _selectedLoad !=
+                                                                    null
+                                                                ? green
+                                                                : Colors.black,
+                                                            decoration:
+                                                                _selectedLoad !=
+                                                                    null
+                                                                ? TextDecoration
+                                                                      .underline
+                                                                : null,
                                                           ),
-                                                          if (_selectedLoad != null) ...[
-                                                            const SizedBox(width: 4),
-                                                            Icon(Icons.person, size: 16, color: green),
-                                                          ],
+                                                        ),
+                                                        if (_selectedLoad !=
+                                                            null) ...[
+                                                          const SizedBox(
+                                                            width: 4,
+                                                          ),
+                                                          Icon(
+                                                            Icons.person,
+                                                            size: 16,
+                                                            color: green,
+                                                          ),
                                                         ],
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  if (_shipperPhone
+                                                      .isNotEmpty) ...[
+                                                    const SizedBox(height: 4),
+                                                    Text(
+                                                      _shipperPhone,
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
                                                       ),
                                                     ),
-                                                    if (_shipperPhone.isNotEmpty) ...[
-                                                      const SizedBox(height: 4),
-                                                      Text(
-                                                        _shipperPhone,
-                                                        style: const TextStyle(fontSize: 16),
-                                                      ),
-                                                    ],
                                                   ],
-                                                )
-                                              : Text(
-                                                  'No shipper info available',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    color: Colors.grey.shade600,
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
+                                                ],
+                                              )
+                                            : Text(
+                                                'No shipper info available',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.grey.shade600,
+                                                  fontStyle: FontStyle.italic,
                                                 ),
+                                              ),
                                       ],
                                     ),
                                   ),
@@ -2328,170 +2506,39 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                 GestureDetector(
                                   onTap: () => _onLocationCardTap('pickup'),
                                   child: Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: _pickupConfirmationData != null 
-                                        ? green.withOpacity(0.05) 
-                                        : Colors.white,
-                                    borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: _pickupConfirmationData != null
-                                            ? green
-                                            : (_activeLocation == 'pickup' ? blue : Colors.white),
-                                        width: _pickupConfirmationData != null
-                                            ? 2.5
-                                            : (_activeLocation == 'pickup' ? 3 : 2),
-                                      ),
-                                      boxShadow: _activeLocation == 'pickup' || _pickupConfirmationData != null
-                                          ? [
-                                              BoxShadow(
-                                                color: (_pickupConfirmationData != null ? green : blue).withOpacity(0.18),
-                                                blurRadius: 4,
-                                                spreadRadius: 0.5,
-                                                offset: const Offset(0, 2),
-                                              ),
-                                            ]
-                                          : [],
-                                    ),
-                                    child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            "Pickup",
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 20,
-                                              color: _pickupConfirmationData != null
-                                                  ? green
-                                                  : (_activeLocation == 'pickup' ? blue : Colors.black),
-                                            ),
-                                          ),
-                                          if (_pickupConfirmationData != null)
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: green,
-                                                borderRadius: BorderRadius.circular(12),
-                                              ),
-                                              child: Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  const Icon(
-                                                    Icons.check_circle,
-                                                    color: Colors.white,
-                                                    size: 16,
-                                                  ),
-                                                  const SizedBox(width: 4),
-                                                  Text(
-                                                    'Confirmed',
-                                                    style: const TextStyle(
-                                                      color: Colors.white,
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                        const SizedBox(height: 8),
-                                      _isLoadingPickupAddress
-                                          ? Row(
-                                              children: [
-                                                SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(green),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  'Loading address...',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    color: Colors.grey.shade600,
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          : _pickupAddress.isNotEmpty 
-                                              ? Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      _pickupAddress,
-                                                      style: const TextStyle(fontSize: 16),
-                                                    ),
-                                                    // Show confirmation timestamp if confirmed
-                                                    if (_pickupConfirmationData != null) ...[
-                                                      const SizedBox(height: 8),
-                                                      Row(
-                                                        children: [
-                                                          Icon(
-                                                            Icons.access_time,
-                                                            size: 14,
-                                                            color: Colors.grey.shade600,
-                                                          ),
-                                                          const SizedBox(width: 4),
-                                                          Text(
-                                                            _getConfirmationTimeText(),
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                              color: Colors.grey.shade600,
-                                                              fontWeight: FontWeight.w500,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  ],
-                                                )
-                                              : Text(
-                                                  'No pickup address available',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    color: Colors.grey.shade600,
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
-                                                ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 8),
-
-                                // Delivery card
-                                GestureDetector(
-                                  onTap: () => _onLocationCardTap('delivery'),
-                                  child: Container(
                                     width: double.infinity,
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: _deliveryConfirmationData != null 
-                                          ? green.withOpacity(0.05) 
+                                      color: _pickupConfirmationData != null
+                                          ? green.withOpacity(0.05)
                                           : Colors.white,
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                        color: _deliveryConfirmationData != null
+                                        color: _pickupConfirmationData != null
                                             ? green
-                                            : (_activeLocation == 'delivery' ? blue : Colors.white),
-                                        width: _deliveryConfirmationData != null
+                                            : (_activeLocation == 'pickup'
+                                                  ? blue
+                                                  : Colors.white),
+                                        width: _pickupConfirmationData != null
                                             ? 2.5
-                                            : (_activeLocation == 'delivery' ? 3 : 2),
+                                            : (_activeLocation == 'pickup'
+                                                  ? 3
+                                                  : 2),
                                       ),
-                                      boxShadow: _activeLocation == 'delivery' || _deliveryConfirmationData != null
+                                      boxShadow:
+                                          _activeLocation == 'pickup' ||
+                                              _pickupConfirmationData != null
                                           ? [
                                               BoxShadow(
-                                                color: (_deliveryConfirmationData != null ? green : blue).withOpacity(0.18),
+                                                color:
+                                                    (_pickupConfirmationData !=
+                                                                null
+                                                            ? green
+                                                            : blue)
+                                                        .withOpacity(0.18),
                                                 blurRadius: 4,
                                                 spreadRadius: 0.5,
                                                 offset: const Offset(0, 2),
@@ -2500,30 +2547,43 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                           : [],
                                     ),
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              "Delivery",
+                                              "Pickup",
                                               style: TextStyle(
                                                 fontWeight: FontWeight.bold,
                                                 fontSize: 20,
-                                                color: _deliveryConfirmationData != null
+                                                color:
+                                                    _pickupConfirmationData !=
+                                                        null
                                                     ? green
-                                                    : (_activeLocation == 'delivery' ? blue : Colors.black),
+                                                    : (_activeLocation ==
+                                                              'pickup'
+                                                          ? blue
+                                                          : Colors.black),
                                               ),
                                             ),
-                                            if (_deliveryConfirmationData != null)
+                                            if (_pickupConfirmationData != null)
                                               Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   color: green,
-                                                  borderRadius: BorderRadius.circular(12),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
                                                 ),
                                                 child: Row(
-                                                  mainAxisSize: MainAxisSize.min,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
                                                   children: [
                                                     const Icon(
                                                       Icons.check_circle,
@@ -2536,7 +2596,8 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                                       style: const TextStyle(
                                                         color: Colors.white,
                                                         fontSize: 12,
-                                                        fontWeight: FontWeight.bold,
+                                                        fontWeight:
+                                                            FontWeight.bold,
                                                       ),
                                                     ),
                                                   ],
@@ -2545,68 +2606,274 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                                           ],
                                         ),
                                         const SizedBox(height: 8),
-                                      _isLoadingDeliveryAddress
-                                          ? Row(
-                                              children: [
-                                                SizedBox(
-                                                  width: 16,
-                                                  height: 16,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    valueColor: AlwaysStoppedAnimation<Color>(green),
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(
-                                                  'Loading address...',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    color: Colors.grey.shade600,
-                                                    fontStyle: FontStyle.italic,
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          : _deliveryAddress.isNotEmpty 
-                                              ? Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      _deliveryAddress,
-                                                      style: const TextStyle(fontSize: 16),
+                                        _isLoadingPickupAddress
+                                            ? Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(green),
                                                     ),
-                                                    // Show confirmation timestamp if confirmed
-                                                    if (_deliveryConfirmationData != null) ...[
-                                                      const SizedBox(height: 8),
-                                                      Row(
-                                                        children: [
-                                                          Icon(
-                                                            Icons.access_time,
-                                                            size: 14,
-                                                            color: Colors.grey.shade600,
-                                                          ),
-                                                          const SizedBox(width: 4),
-                                                          Text(
-                                                            _getDeliveryConfirmationTimeText(),
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                              color: Colors.grey.shade600,
-                                                              fontWeight: FontWeight.w500,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ],
-                                                  ],
-                                                )
-                                              : Text(
-                                                  'No delivery address available',
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    color: Colors.grey.shade600,
-                                                    fontStyle: FontStyle.italic,
                                                   ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Loading address...',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : _pickupAddress.isNotEmpty
+                                            ? Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    _pickupAddress,
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                  // Show confirmation timestamp if confirmed
+                                                  if (_pickupConfirmationData !=
+                                                      null) ...[
+                                                    const SizedBox(height: 8),
+                                                    Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.access_time,
+                                                          size: 14,
+                                                          color: Colors
+                                                              .grey
+                                                              .shade600,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Text(
+                                                          _getConfirmationTimeText(),
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade600,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ],
+                                              )
+                                            : Text(
+                                                'No pickup address available',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.grey.shade600,
+                                                  fontStyle: FontStyle.italic,
                                                 ),
+                                              ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 8),
+
+                                // Delivery card
+                                GestureDetector(
+                                  onTap: () => _onLocationCardTap('delivery'),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _deliveryConfirmationData != null
+                                          ? green.withOpacity(0.05)
+                                          : Colors.white,
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: _deliveryConfirmationData != null
+                                            ? green
+                                            : (_activeLocation == 'delivery'
+                                                  ? blue
+                                                  : Colors.white),
+                                        width: _deliveryConfirmationData != null
+                                            ? 2.5
+                                            : (_activeLocation == 'delivery'
+                                                  ? 3
+                                                  : 2),
+                                      ),
+                                      boxShadow:
+                                          _activeLocation == 'delivery' ||
+                                              _deliveryConfirmationData != null
+                                          ? [
+                                              BoxShadow(
+                                                color:
+                                                    (_deliveryConfirmationData !=
+                                                                null
+                                                            ? green
+                                                            : blue)
+                                                        .withOpacity(0.18),
+                                                blurRadius: 4,
+                                                spreadRadius: 0.5,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ]
+                                          : [],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              "Delivery",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 20,
+                                                color:
+                                                    _deliveryConfirmationData !=
+                                                        null
+                                                    ? green
+                                                    : (_activeLocation ==
+                                                              'delivery'
+                                                          ? blue
+                                                          : Colors.black),
+                                              ),
+                                            ),
+                                            if (_deliveryConfirmationData !=
+                                                null)
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: green,
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Row(
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.check_circle,
+                                                      color: Colors.white,
+                                                      size: 16,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      'Confirmed',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        _isLoadingDeliveryAddress
+                                            ? Row(
+                                                children: [
+                                                  SizedBox(
+                                                    width: 16,
+                                                    height: 16,
+                                                    child: CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      valueColor:
+                                                          AlwaysStoppedAnimation<
+                                                            Color
+                                                          >(green),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    'Loading address...',
+                                                    style: TextStyle(
+                                                      fontSize: 16,
+                                                      color:
+                                                          Colors.grey.shade600,
+                                                      fontStyle:
+                                                          FontStyle.italic,
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : _deliveryAddress.isNotEmpty
+                                            ? Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Text(
+                                                    _deliveryAddress,
+                                                    style: const TextStyle(
+                                                      fontSize: 16,
+                                                    ),
+                                                  ),
+                                                  // Show confirmation timestamp if confirmed
+                                                  if (_deliveryConfirmationData !=
+                                                      null) ...[
+                                                    const SizedBox(height: 8),
+                                                    Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.access_time,
+                                                          size: 14,
+                                                          color: Colors
+                                                              .grey
+                                                              .shade600,
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 4,
+                                                        ),
+                                                        Text(
+                                                          _getDeliveryConfirmationTimeText(),
+                                                          style: TextStyle(
+                                                            fontSize: 12,
+                                                            color: Colors
+                                                                .grey
+                                                                .shade600,
+                                                            fontWeight:
+                                                                FontWeight.w500,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ],
+                                              )
+                                            : Text(
+                                                'No delivery address available',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.grey.shade600,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
                                       ],
                                     ),
                                   ),
@@ -2621,40 +2888,52 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                           Column(
                             children: [
                               IconButton(
-                                onPressed: _shipperPhone.isNotEmpty 
+                                onPressed: _shipperPhone.isNotEmpty
                                     ? () {
-                                        print('Call button pressed. Phone: $_shipperPhone');
+                                        print(
+                                          'Call button pressed. Phone: $_shipperPhone',
+                                        );
                                         _makePhoneCall();
                                       }
                                     : () {
-                                        print('Call button pressed but phone is empty');
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        print(
+                                          'Call button pressed but phone is empty',
+                                        );
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
                                           const SnackBar(
-                                            content: Text('Phone number not available'),
+                                            content: Text(
+                                              'Phone number not available',
+                                            ),
                                             backgroundColor: Colors.orange,
                                           ),
                                         );
                                       },
                                 icon: const Icon(Icons.phone_rounded),
-                                color: _shipperPhone.isNotEmpty 
-                                    ? green 
+                                color: _shipperPhone.isNotEmpty
+                                    ? green
                                     : Colors.grey.shade400,
                                 iconSize: 30,
-                                tooltip: _shipperPhone.isNotEmpty 
-                                    ? 'Call $_shipperPhone' 
+                                tooltip: _shipperPhone.isNotEmpty
+                                    ? 'Call $_shipperPhone'
                                     : 'Phone number not available',
                               ),
                               const SizedBox(height: 6),
                               IconButton(
-                                onPressed: _selectedLoad != null 
+                                onPressed: _selectedLoad != null
                                     ? () {
-                                        print('Message button pressed. Load ID: ${_selectedLoad!.id}');
+                                        print(
+                                          'Message button pressed. Load ID: ${_selectedLoad!.id}',
+                                        );
                                         _navigateToChat();
                                       }
                                     : null,
-                                icon: const Icon(Icons.chat_bubble_outline_rounded),
-                                color: _selectedLoad != null 
-                                    ? green 
+                                icon: const Icon(
+                                  Icons.chat_bubble_outline_rounded,
+                                ),
+                                color: _selectedLoad != null
+                                    ? green
                                     : Colors.grey.shade400,
                                 iconSize: 30,
                                 tooltip: 'Message ${_shipperName}',
@@ -2665,30 +2944,41 @@ class _MarketplaceScreenState extends State<MarketplaceScreen> {
                       ),
 
                       const SizedBox(height: 40), // instead of Spacer()
-
                       // bottom row with confirm button
                       if (_selectedLoad != null)
                         Row(
                           children: [
                             const Spacer(),
                             ElevatedButton(
-                              onPressed: _isConfirmButtonEnabled() ? () => _showConfirmationDialog() : null,
+                              onPressed: _isConfirmButtonEnabled()
+                                  ? () => _showConfirmationDialog()
+                                  : null,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _isConfirmButtonEnabled() ? green : Colors.grey,
-                                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
+                                backgroundColor: _isConfirmButtonEnabled()
+                                    ? green
+                                    : Colors.grey,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 22,
+                                  vertical: 20,
+                                ),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 elevation: _isConfirmButtonEnabled() ? 8 : 0,
-                                shadowColor: _isConfirmButtonEnabled() ? Colors.black45 : Colors.transparent,
+                                shadowColor: _isConfirmButtonEnabled()
+                                    ? Colors.black45
+                                    : Colors.transparent,
                               ),
                               child: Text(
                                 _getConfirmButtonText(),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    fontSize: 16, 
-                                    fontWeight: FontWeight.w700, 
-                                    color: _isConfirmButtonEnabled() ? Colors.white : Colors.grey.shade300),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: _isConfirmButtonEnabled()
+                                      ? Colors.white
+                                      : Colors.grey.shade300,
+                                ),
                               ),
                             ),
                           ],
@@ -2718,7 +3008,7 @@ class _StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 375;
-    
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(
@@ -2728,7 +3018,7 @@ class _StatusPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all( color: Colors.green.withOpacity(0.2),width: 1.4),
+        border: Border.all(color: Colors.green.withOpacity(0.2), width: 1.4),
         boxShadow: [
           BoxShadow(
             color: Colors.green.withOpacity(0.18),
@@ -2782,7 +3072,7 @@ class _ConfirmationPage extends StatefulWidget {
 class _ConfirmationPageState extends State<_ConfirmationPage> {
   static const Color green = Color(0xFF2E9340);
   static const Color red = const Color(0xFFEB001B);
-  
+
   final ImagePicker _imagePicker = ImagePicker();
   final TextEditingController _notesController = TextEditingController();
   final TextEditingController _receiverNameController = TextEditingController();
@@ -2791,7 +3081,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
     penColor: Colors.black,
     exportBackgroundColor: Colors.white,
   );
-  
+
   String _selectedStatus = 'success'; // 'success' or 'failed'
   String? _selectedReason;
   String _customReason = '';
@@ -2800,36 +3090,39 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
   File? _podFile; // Proof of Delivery file
   File? _deliveryPhoto; // Delivery photo
   bool _isSubmitting = false;
-  
+
   // For pickup success: 'complete' or 'partial' - MUST be explicitly selected by user
   String? _pickupCompletionStatus; // Explicitly null until user selects
-  
+
   // For delivery success: 'complete' or 'partial' - MUST be explicitly selected by user
   String? _deliveryCompletionStatus; // Explicitly null until user selects
-  
+
   // For delivery partial success: reason and notes
   String? _partialSuccessReason;
   String _partialSuccessCustomReason = '';
   bool _showPartialSuccessCustomReason = false;
   String _deliveryNotes = '';
-  final TextEditingController _deliveryNotesController = TextEditingController();
-  
+  final TextEditingController _deliveryNotesController =
+      TextEditingController();
+
   // Pickup confirmation data (will be loaded from Firestore)
   Map<String, dynamic>? _pickupConfirmationData;
   // Delivery confirmation data (will be loaded from Firestore)
   Map<String, dynamic>? _deliveryConfirmationData;
   bool _isLoadingConfirmationData = true;
-  
+
   // Check if pickup is already confirmed - must have actual confirmation data
-  bool get _isPickupConfirmed => widget.isPickup && 
+  bool get _isPickupConfirmed =>
+      widget.isPickup &&
       _pickupConfirmationData != null &&
       !_isLoadingConfirmationData;
-  
+
   // Check if delivery is already confirmed - must have actual confirmation data
-  bool get _isDeliveryConfirmed => !widget.isPickup && 
+  bool get _isDeliveryConfirmed =>
+      !widget.isPickup &&
       _deliveryConfirmationData != null &&
       !_isLoadingConfirmationData;
-  
+
   // Predefined reasons for pickup failures
   final List<String> _pickupFailureReasons = [
     'Address not found',
@@ -2841,7 +3134,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
     'Wrong item provided',
     'Other',
   ];
-  
+
   // Predefined reasons for delivery failures
   final List<String> _deliveryFailureReasons = [
     'Address not found',
@@ -2857,10 +3150,9 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
     'Weather conditions prevented delivery',
     'Other',
   ];
-  
-  List<String> get _failureReasons => widget.isPickup 
-      ? _pickupFailureReasons 
-      : _deliveryFailureReasons;
+
+  List<String> get _failureReasons =>
+      widget.isPickup ? _pickupFailureReasons : _deliveryFailureReasons;
 
   @override
   void initState() {
@@ -2964,12 +3256,10 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             onPressed: () => Navigator.of(context).pop(),
           ),
         ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     // If pickup is already confirmed (has confirmation data), show confirmation details
     if (widget.isPickup && _isPickupConfirmed) {
       return Scaffold(
@@ -2983,7 +3273,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
         body: _buildPickupConfirmationDetails(),
       );
     }
-    
+
     // If delivery is already confirmed (has confirmation data), show confirmation details
     if (!widget.isPickup && _isDeliveryConfirmed) {
       return Scaffold(
@@ -2997,7 +3287,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
         body: _buildDeliveryConfirmationDetails(),
       );
     }
-    
+
     // Otherwise show the confirmation form
     return Scaffold(
       appBar: AppBar(
@@ -3008,7 +3298,8 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
                 icon: const Icon(Icons.arrow_back),
                 onPressed: () => Navigator.of(context).pop(),
               ),
-        automaticallyImplyLeading: !_isSubmitting, // Prevent back button during submission
+        automaticallyImplyLeading:
+            !_isSubmitting, // Prevent back button during submission
       ),
       body: PopScope(
         canPop: !_isSubmitting, // Prevent back button during submission
@@ -3021,7 +3312,8 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
     final confirmationDate = _pickupConfirmationData?['confirmedAt'] != null
         ? (_pickupConfirmationData!['confirmedAt'] as Timestamp).toDate()
         : null;
-    final completionStatus = _pickupConfirmationData?['completionStatus'] ?? 'Complete';
+    final completionStatus =
+        _pickupConfirmationData?['completionStatus'] ?? 'Complete';
     final notes = _pickupConfirmationData?['notes'] ?? '';
     final imageUrl = _pickupConfirmationData?['imageUrl'] as String?;
 
@@ -3030,126 +3322,122 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-                
-                // Title
-                Row(
-                  children: [
-                    Icon(Icons.check_circle, color: green, size: 28),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'Pickup Confirmed',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ],
+          // Title
+          Row(
+            children: [
+              Icon(Icons.check_circle, color: green, size: 28),
+              const SizedBox(width: 12),
+              const Text(
+                'Pickup Confirmed',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
-                
-                const SizedBox(height: 24),
-                
-                // Confirmed date/time
-                if (confirmationDate != null) ...[
-                  _buildInfoRow(
-                    'Confirmed At',
-                    DateFormat('MMM dd, yyyy • hh:mm a').format(confirmationDate),
-                    Icons.access_time,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                
-                // Completion status
-                _buildInfoRow(
-                  'Status',
-                  completionStatus == 'complete' ? 'Complete' : 'Partial Success',
-                  Icons.info_outline,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 24),
+
+          // Confirmed date/time
+          if (confirmationDate != null) ...[
+            _buildInfoRow(
+              'Confirmed At',
+              DateFormat('MMM dd, yyyy • hh:mm a').format(confirmationDate),
+              Icons.access_time,
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Completion status
+          _buildInfoRow(
+            'Status',
+            completionStatus == 'complete' ? 'Complete' : 'Partial Success',
+            Icons.info_outline,
+          ),
+
+          const SizedBox(height: 16),
+
+          // Notes
+          if (notes.isNotEmpty) ...[
+            Text(
+              'Notes',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Text(notes, style: const TextStyle(fontSize: 14)),
+            ),
+            const SizedBox(height: 16),
+          ],
+
+          // Image
+          if (imageUrl != null && imageUrl.isNotEmpty) ...[
+            Text(
+              'Confirmation Image',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                imageUrl,
+                width: double.infinity,
+                height: 200,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 200,
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                      child: Icon(Icons.broken_image, size: 48),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 24),
+
+          // Close button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: green,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                
-                const SizedBox(height: 16),
-                
-                // Notes
-                if (notes.isNotEmpty) ...[
-                  Text(
-                    'Notes',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.shade300),
-                    ),
-                    child: Text(
-                      notes,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                
-                // Image
-                if (imageUrl != null && imageUrl.isNotEmpty) ...[
-                  Text(
-                    'Confirmation Image',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(
-                      imageUrl,
-                      width: double.infinity,
-                      height: 200,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 200,
-                          color: Colors.grey.shade200,
-                          child: const Center(
-                            child: Icon(Icons.broken_image, size: 48),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-                
-                const SizedBox(height: 24),
-                
-                // Close button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: green,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Close',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+              ),
+              child: const Text(
+                'Close',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -3159,12 +3447,15 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
     final confirmationDate = _deliveryConfirmationData?['confirmedAt'] != null
         ? (_deliveryConfirmationData!['confirmedAt'] as Timestamp).toDate()
         : null;
-    final completionStatus = _deliveryConfirmationData?['completionStatus'] ?? 'Complete';
+    final completionStatus =
+        _deliveryConfirmationData?['completionStatus'] ?? 'Complete';
     final receiverName = _deliveryConfirmationData?['receiverName'] ?? '';
     final signatureUrl = _deliveryConfirmationData?['signatureUrl'] as String?;
     final podUrl = _deliveryConfirmationData?['podUrl'] as String?;
-    final deliveryPhotoUrl = _deliveryConfirmationData?['deliveryPhotoUrl'] as String?;
-    final partialSuccessReason = _deliveryConfirmationData?['partialSuccessReason'] as String?;
+    final deliveryPhotoUrl =
+        _deliveryConfirmationData?['deliveryPhotoUrl'] as String?;
+    final partialSuccessReason =
+        _deliveryConfirmationData?['partialSuccessReason'] as String?;
     final notes = _deliveryConfirmationData?['notes'] as String?;
 
     return SingleChildScrollView(
@@ -3187,9 +3478,9 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 24),
-          
+
           // Confirmed date/time
           if (confirmationDate != null) ...[
             _buildInfoRow(
@@ -3199,28 +3490,26 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             ),
             const SizedBox(height: 16),
           ],
-          
+
           // Completion status
           _buildInfoRow(
             'Status',
             completionStatus == 'complete' ? 'Complete' : 'Partial Success',
             Icons.info_outline,
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Receiver name
           if (receiverName.isNotEmpty) ...[
-            _buildInfoRow(
-              'Receiver Name',
-              receiverName,
-              Icons.person,
-            ),
+            _buildInfoRow('Receiver Name', receiverName, Icons.person),
             const SizedBox(height: 16),
           ],
-          
+
           // Partial success reason (if applicable)
-          if (completionStatus == 'partial' && partialSuccessReason != null && partialSuccessReason.isNotEmpty) ...[
+          if (completionStatus == 'partial' &&
+              partialSuccessReason != null &&
+              partialSuccessReason.isNotEmpty) ...[
             Text(
               'Reason for Partial Success',
               style: TextStyle(
@@ -3245,7 +3534,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             ),
             const SizedBox(height: 16),
           ],
-          
+
           // Notes
           if (notes != null && notes.isNotEmpty) ...[
             Text(
@@ -3265,14 +3554,11 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey.shade300),
               ),
-              child: Text(
-                notes,
-                style: const TextStyle(fontSize: 14),
-              ),
+              child: Text(notes, style: const TextStyle(fontSize: 14)),
             ),
             const SizedBox(height: 16),
           ],
-          
+
           // Signature
           if (signatureUrl != null && signatureUrl.isNotEmpty) ...[
             Text(
@@ -3304,7 +3590,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             ),
             const SizedBox(height: 16),
           ],
-          
+
           // Proof of Delivery (POD)
           if (podUrl != null && podUrl.isNotEmpty) ...[
             Text(
@@ -3336,7 +3622,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             ),
             const SizedBox(height: 16),
           ],
-          
+
           // Delivery Photo
           if (deliveryPhotoUrl != null && deliveryPhotoUrl.isNotEmpty) ...[
             Text(
@@ -3368,9 +3654,9 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             ),
             const SizedBox(height: 16),
           ],
-          
+
           const SizedBox(height: 24),
-          
+
           // Close button
           SizedBox(
             width: double.infinity,
@@ -3419,10 +3705,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
               const SizedBox(height: 4),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.black87,
-                ),
+                style: const TextStyle(fontSize: 16, color: Colors.black87),
               ),
             ],
           ),
@@ -3437,727 +3720,718 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-                
-                // Status selection (for both pickup and delivery)
+          // Status selection (for both pickup and delivery)
+          Text(
+            'Status',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey.shade800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _buildStatusOption(
+                  label: widget.isPickup ? 'Picked Up' : 'Delivered',
+                  value: 'success',
+                  icon: Icons.check_circle,
+                  color: green,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatusOption(
+                  label: 'Failed',
+                  value: 'failed',
+                  icon: Icons.cancel,
+                  color: Colors.red,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // Delivery confirmation form (only for delivery success)
+          if (!widget.isPickup && _selectedStatus == 'success') ...[
+            _buildDeliveryConfirmationForm(),
+          ],
+
+          // Delivery completion status (only for delivery success)
+          if (!widget.isPickup && _selectedStatus == 'success') ...[
+            Row(
+              children: [
                 Text(
-                  'Status',
+                  'Delivery Status',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Colors.grey.shade800,
                   ),
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStatusOption(
-                        label: widget.isPickup ? 'Picked Up' : 'Delivered',
-                        value: 'success',
-                        icon: Icons.check_circle,
-                        color: green,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _buildStatusOption(
-                        label: 'Failed',
-                        value: 'failed',
-                        icon: Icons.cancel,
-                        color: Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-                
-                // Delivery confirmation form (only for delivery success)
-                if (!widget.isPickup && _selectedStatus == 'success') ...[
-                  _buildDeliveryConfirmationForm(),
-                ],
-                
-                // Delivery completion status (only for delivery success)
-                if (!widget.isPickup && _selectedStatus == 'success') ...[
-                  Row(
-                    children: [
-                      Text(
-                        'Delivery Status',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade800,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '*',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildCompletionStatusOption(
-                          label: 'Complete',
-                          value: 'complete',
-                          icon: Icons.check_circle,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildCompletionStatusOption(
-                          label: 'Partial Success',
-                          value: 'partial',
-                          icon: Icons.warning_amber_rounded,
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Show helper text if nothing selected
-                  if (_deliveryCompletionStatus == null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Please select one of the options above',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  
-                  // Partial success reason and notes (only for partial success)
-                  if (_deliveryCompletionStatus == 'partial') ...[
-                    Text(
-                      'Reason for Partial Success',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: _partialSuccessReason,
-                      isExpanded: true,
-                      decoration: InputDecoration(
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      hint: const Text('Select a reason'),
-                      items: [
-                        'Some items missing',
-                        'Damaged items',
-                        'Quantity mismatch',
-                        'Wrong items received',
-                        'Partial delivery accepted by receiver',
-                        'Other',
-                      ].map((reason) {
-                        return DropdownMenuItem(
-                          value: reason,
-                          child: Text(
-                            reason,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _partialSuccessReason = value;
-                          _showPartialSuccessCustomReason = value == 'Other';
-                          if (!_showPartialSuccessCustomReason) {
-                            _partialSuccessCustomReason = '';
-                          }
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Custom reason text field for partial success
-                    if (_showPartialSuccessCustomReason) ...[
-                      TextField(
-                        decoration: InputDecoration(
-                          labelText: 'Please specify the reason',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                        maxLines: 3,
-                        onChanged: (value) {
-                          setState(() {
-                            _partialSuccessCustomReason = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    
-                    const SizedBox(height: 8),
-                    
-                    // Notes field for delivery
-                    Text(
-                      'Notes (Optional)',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _deliveryNotesController,
-                      decoration: InputDecoration(
-                        hintText: 'Add any additional notes about the delivery...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      maxLines: 4,
-                      onChanged: (value) {
-                        setState(() {
-                          _deliveryNotes = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                ],
-                
-                // Delivery failure reason (only for delivery failure)
-                if (!widget.isPickup && _selectedStatus == 'failed') ...[
-                  Text(
-                    'Reason for Failure',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: _selectedReason,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    hint: const Text('Select a reason'),
-                    items: _deliveryFailureReasons.map((reason) {
-                      return DropdownMenuItem(
-                        value: reason,
-                        child: Text(
-                          reason,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedReason = value;
-                        _showCustomReason = value == 'Other';
-                        if (!_showCustomReason) {
-                          _customReason = '';
-                        }
-                      });
-                    },
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Custom reason text field
-                  if (_showCustomReason) ...[
-                    TextField(
-                      decoration: InputDecoration(
-                        labelText: 'Please specify the reason',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      maxLines: 3,
-                      onChanged: (value) {
-                        setState(() {
-                          _customReason = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  
-                  // Image attachment (optional for failures)
-                  Text(
-                    'Attach Image (Optional)',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      height: 150,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 2,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: _selectedImage != null
-                          ? Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.file(
-                                    _selectedImage!,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: IconButton(
-                                    icon: const Icon(Icons.close, color: Colors.white),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Colors.black54,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _selectedImage = null;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add_photo_alternate,
-                                  size: 48,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Tap to add image',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-                
-                // Pickup completion status (only for pickup success)
-                if (widget.isPickup && _selectedStatus == 'success') ...[
-                  Row(
-                    children: [
-                      Text(
-                        'Pickup Status',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.grey.shade800,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '*',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Ensure neither is pre-selected - user must explicitly choose
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildCompletionStatusOption(
-                          label: 'Complete',
-                          value: 'complete',
-                          icon: Icons.check_circle,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildCompletionStatusOption(
-                          label: 'Partial Success',
-                          value: 'partial',
-                          icon: Icons.warning_amber_rounded,
-                        ),
-                      ),
-                    ],
-                  ),
-                  // Show helper text if nothing selected
-                  if (_pickupCompletionStatus == null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      'Please select one of the options above',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-                  
-                  // Notes field
-                  Text(
-                    'Notes (Optional)',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _notesController,
-                    decoration: InputDecoration(
-                      hintText: 'Add any additional notes about the pickup...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    maxLines: 4,
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Image attachment
-                  Text(
-                    'Attach Image (Optional)',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      height: 150,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 2,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: _selectedImage != null
-                          ? Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.file(
-                                    _selectedImage!,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: IconButton(
-                                    icon: const Icon(Icons.close, color: Colors.white),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Colors.black54,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _selectedImage = null;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add_photo_alternate,
-                                  size: 48,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Tap to add image',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-                
-                // Failure reason (only show if failed and pickup)
-                if (widget.isPickup && _selectedStatus == 'failed') ...[
-                  Text(
-                    'Reason for Failure',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: _selectedReason,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    hint: const Text('Select a reason'),
-                    items: _failureReasons.map((reason) {
-                      return DropdownMenuItem(
-                        value: reason,
-                        child: Text(
-                          reason,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedReason = value;
-                        _showCustomReason = value == 'Other';
-                        if (!_showCustomReason) {
-                          _customReason = '';
-                        }
-                      });
-                    },
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Custom reason text field
-                  if (_showCustomReason) ...[
-                    TextField(
-                      decoration: InputDecoration(
-                        labelText: 'Please specify the reason',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                      maxLines: 3,
-                      onChanged: (value) {
-                        setState(() {
-                          _customReason = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  
-                  // Image attachment (optional for failures)
-                  Text(
-                    'Attach Image (Optional)',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey.shade800,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  GestureDetector(
-                    onTap: _pickImage,
-                    child: Container(
-                      height: 150,
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: Colors.grey.shade300,
-                          width: 2,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.grey.shade50,
-                      ),
-                      child: _selectedImage != null
-                          ? Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(10),
-                                  child: Image.file(
-                                    _selectedImage!,
-                                    width: double.infinity,
-                                    height: double.infinity,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                Positioned(
-                                  top: 8,
-                                  right: 8,
-                                  child: IconButton(
-                                    icon: const Icon(Icons.close, color: Colors.white),
-                                    style: IconButton.styleFrom(
-                                      backgroundColor: Colors.black54,
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        _selectedImage = null;
-                                      });
-                                    },
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.add_photo_alternate,
-                                  size: 48,
-                                  color: Colors.grey.shade400,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Tap to add image',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-                
-                // Submit button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _handleSubmit,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: green,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 4,
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Text(
-                            'Confirm',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
+                const SizedBox(width: 4),
+                const Text(
+                  '*',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red,
                   ),
                 ),
-                
-                const SizedBox(height: 16),
-                // Submit button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : Navigator.of(context).pop,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: red,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 4,
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Text(
-                            'Cancel',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-                
-                const SizedBox(height: 16),
               ],
             ),
-          );
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCompletionStatusOption(
+                    label: 'Complete',
+                    value: 'complete',
+                    icon: Icons.check_circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildCompletionStatusOption(
+                    label: 'Partial Success',
+                    value: 'partial',
+                    icon: Icons.warning_amber_rounded,
+                  ),
+                ),
+              ],
+            ),
+            // Show helper text if nothing selected
+            if (_deliveryCompletionStatus == null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Please select one of the options above',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+
+            // Partial success reason and notes (only for partial success)
+            if (_deliveryCompletionStatus == 'partial') ...[
+              Text(
+                'Reason for Partial Success',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _partialSuccessReason,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                hint: const Text('Select a reason'),
+                items:
+                    [
+                      'Some items missing',
+                      'Damaged items',
+                      'Quantity mismatch',
+                      'Wrong items received',
+                      'Partial delivery accepted by receiver',
+                      'Other',
+                    ].map((reason) {
+                      return DropdownMenuItem(
+                        value: reason,
+                        child: Text(reason, overflow: TextOverflow.ellipsis),
+                      );
+                    }).toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _partialSuccessReason = value;
+                    _showPartialSuccessCustomReason = value == 'Other';
+                    if (!_showPartialSuccessCustomReason) {
+                      _partialSuccessCustomReason = '';
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Custom reason text field for partial success
+              if (_showPartialSuccessCustomReason) ...[
+                TextField(
+                  decoration: InputDecoration(
+                    labelText: 'Please specify the reason',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                  ),
+                  maxLines: 3,
+                  onChanged: (value) {
+                    setState(() {
+                      _partialSuccessCustomReason = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              const SizedBox(height: 8),
+
+              // Notes field for delivery
+              Text(
+                'Notes (Optional)',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade800,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _deliveryNotesController,
+                decoration: InputDecoration(
+                  hintText: 'Add any additional notes about the delivery...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                maxLines: 4,
+                onChanged: (value) {
+                  setState(() {
+                    _deliveryNotes = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 24),
+            ],
+          ],
+
+          // Delivery failure reason (only for delivery failure)
+          if (!widget.isPickup && _selectedStatus == 'failed') ...[
+            Text(
+              'Reason for Failure',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedReason,
+              isExpanded: true,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              hint: const Text('Select a reason'),
+              items: _deliveryFailureReasons.map((reason) {
+                return DropdownMenuItem(
+                  value: reason,
+                  child: Text(reason, overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedReason = value;
+                  _showCustomReason = value == 'Other';
+                  if (!_showCustomReason) {
+                    _customReason = '';
+                  }
+                });
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Custom reason text field
+            if (_showCustomReason) ...[
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Please specify the reason',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                maxLines: 3,
+                onChanged: (value) {
+                  setState(() {
+                    _customReason = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Image attachment (optional for failures)
+            Text(
+              'Attach Image (Optional)',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey.shade50,
+                ),
+                child: _selectedImage != null
+                    ? Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(
+                              _selectedImage!,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.black54,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedImage = null;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap to add image',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Pickup completion status (only for pickup success)
+          if (widget.isPickup && _selectedStatus == 'success') ...[
+            Row(
+              children: [
+                Text(
+                  'Pickup Status',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.grey.shade800,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  '*',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // Ensure neither is pre-selected - user must explicitly choose
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCompletionStatusOption(
+                    label: 'Complete',
+                    value: 'complete',
+                    icon: Icons.check_circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildCompletionStatusOption(
+                    label: 'Partial Success',
+                    value: 'partial',
+                    icon: Icons.warning_amber_rounded,
+                  ),
+                ),
+              ],
+            ),
+            // Show helper text if nothing selected
+            if (_pickupCompletionStatus == null) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Please select one of the options above',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey.shade600,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+
+            // Notes field
+            Text(
+              'Notes (Optional)',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _notesController,
+              decoration: InputDecoration(
+                hintText: 'Add any additional notes about the pickup...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              maxLines: 4,
+            ),
+            const SizedBox(height: 24),
+
+            // Image attachment
+            Text(
+              'Attach Image (Optional)',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey.shade50,
+                ),
+                child: _selectedImage != null
+                    ? Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(
+                              _selectedImage!,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.black54,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedImage = null;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap to add image',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Failure reason (only show if failed and pickup)
+          if (widget.isPickup && _selectedStatus == 'failed') ...[
+            Text(
+              'Reason for Failure',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _selectedReason,
+              isExpanded: true,
+              decoration: InputDecoration(
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+              ),
+              hint: const Text('Select a reason'),
+              items: _failureReasons.map((reason) {
+                return DropdownMenuItem(
+                  value: reason,
+                  child: Text(reason, overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  _selectedReason = value;
+                  _showCustomReason = value == 'Other';
+                  if (!_showCustomReason) {
+                    _customReason = '';
+                  }
+                });
+              },
+            ),
+
+            const SizedBox(height: 16),
+
+            // Custom reason text field
+            if (_showCustomReason) ...[
+              TextField(
+                decoration: InputDecoration(
+                  labelText: 'Please specify the reason',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                ),
+                maxLines: 3,
+                onChanged: (value) {
+                  setState(() {
+                    _customReason = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // Image attachment (optional for failures)
+            Text(
+              'Attach Image (Optional)',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey.shade800,
+              ),
+            ),
+            const SizedBox(height: 12),
+            GestureDetector(
+              onTap: _pickImage,
+              child: Container(
+                height: 150,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                  color: Colors.grey.shade50,
+                ),
+                child: _selectedImage != null
+                    ? Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.file(
+                              _selectedImage!,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                          Positioned(
+                            top: 8,
+                            right: 8,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.black54,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _selectedImage = null;
+                                });
+                              },
+                            ),
+                          ),
+                        ],
+                      )
+                    : Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_photo_alternate,
+                            size: 48,
+                            color: Colors.grey.shade400,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Tap to add image',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+
+          // Submit button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : _handleSubmit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: green,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 4,
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      'Confirm',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+          // Submit button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isSubmitting ? null : Navigator.of(context).pop,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: red,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 4,
+              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      height: 20,
+                      width: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      'Cancel',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+        ],
+      ),
+    );
   }
 
   Widget _buildCompletionStatusOption({
@@ -4166,11 +4440,13 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
     required IconData icon,
   }) {
     // Check the appropriate completion status based on pickup/delivery
-    final completionStatus = widget.isPickup ? _pickupCompletionStatus : _deliveryCompletionStatus;
+    final completionStatus = widget.isPickup
+        ? _pickupCompletionStatus
+        : _deliveryCompletionStatus;
     // Only show as selected if explicitly set to this value (not null)
     final isSelected = completionStatus != null && completionStatus == value;
     final color = value == 'complete' ? green : Colors.orange;
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
@@ -4294,9 +4570,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           controller: _receiverNameController,
           decoration: InputDecoration(
             hintText: 'Enter receiver\'s full name',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 12,
@@ -4306,7 +4580,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           ),
         ),
         const SizedBox(height: 24),
-        
+
         // Receiver Signature
         Text(
           'Receiver Signature',
@@ -4322,10 +4596,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Colors.grey.shade300,
-              width: 1.5,
-            ),
+            border: Border.all(color: Colors.grey.shade300, width: 1.5),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.05),
@@ -4354,16 +4625,13 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
               },
               child: Text(
                 'Clear',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
             ),
           ],
         ),
         const SizedBox(height: 24),
-        
+
         // Upload Proof of Delivery (POD) - Required
         _buildFileUploadButton(
           label: 'Upload Proof of Delivery (POD)',
@@ -4378,7 +4646,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           },
         ),
         const SizedBox(height: 16),
-        
+
         // Take Photo of Deliver & Location - Recommended
         _buildFileUploadButton(
           label: 'Take Photo of Deliver & Location',
@@ -4412,10 +4680,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: green.withOpacity(0.3),
-            width: 1.5,
-          ),
+          border: Border.all(color: green.withOpacity(0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
@@ -4459,10 +4724,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             const SizedBox(height: 4),
             Text(
               subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
             if (file != null) ...[
               const SizedBox(height: 8),
@@ -4525,14 +4787,14 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           ),
         ),
       );
-      
+
       if (source == null) return;
-      
+
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _podFile = File(image.path);
@@ -4556,7 +4818,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
         source: ImageSource.camera,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _deliveryPhoto = File(image.path);
@@ -4602,14 +4864,14 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           ),
         ),
       );
-      
+
       if (source == null) return;
-      
+
       final XFile? image = await _imagePicker.pickImage(
         source: source,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           _selectedImage = File(image.path);
@@ -4630,11 +4892,11 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
   Future<void> _handleSubmit() async {
     // Prevent multiple submissions
     if (_isSubmitting) return;
-    
+
     // Helper function to show error - use dialog for better visibility in modal bottom sheet
     Future<void> showErrorDialog(String message) async {
       if (!mounted) return;
-      
+
       await showDialog(
         context: context,
         barrierDismissible: true,
@@ -4659,16 +4921,16 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
                 ),
               ],
             ),
-            content: Text(
-              message,
-              style: const TextStyle(fontSize: 16),
-            ),
+            content: Text(message, style: const TextStyle(fontSize: 16)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(),
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
                 ),
                 child: const Text(
                   'OK',
@@ -4680,7 +4942,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
         },
       );
     }
-    
+
     // Also show snackbar as backup
     void showErrorSnackbar(String message) {
       if (mounted) {
@@ -4690,12 +4952,19 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 20),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     message,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -4709,41 +4978,46 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
         );
       }
     }
-    
+
     try {
       // First, validate that a status (success/failed) is selected
-      if (_selectedStatus.isEmpty || (_selectedStatus != 'success' && _selectedStatus != 'failed')) {
-        final message = widget.isPickup 
+      if (_selectedStatus.isEmpty ||
+          (_selectedStatus != 'success' && _selectedStatus != 'failed')) {
+        final message = widget.isPickup
             ? 'Please select a status: Picked Up or Failed'
             : 'Please select a status: Delivered or Failed';
         await showErrorDialog(message);
         showErrorSnackbar(message);
         return;
       }
-      
+
       // Validate - MUST select completion status for pickup success
       if (widget.isPickup && _selectedStatus == 'success') {
-        if (_pickupCompletionStatus == null || 
-            (_pickupCompletionStatus != 'complete' && _pickupCompletionStatus != 'partial')) {
-          const message = 'Please select Pickup Status: Complete or Partial Success';
+        if (_pickupCompletionStatus == null ||
+            (_pickupCompletionStatus != 'complete' &&
+                _pickupCompletionStatus != 'partial')) {
+          const message =
+              'Please select Pickup Status: Complete or Partial Success';
           await showErrorDialog(message);
           showErrorSnackbar(message);
           return;
         }
       }
-      
+
       // Validate delivery fields (for both success and failed)
       if (!widget.isPickup) {
         if (_selectedStatus == 'success') {
           // Validate completion status for delivery success
-          if (_deliveryCompletionStatus == null || 
-              (_deliveryCompletionStatus != 'complete' && _deliveryCompletionStatus != 'partial')) {
-            const message = 'Please select Delivery Status: Complete or Partial Success';
+          if (_deliveryCompletionStatus == null ||
+              (_deliveryCompletionStatus != 'complete' &&
+                  _deliveryCompletionStatus != 'partial')) {
+            const message =
+                'Please select Delivery Status: Complete or Partial Success';
             await showErrorDialog(message);
             showErrorSnackbar(message);
             return;
           }
-          
+
           // Validate partial success reason if status is partial
           if (_deliveryCompletionStatus == 'partial') {
             if (_partialSuccessReason == null) {
@@ -4752,15 +5026,16 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
               showErrorSnackbar(message);
               return;
             }
-            
-            if (_showPartialSuccessCustomReason && _partialSuccessCustomReason.trim().isEmpty) {
+
+            if (_showPartialSuccessCustomReason &&
+                _partialSuccessCustomReason.trim().isEmpty) {
               const message = 'Please provide a reason for Partial Success';
               await showErrorDialog(message);
               showErrorSnackbar(message);
               return;
             }
           }
-          
+
           // Validate required fields for delivery success
           if (_receiverNameController.text.trim().isEmpty) {
             const message = 'Please enter receiver\'s full name';
@@ -4768,14 +5043,14 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             showErrorSnackbar(message);
             return;
           }
-          
+
           if (_podFile == null) {
             const message = 'Please upload Proof of Delivery (POD)';
             await showErrorDialog(message);
             showErrorSnackbar(message);
             return;
           }
-          
+
           if (_signatureController.isEmpty) {
             const message = 'Please provide receiver\'s signature';
             await showErrorDialog(message);
@@ -4786,18 +5061,18 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           // Validation for delivery failure is handled below in the failure section
         }
       }
-      
+
       // Validate failure reasons (for both pickup and delivery failures)
       if (_selectedStatus == 'failed') {
         if (_selectedReason == null) {
-          final message = widget.isPickup 
+          final message = widget.isPickup
               ? 'Please select a reason for pickup failure'
               : 'Please select a reason for delivery failure';
           await showErrorDialog(message);
           showErrorSnackbar(message);
           return;
         }
-        
+
         if (_showCustomReason && _customReason.trim().isEmpty) {
           const message = 'Please provide a reason for failure';
           await showErrorDialog(message);
@@ -4821,29 +5096,29 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
       }
       return;
     }
-    
+
     setState(() {
       _isSubmitting = true;
     });
-    
+
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier == null) {
         throw Exception('Carrier not found');
       }
-      
+
       // Upload POD file and delivery photo for delivery
       String? podUrl;
       String? deliveryPhotoUrl;
-      
+
       if (!widget.isPickup) {
         // Upload POD file (required)
         if (_podFile != null) {
           try {
             final ref = FirebaseService.storage.ref().child(
-              'loads/${widget.loadId}/delivery_pod_${DateTime.now().millisecondsSinceEpoch}.jpg'
+              'loads/${widget.loadId}/delivery_pod_${DateTime.now().millisecondsSinceEpoch}.jpg',
             );
             final uploadTask = ref.putFile(_podFile!);
             final snapshot = await uploadTask;
@@ -4853,12 +5128,12 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             throw Exception('Failed to upload Proof of Delivery');
           }
         }
-        
+
         // Upload delivery photo (optional)
         if (_deliveryPhoto != null) {
           try {
             final ref = FirebaseService.storage.ref().child(
-              'loads/${widget.loadId}/delivery_photo_${DateTime.now().millisecondsSinceEpoch}.jpg'
+              'loads/${widget.loadId}/delivery_photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
             );
             final uploadTask = ref.putFile(_deliveryPhoto!);
             final snapshot = await uploadTask;
@@ -4869,25 +5144,30 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           }
         }
       }
-      
+
       // Upload image if provided (for pickup or failures)
       String? imageUrl;
       if (_selectedImage != null) {
         try {
           // Upload image - different path for success vs failure
-          final imageType = _selectedStatus == 'success' ? 'confirmation' : 'failure';
+          final imageType = _selectedStatus == 'success'
+              ? 'confirmation'
+              : 'failure';
           final ref = FirebaseService.storage.ref().child(
-            'loads/${widget.loadId}/${widget.locationType}_${imageType}_${DateTime.now().millisecondsSinceEpoch}.jpg'
+            'loads/${widget.loadId}/${widget.locationType}_${imageType}_${DateTime.now().millisecondsSinceEpoch}.jpg',
           );
           final uploadTask = ref.putFile(_selectedImage!);
           final snapshot = await uploadTask;
           imageUrl = await snapshot.ref.getDownloadURL();
-          
+
           // Log image upload success
-          await FirebaseService.logEvent('load_${imageType}_image_uploaded', parameters: {
-            'load_id': widget.loadId,
-            'location_type': widget.locationType,
-          });
+          await FirebaseService.logEvent(
+            'load_${imageType}_image_uploaded',
+            parameters: {
+              'load_id': widget.loadId,
+              'location_type': widget.locationType,
+            },
+          );
         } catch (e) {
           print('Error uploading image: $e');
           await FirebaseService.recordError(
@@ -4898,14 +5178,14 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           // Continue without image if upload fails
         }
       }
-      
+
       // Store pickup confirmation data if pickup success
       if (widget.isPickup && _selectedStatus == 'success') {
         // Ensure completion status is set (validation should have caught null, but double-check)
         if (_pickupCompletionStatus == null) {
           throw Exception('Pickup completion status must be selected');
         }
-        
+
         final confirmationData = {
           'loadId': widget.loadId,
           'carrierUid': carrier.uid,
@@ -4915,7 +5195,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           'confirmedAt': Timestamp.now(),
           'createdAt': Timestamp.now(),
         };
-        
+
         try {
           await FirebaseService.firestore
               .collection('pickup_confirmations')
@@ -4925,14 +5205,14 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           // Continue even if storing confirmation fails
         }
       }
-      
+
       // Store delivery confirmation data (only for delivery success)
       if (!widget.isPickup && _selectedStatus == 'success') {
         // Ensure completion status is set (validation should have caught null, but double-check)
         if (_deliveryCompletionStatus == null) {
           throw Exception('Delivery completion status must be selected');
         }
-        
+
         // Convert signature to image and upload
         String? signatureUrl;
         if (!_signatureController.isEmpty) {
@@ -4941,17 +5221,19 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             if (signatureData != null) {
               // Save signature as temporary file
               final tempDir = Directory.systemTemp;
-              final signatureFile = File('${tempDir.path}/signature_${DateTime.now().millisecondsSinceEpoch}.png');
+              final signatureFile = File(
+                '${tempDir.path}/signature_${DateTime.now().millisecondsSinceEpoch}.png',
+              );
               await signatureFile.writeAsBytes(signatureData);
-              
+
               // Upload signature to Firebase Storage
               final ref = FirebaseService.storage.ref().child(
-                'loads/${widget.loadId}/delivery_signature_${DateTime.now().millisecondsSinceEpoch}.png'
+                'loads/${widget.loadId}/delivery_signature_${DateTime.now().millisecondsSinceEpoch}.png',
               );
               final uploadTask = ref.putFile(signatureFile);
               final snapshot = await uploadTask;
               signatureUrl = await snapshot.ref.getDownloadURL();
-              
+
               // Clean up temp file
               try {
                 await signatureFile.delete();
@@ -4969,7 +5251,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             // Continue even if signature upload fails
           }
         }
-        
+
         final deliveryConfirmationData = {
           'loadId': widget.loadId,
           'carrierUid': carrier.uid,
@@ -4978,27 +5260,34 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           'signatureUrl': signatureUrl,
           'podUrl': podUrl,
           'deliveryPhotoUrl': deliveryPhotoUrl,
-          'partialSuccessReason': _deliveryCompletionStatus == 'partial' 
-              ? (_showPartialSuccessCustomReason ? _partialSuccessCustomReason : _partialSuccessReason)
+          'partialSuccessReason': _deliveryCompletionStatus == 'partial'
+              ? (_showPartialSuccessCustomReason
+                    ? _partialSuccessCustomReason
+                    : _partialSuccessReason)
               : null,
-          'notes': _deliveryNotes.trim().isNotEmpty ? _deliveryNotes.trim() : null,
+          'notes': _deliveryNotes.trim().isNotEmpty
+              ? _deliveryNotes.trim()
+              : null,
           'confirmedAt': Timestamp.now(),
           'createdAt': Timestamp.now(),
         };
-        
+
         try {
           await FirebaseService.firestore
               .collection('delivery_confirmations')
               .add(deliveryConfirmationData);
-          
+
           // Log analytics
-          await FirebaseService.logEvent('delivery_confirmation_stored', parameters: {
-            'load_id': widget.loadId,
-            'completion_status': _deliveryCompletionStatus!,
-            'has_pod': podUrl != null ? 1 : 0,
-            'has_delivery_photo': deliveryPhotoUrl != null ? 1 : 0,
-            'has_signature': signatureUrl != null ? 1 : 0,
-          });
+          await FirebaseService.logEvent(
+            'delivery_confirmation_stored',
+            parameters: {
+              'load_id': widget.loadId,
+              'completion_status': _deliveryCompletionStatus!,
+              'has_pod': podUrl != null ? 1 : 0,
+              'has_delivery_photo': deliveryPhotoUrl != null ? 1 : 0,
+              'has_signature': signatureUrl != null ? 1 : 0,
+            },
+          );
         } catch (e) {
           print('Error storing delivery confirmation: $e');
           await FirebaseService.recordError(
@@ -5009,7 +5298,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           // Continue even if storing confirmation fails
         }
       }
-      
+
       // Determine new status
       String newStatus;
       if (widget.isPickup) {
@@ -5027,7 +5316,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           newStatus = 'in-transit'; // Keep as in-transit for delivery failures
         }
       }
-      
+
       // Update load status
       if (_selectedStatus == 'success') {
         try {
@@ -5036,14 +5325,17 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             status: newStatus,
             carrierUid: carrier.uid,
           );
-          
+
           // Log analytics for success
-          await FirebaseService.logEvent('load_${widget.locationType}_success', parameters: {
-            'load_id': widget.loadId,
-            'completion_status': widget.isPickup 
-                ? (_pickupCompletionStatus ?? 'unknown')
-                : (_deliveryCompletionStatus ?? 'unknown'),
-          });
+          await FirebaseService.logEvent(
+            'load_${widget.locationType}_success',
+            parameters: {
+              'load_id': widget.loadId,
+              'completion_status': widget.isPickup
+                  ? (_pickupCompletionStatus ?? 'unknown')
+                  : (_deliveryCompletionStatus ?? 'unknown'),
+            },
+          );
         } catch (e) {
           await FirebaseService.recordError(
             e,
@@ -5053,11 +5345,11 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           rethrow;
         }
       }
-      
+
       // Store failure reason and image if it's a failure (for both pickup and delivery)
       if (_selectedStatus == 'failed') {
         final reason = _showCustomReason ? _customReason : _selectedReason;
-        
+
         // Store failure information in Firestore
         try {
           final failureData = {
@@ -5069,18 +5361,21 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             'timestamp': DateTime.now().toIso8601String(),
             'carrierUid': carrier.uid,
           };
-          
+
           await FirebaseService.firestore
               .collection('load_failures')
               .add(failureData);
-          
+
           // Log analytics for failure
-          await FirebaseService.logEvent('load_${widget.locationType}_failed', parameters: {
-            'load_id': widget.loadId,
-            'reason': reason ?? 'Unknown',
-            'has_image': imageUrl != null ? 1 : 0,
-            'is_custom_reason': _showCustomReason ? 1 : 0,
-          });
+          await FirebaseService.logEvent(
+            'load_${widget.locationType}_failed',
+            parameters: {
+              'load_id': widget.loadId,
+              'reason': reason ?? 'Unknown',
+              'has_image': imageUrl != null ? 1 : 0,
+              'is_custom_reason': _showCustomReason ? 1 : 0,
+            },
+          );
         } catch (e) {
           print('Error storing failure data: $e');
           await FirebaseService.recordError(
@@ -5091,24 +5386,29 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           // Continue even if storing fails
         }
       }
-      
+
       // Success - update UI state and close dialog
       if (mounted) {
         setState(() {
           _isSubmitting = false;
         });
-        
+
         Navigator.of(context).pop();
         widget.onStatusUpdated();
-        
+
         // Show success message using root context
         try {
-          final rootContext = Navigator.of(context, rootNavigator: true).context;
+          final rootContext = Navigator.of(
+            context,
+            rootNavigator: true,
+          ).context;
           ScaffoldMessenger.of(rootContext).showSnackBar(
             SnackBar(
               content: Text(
                 _selectedStatus == 'success'
-                    ? (widget.isPickup ? 'Pickup confirmed successfully' : 'Delivery confirmed successfully')
+                    ? (widget.isPickup
+                          ? 'Pickup confirmed successfully'
+                          : 'Delivery confirmed successfully')
                     : 'Failure reason recorded',
               ),
               backgroundColor: green,
@@ -5121,7 +5421,9 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             SnackBar(
               content: Text(
                 _selectedStatus == 'success'
-                    ? (widget.isPickup ? 'Pickup confirmed successfully' : 'Delivery confirmed successfully')
+                    ? (widget.isPickup
+                          ? 'Pickup confirmed successfully'
+                          : 'Delivery confirmed successfully')
                     : 'Failure reason recorded',
               ),
               backgroundColor: green,
@@ -5137,25 +5439,29 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           _isSubmitting = false;
         });
       }
-      
+
       // Log error to Crashlytics
       await FirebaseService.recordError(
         e,
         StackTrace.current,
-        reason: 'Failed to ${widget.isPickup ? "confirm pickup" : "confirm delivery"}',
+        reason:
+            'Failed to ${widget.isPickup ? "confirm pickup" : "confirm delivery"}',
       );
-      
+
       // Log analytics for error
-      await FirebaseService.logEvent('load_confirmation_error', parameters: {
-        'load_id': widget.loadId,
-        'location_type': widget.locationType,
-        'error_type': e.runtimeType.toString(),
-        'error_message': e.toString(),
-      });
-      
+      await FirebaseService.logEvent(
+        'load_confirmation_error',
+        parameters: {
+          'load_id': widget.loadId,
+          'location_type': widget.locationType,
+          'error_type': e.runtimeType.toString(),
+          'error_message': e.toString(),
+        },
+      );
+
       if (mounted) {
         String errorMessage = 'Failed to update status';
-        
+
         // Provide user-friendly error messages
         if (e.toString().contains('Load not found')) {
           errorMessage = 'Load not found. Please refresh and try again.';
@@ -5168,22 +5474,23 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
         } else {
           errorMessage = 'Failed to update status: ${e.toString()}';
         }
-        
+
         // Show error dialog
         await showErrorDialog(errorMessage);
-        
+
         // Also show snackbar
         try {
-          final rootContext = Navigator.of(context, rootNavigator: true).context;
+          final rootContext = Navigator.of(
+            context,
+            rootNavigator: true,
+          ).context;
           ScaffoldMessenger.of(rootContext).showSnackBar(
             SnackBar(
               content: Row(
                 children: [
                   const Icon(Icons.error_outline, color: Colors.white),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(errorMessage),
-                  ),
+                  Expanded(child: Text(errorMessage)),
                 ],
               ),
               backgroundColor: Colors.red,
@@ -5198,9 +5505,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
                 children: [
                   const Icon(Icons.error_outline, color: Colors.white),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(errorMessage),
-                  ),
+                  Expanded(child: Text(errorMessage)),
                 ],
               ),
               backgroundColor: Colors.red,

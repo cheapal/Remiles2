@@ -4,6 +4,7 @@ import 'package:remiles/models/load_model.dart';
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/load_card_info.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_preferences.dart';
 import 'dart:io';
 import 'dart:async';
 
@@ -17,11 +18,12 @@ class ManageLoadScreen extends StatefulWidget {
   State<ManageLoadScreen> createState() => _ManageLoadScreenState();
 }
 
-class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerProviderStateMixin {
+class _ManageLoadScreenState extends State<ManageLoadScreen>
+    with SingleTickerProviderStateMixin {
   String _searchQuery = '';
   String _selectedFilter = 'All';
   final TextEditingController _searchController = TextEditingController();
-  
+
   // State management
   List<LoadModel> _loads = [];
   bool _isLoading = false;
@@ -36,11 +38,15 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
   static const double _searchBarHeight = 50;
   static const double _sortHeaderHeight = 48;
   static const double _searchAndSortSpacing = 12;
-  static const double _sortExpandedExtraHeight = 116; // 12 spacing + two 40px rows + 8 gap + 16 bottom padding
+  static const double _sortExpandedExtraHeight =
+      116; // 12 spacing + two 40px rows + 8 gap + 16 bottom padding
   static const double _stickyHeaderTopPadding = 8;
 
   double get _collapsedHeaderHeight =>
-      _stickyHeaderTopPadding + _searchBarHeight + _searchAndSortSpacing + _sortHeaderHeight;
+      _stickyHeaderTopPadding +
+      _searchBarHeight +
+      _searchAndSortSpacing +
+      _sortHeaderHeight;
 
   @override
   void initState() {
@@ -70,10 +76,9 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
     super.dispose();
   }
 
-
   Future<void> _loadLoads({bool reset = false}) async {
     if (_isLoading || !_hasMore) return;
-    
+
     if (!mounted) return;
     setState(() {
       _isLoading = true;
@@ -92,7 +97,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
       }
 
       Map<String, dynamic> result;
-      
+
       if (_selectedFilter == 'All') {
         // Get all loads for the carrier (both available and booked)
         result = await FirebaseService.getAllLoadsForCarrier(
@@ -110,10 +115,13 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
         );
       } else {
         String status = 'booked';
-        if (_selectedFilter == 'In-Transit') status = 'in-transit';
-        else if (_selectedFilter == 'Cancelled Loads') status = 'cancelled';
-        else if (_selectedFilter == 'Completed Loads') status = 'completed';
-        
+        if (_selectedFilter == 'In-Transit')
+          status = 'in-transit';
+        else if (_selectedFilter == 'Cancelled Loads')
+          status = 'cancelled';
+        else if (_selectedFilter == 'Completed Loads')
+          status = 'completed';
+
         result = await FirebaseService.getCarrierBookedLoads(
           carrierUid: user.uid,
           status: status,
@@ -135,28 +143,45 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
           _isLoading = false;
         });
       }
-      
+
       // Debug print
       print('Loaded ${_loads.length} loads for filter: $_selectedFilter');
       print('Has more: $_hasMore');
-      
+
       // Debug: Check match percentages
-      final matchedCount = _loads.where((load) => load.matchPercentage != null && load.matchPercentage! > 0).length;
+      final matchedCount = _loads
+          .where(
+            (load) => load.matchPercentage != null && load.matchPercentage! > 0,
+          )
+          .length;
       print('Loads with matchPercentage > 0: $matchedCount');
       if (matchedCount > 0) {
-        final topMatches = _loads.where((load) => load.matchPercentage != null && load.matchPercentage! > 0)
-            .toList()
-          ..sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
-        print('Top 3 matches: ${topMatches.take(3).map((l) => '${l.id}: ${l.matchPercentage?.toStringAsFixed(1)}%').join(', ')}');
+        final topMatches =
+            _loads
+                .where(
+                  (load) =>
+                      load.matchPercentage != null && load.matchPercentage! > 0,
+                )
+                .toList()
+              ..sort(
+                (a, b) =>
+                    (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0),
+              );
+        print(
+          'Top 3 matches: ${topMatches.take(3).map((l) => '${l.id}: ${l.matchPercentage?.toStringAsFixed(1)}%').join(', ')}',
+        );
       }
     } catch (e) {
       String errorMessage;
       print('Error loading loads: $e'); // Debug print
       print('Selected filter: $_selectedFilter'); // Debug print
       print('Search query: $_searchQuery'); // Debug print
-      
-      if (e is SocketException || e.toString().contains('network') || e.toString().contains('connection')) {
-        errorMessage = 'Network error. Please check your internet connection and try again.';
+
+      if (e is SocketException ||
+          e.toString().contains('network') ||
+          e.toString().contains('connection')) {
+        errorMessage =
+            'Network error. Please check your internet connection and try again.';
       } else if (e.toString().contains('permission')) {
         errorMessage = 'Permission denied. Please contact support.';
       } else if (e.toString().contains('not found')) {
@@ -164,13 +189,13 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
       } else {
         errorMessage = 'Failed to load loads: ${e.toString()}';
       }
-      
+
       if (mounted) {
         setState(() {
           _error = errorMessage;
           _isLoading = false;
         });
-        
+
         // Show user-friendly error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -196,7 +221,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
       _hasMore = true;
       _error = null;
     });
-    
+
     // Reload data
     await _loadLoads(reset: true);
   }
@@ -220,10 +245,10 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
       setState(() {
         _searchQuery = query;
       });
-      
+
       // Cancel previous debounce timer
       _searchDebounce?.cancel();
-      
+
       // If immediate is true (e.g., when clearing), reload right away
       // Otherwise, use debounce timer
       if (immediate) {
@@ -254,7 +279,12 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final headerHeight = _collapsedHeaderHeight + (_sortExpandedExtraHeight * _sortAnimation.value);
+    final media = MediaQuery.of(context);
+    final screenW = media.size.width;
+    final bool isWide = screenW >= 900;
+    final headerHeight =
+        _collapsedHeaderHeight +
+        (_sortExpandedExtraHeight * _sortAnimation.value);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -262,49 +292,55 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
         children: [
           /// Top Navigation Bar - Fixed at top
           TopNavigationBar(context),
-          
-          /// RefreshIndicator starts from here (above Manage Loads text)
+
+          /// RefreshIndicator starts from here
           Expanded(
             child: RefreshIndicator(
               onRefresh: _refreshLoads,
               child: CustomScrollView(
                 slivers: [
                   SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// Top Card without Shadow
-                        Container(
-                          margin: const EdgeInsets.all(16),
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Manage Loads",
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                  height: 1.2,
-                                ),
+                    child: Container(
+                      padding: EdgeInsets.only(left: isWide ? 340 : 0),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 760),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            /// Top Card
+                            Container(
+                              margin: const EdgeInsets.all(16),
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              const SizedBox(height: 8),
-                              Text(
-                                "Track and manage your loads efficiently",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey.shade600,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    "Manage Loads",
+                                    style: TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.black,
+                                      height: 1.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    "Track and manage your loads efficiently",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
 
@@ -313,7 +349,17 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
                     pinned: true,
                     floating: false,
                     delegate: _StickySearchBarDelegate(
-                      child: _buildSearchAndFilterSection(),
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isWide ? 100.0 : 0.0,
+                          ),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 760),
+                            child: _buildSearchAndFilterSection(),
+                          ),
+                        ),
+                      ),
                       minHeight: headerHeight,
                       maxHeight: headerHeight,
                       topPadding: _stickyHeaderTopPadding,
@@ -321,20 +367,32 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
                   ),
 
                   SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        /// Recommended Load (only show matched loads with matchPercentage for Available Loads and All)
-                        if ((_selectedFilter == 'Available Loads' || _selectedFilter == 'All')) ...[
-                          ..._buildRecommendedLoads(),
-                          const SizedBox(height: 20),
-                        ],
-                      ],
+                    child: Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isWide ? 100.0 : 0.0,
+                        ),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 760),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              /// Recommended Load
+                              if ((_selectedFilter == 'Available Loads' ||
+                                  _selectedFilter == 'All')) ...[
+                                const SizedBox(height: 16),
+                                ..._buildRecommendedLoads(),
+                                const SizedBox(height: 20),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
 
                   /// Load Cards
-                  _buildLoadCardsSliver(),
+                  _buildLoadCardsSliver(isWide),
                 ],
               ),
             ),
@@ -368,7 +426,11 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
             child: Row(
               children: [
                 const SizedBox(width: 16),
-                Icon(Icons.search, size: 20, color: Colors.black.withOpacity(0.6)),
+                Icon(
+                  Icons.search,
+                  size: 20,
+                  color: Colors.black.withOpacity(0.6),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: TextField(
@@ -412,8 +474,19 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
                         duration: const Duration(seconds: 1),
                       ),
                     );
+
+                    ///redirect to preferences page
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CarrierPreferencesPage(),
+                      ),
+                    );
                   },
-                  icon: Icon(Icons.filter_list, color: Colors.black.withOpacity(0.6)),
+                  icon: Icon(
+                    Icons.filter_list,
+                    color: Colors.black.withOpacity(0.6),
+                  ),
                   tooltip: 'Filter',
                 ),
                 const SizedBox(width: 8),
@@ -492,10 +565,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
                 padding: const EdgeInsets.fromLTRB(10, 0, 16, 10),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(height: 12),
-                    _buildFilterButtons(),
-                  ],
+                  children: [const SizedBox(height: 12), _buildFilterButtons()],
                 ),
               ),
             ),
@@ -506,8 +576,15 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
   }
 
   Widget _buildFilterButtons() {
-    final filters = ['All', 'Available', 'My Bookings', 'In-Transit', 'Cancelled', 'Completed'];
-    
+    final filters = [
+      'All',
+      'Available',
+      'My Bookings',
+      'In-Transit',
+      'Cancelled',
+      'Completed',
+    ];
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -539,25 +616,29 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
   /// Get loads that have matchPercentage > 0 (matched/recommended loads)
   /// These are loads that have a meaningful match score
   List<LoadModel> _getMatchedLoads() {
-    return _loads.where((load) => 
-      load.matchPercentage != null && load.matchPercentage! > 0
-    ).toList();
+    return _loads
+        .where(
+          (load) => load.matchPercentage != null && load.matchPercentage! > 0,
+        )
+        .toList();
   }
 
   /// Get all loads for regular cards (excluding the top recommended one)
   /// This includes all loads with any match percentage
   List<LoadModel> _getNonMatchedLoads() {
     final matchedLoads = _getMatchedLoads();
-    
+
     // If there are matched loads, exclude the top one (shown in recommended section)
     if (matchedLoads.isNotEmpty) {
-      matchedLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
+      matchedLoads.sort(
+        (a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0),
+      );
       final topMatchId = matchedLoads.first.id;
-      
+
       // Return all loads except the top matched one
       return _loads.where((load) => load.id != topMatchId).toList();
     }
-    
+
     // If no matched loads, return all loads
     return _loads;
   }
@@ -566,28 +647,28 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
   /// Shows only the best match to highlight it
   List<Widget> _buildRecommendedLoads() {
     final matchedLoads = _getMatchedLoads();
-    
+
     if (matchedLoads.isEmpty) {
       return [];
     }
-    
+
     // Sort by match percentage (highest first) and take the first one
-    matchedLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
-    
+    matchedLoads.sort(
+      (a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0),
+    );
+
     // Only show in recommended if match is above 20% threshold
     final topMatch = matchedLoads.first;
     if (topMatch.matchPercentage != null && topMatch.matchPercentage! >= 20.0) {
-      return [
-        RecommendedLoad(load: topMatch),
-      ];
+      return [RecommendedLoad(load: topMatch)];
     }
-    
+
     return [];
   }
 
   Widget _buildFilterButton(String text, int index) {
     final isActive = _selectedFilter == text;
-    
+
     return Expanded(
       child: GestureDetector(
         onTap: () => _onFilterChanged(text),
@@ -620,41 +701,56 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
     );
   }
 
-  Widget _buildLoadCardsSliver() {
+  Widget _buildLoadCardsSliver(bool isWide) {
     if (_error != null) {
       return SliverToBoxAdapter(
-        child: Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.all(32),
-          decoration: BoxDecoration(
-            color: Colors.red.shade50,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.red.shade200),
-          ),
-          child: Column(
-            children: [
-              Icon(Icons.error_outline, size: 64, color: Colors.red.shade400),
-              const SizedBox(height: 16),
-              Text(
-                'Error loading loads',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.red.shade600,
+        child: Center(
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: isWide ? 100.0 : 0.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error loading loads',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.red.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _error!,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.red.shade500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _refreshLoads,
+                      child: const Text('Retry'),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                _error!,
-                style: TextStyle(fontSize: 14, color: Colors.red.shade500),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _refreshLoads,
-                child: const Text('Retry'),
-              ),
-            ],
+            ),
           ),
         ),
       );
@@ -666,7 +762,15 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
     if (_loads.isEmpty && _isLoading) {
       return SliverList(
         delegate: SliverChildBuilderDelegate(
-          (context, index) => _buildLoadingCard(),
+          (context, index) => Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: isWide ? 100.0 : 0.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: _buildLoadingCard(),
+              ),
+            ),
+          ),
           childCount: 3, // Show 3 loading cards
         ),
       );
@@ -675,81 +779,101 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
     if (nonMatchedLoads.isEmpty && !_isLoading) {
       return SliverToBoxAdapter(
         child: Center(
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(32),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.inbox_outlined,
-                  size: 64,
-                  color: Colors.grey.shade400,
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: isWide ? 100.0 : 0.0),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760),
+              child: Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  'No loads found',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.grey.shade600,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.inbox_outlined,
+                      size: 64,
+                      color: Colors.grey.shade400,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'No loads found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _searchQuery.isNotEmpty
+                          ? 'Try adjusting your search terms'
+                          : 'No loads available for this filter',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  _searchQuery.isNotEmpty 
-                    ? 'Try adjusting your search terms'
-                    : 'No loads available for this filter',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade500,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
       );
     }
-    
+
     return SliverList(
-      delegate: SliverChildBuilderDelegate(
-        (context, index) {
-          if (index < nonMatchedLoads.length) {
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: LoadCardInfo(load: nonMatchedLoads[index], onLoadBooked: _refreshLoads),
-            );
-          } else if (_hasMore && !_isLoading) {
-            // Load more when reaching the end
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _loadLoads();
-            });
-            return const SizedBox.shrink();
-          } else if (_isLoading) {
-            return const Padding(
-              padding: EdgeInsets.all(16),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 8),
-                    Text('Loading more loads...', style: TextStyle(color: Colors.grey)),
-                  ],
+      delegate: SliverChildBuilderDelegate((context, index) {
+        if (index < nonMatchedLoads.length) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: isWide ? 100.0 : 0.0),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  child: LoadCardInfo(
+                    load: nonMatchedLoads[index],
+                    onLoadBooked: _refreshLoads,
+                  ),
                 ),
               ),
-            );
-          }
+            ),
+          );
+        } else if (_hasMore && !_isLoading) {
+          // Load more when reaching the end
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _loadLoads();
+          });
           return const SizedBox.shrink();
-        },
-        childCount: nonMatchedLoads.length + (_hasMore ? 1 : 0),
-      ),
+        } else if (_isLoading) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 8),
+                  Text(
+                    'Loading more loads...',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
+      }, childCount: nonMatchedLoads.length + (_hasMore ? 1 : 0)),
     );
   }
 
@@ -815,7 +939,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Route Info
           Row(
             children: [
@@ -861,7 +985,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
             ],
           ),
           const SizedBox(height: 12),
-          
+
           // Dates
           Row(
             children: [
@@ -917,7 +1041,7 @@ class _ManageLoadScreenState extends State<ManageLoadScreen> with SingleTickerPr
           ),
           const SizedBox(height: 12),
           const Divider(),
-          
+
           // Bottom Row
           Row(
             children: [
@@ -985,7 +1109,11 @@ class _StickySearchBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => maxHeight;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

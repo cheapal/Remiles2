@@ -11,7 +11,7 @@ import '../modules/shipper_dashboard/pages/shipper_dashboard_1.dart';
 import '../modules/carrier_onboarding/carrier_onboarding_wrapper.dart';
 import '../modules/shipper_onboarding/shipper_onboarding_wrapper.dart';
 import '../modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_1.dart';
-import '../modules/carrier_dashboard/views/dashboard/pages/main_page.dart';
+import '../modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_main_page.dart';
 import '../models/user_model.dart';
 import 'firebase_service.dart';
 
@@ -46,9 +46,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   void _onAuthStateChanged() async {
     if (!mounted) return; // Prevent navigation if widget is disposed
-    
-    print('AuthWrapper: Auth state changed - isLoggedIn: ${_authProvider.isLoggedIn}, firebaseUser: ${_authProvider.firebaseUser?.uid}');
-    
+
+    print(
+      'AuthWrapper: Auth state changed - isLoggedIn: ${_authProvider.isLoggedIn}, firebaseUser: ${_authProvider.firebaseUser?.uid}',
+    );
+
     final userProvider = context.read<UserProvider>();
 
     // Check for Firebase user (even if Firestore data doesn't exist yet - e.g., new Google Sign-In users)
@@ -60,13 +62,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
         print('AuthWrapper: Loading user data...');
         try {
           await userProvider.loadCurrentUser();
-          
+
           // Update AuthProvider with the loaded user data
           if (userProvider.currentUser != null) {
-            print('AuthWrapper: User data loaded successfully: ${userProvider.currentUser?.role}');
-            _authProvider.setUserData(_authProvider.firebaseUser, userProvider.currentUser);
+            print(
+              'AuthWrapper: User data loaded successfully: ${userProvider.currentUser?.role}',
+            );
+            _authProvider.setUserData(
+              _authProvider.firebaseUser,
+              userProvider.currentUser,
+            );
           } else {
-            print('AuthWrapper: No user data found in UserProvider - this might be a new user');
+            print(
+              'AuthWrapper: No user data found in UserProvider - this might be a new user',
+            );
             // Don't sign out - this could be a new Google Sign-In user who needs role selection
             // Keep the Firebase user authenticated
           }
@@ -78,7 +87,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
         }
       } else {
         // Firebase user exists but no Firestore data - could be new user
-        print('AuthWrapper: Firebase user exists but no Firestore data - likely new user');
+        print(
+          'AuthWrapper: Firebase user exists but no Firestore data - likely new user',
+        );
         // Don't navigate away - let the current flow (e.g., role selection) continue
       }
 
@@ -93,7 +104,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
       }
 
       // Navigate based on role
-      print('AuthWrapper: Navigating based on role: ${_authProvider.currentUser?.role}');
+      print(
+        'AuthWrapper: Navigating based on role: ${_authProvider.currentUser?.role}',
+      );
       if (_authProvider.currentUser?.role == UserRole.shipper) {
         // Check if shipper needs onboarding
         final shipper = _authProvider.shipperUser;
@@ -101,23 +114,30 @@ class _AuthWrapperState extends State<AuthWrapper> {
         if (shipper != null) {
           // Check both the flag and actual onboarding data
           final isOnboardingComplete = shipper.isOnboardingComplete;
-          print('AuthWrapper: Shipper isOnboardingComplete flag: $isOnboardingComplete');
-          print('AuthWrapper: Shipper onboarding data: ${shipper.onboardingData?.toString()}');
-          
+          print(
+            'AuthWrapper: Shipper isOnboardingComplete flag: $isOnboardingComplete',
+          );
+          print(
+            'AuthWrapper: Shipper onboarding data: ${shipper.onboardingData?.toString()}',
+          );
+
           if (!isOnboardingComplete) {
             print('AuthWrapper: Navigating to Shipper Onboarding Wrapper');
             if (mounted) {
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const ShipperOnboardingWrapper()),
+                MaterialPageRoute(
+                  builder: (_) => const ShipperOnboardingWrapper(),
+                ),
                 (route) => false,
               );
             }
           } else {
             // Check if dashboard steps are completed
             print('AuthWrapper: Checking if dashboard steps are completed...');
-            final isDashboardComplete = await FirebaseService.isShipperDashboardComplete(shipper.uid);
+            final isDashboardComplete =
+                await FirebaseService.isShipperDashboardComplete(shipper.uid);
             print('AuthWrapper: Dashboard complete: $isDashboardComplete');
-            
+
             if (!isDashboardComplete) {
               print('AuthWrapper: Navigating to Shipper Dashboard 1');
               if (mounted) {
@@ -130,7 +150,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
               print('AuthWrapper: Navigating to Shipper Dashboard Main Page');
               if (mounted) {
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+                  MaterialPageRoute(
+                    builder: (_) => const ShipperDashboardMainPage(),
+                  ),
                   (route) => false,
                 );
               }
@@ -148,19 +170,26 @@ class _AuthWrapperState extends State<AuthWrapper> {
       } else if (_authProvider.currentUser?.role == UserRole.carrier) {
         final carrier = _authProvider.carrierUser;
         if (carrier != null && carrier.isOnboardingComplete == false) {
-        print('AuthWrapper: Navigating to Carrier Onboarding Wrapper');
-        if (mounted) {
-          Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-            (route) => false,
-          );
+          print('AuthWrapper: Navigating to Carrier Onboarding Wrapper');
+          if (mounted) {
+            Navigator.of(context).pushAndRemoveUntil(
+              MaterialPageRoute(
+                builder: (_) => const CarrierOnboardingWrapper(),
+              ),
+              (route) => false,
+            );
           }
         } else if (carrier != null) {
           // Check if dashboard steps are completed
-          print('AuthWrapper: Checking if carrier dashboard steps are completed...');
-          final isDashboardComplete = await FirebaseService.isCarrierDashboardComplete(carrier.uid);
-          print('AuthWrapper: Carrier dashboard complete: $isDashboardComplete');
-          
+          print(
+            'AuthWrapper: Checking if carrier dashboard steps are completed...',
+          );
+          final isDashboardComplete =
+              await FirebaseService.isCarrierDashboardComplete(carrier.uid);
+          print(
+            'AuthWrapper: Carrier dashboard complete: $isDashboardComplete',
+          );
+
           if (!isDashboardComplete) {
             print('AuthWrapper: Navigating to Carrier Dashboard 1');
             if (mounted) {
@@ -173,7 +202,9 @@ class _AuthWrapperState extends State<AuthWrapper> {
             print('AuthWrapper: Navigating to Carrier Main Page');
             if (mounted) {
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const MainPage()),
+                MaterialPageRoute(
+                  builder: (_) => const CarrierDashboardMainPage(),
+                ),
                 (route) => false,
               );
             }
@@ -201,7 +232,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
       // User is not authenticated, show welcome screen
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const WelcomeScreen(nextScreen: SignScreen(nextScreen: LoginScreen()))),
+          MaterialPageRoute(
+            builder: (_) => const WelcomeScreen(
+              nextScreen: SignScreen(nextScreen: LoginScreen()),
+            ),
+          ),
           (route) => false,
         );
       }
@@ -211,16 +246,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   Widget build(BuildContext context) {
     // Show a simple loading screen while determining auth state
-    return const LoadingScreen(
-      message: 'Loading...',
-    );
+    return const LoadingScreen(message: 'Loading...');
   }
 }
 
 // Loading screen widget
 class LoadingScreen extends StatelessWidget {
   final String? message;
-  
+
   const LoadingScreen({Key? key, this.message}) : super(key: key);
 
   @override
@@ -239,20 +272,17 @@ class LoadingScreen extends StatelessWidget {
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 40),
-            
+
             // Loading indicator
             const CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF4B744F)),
             ),
-            
+
             if (message != null) ...[
               const SizedBox(height: 20),
               Text(
                 message!,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF666666)),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -267,12 +297,9 @@ class LoadingScreen extends StatelessWidget {
 class ErrorScreen extends StatelessWidget {
   final String error;
   final VoidCallback? onRetry;
-  
-  const ErrorScreen({
-    Key? key,
-    required this.error,
-    this.onRetry,
-  }) : super(key: key);
+
+  const ErrorScreen({Key? key, required this.error, this.onRetry})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -291,7 +318,7 @@ class ErrorScreen extends StatelessWidget {
                 color: Color(0xFFE53E3E),
               ),
               const SizedBox(height: 20),
-              
+
               // Error message
               Text(
                 'Something went wrong',
@@ -303,17 +330,14 @@ class ErrorScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
-              
+
               Text(
                 error,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF666666)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 30),
-              
+
               // Retry button
               if (onRetry != null)
                 ElevatedButton(

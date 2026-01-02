@@ -2,7 +2,7 @@ import 'package:remiles/core/theme/colors.dart';
 import 'package:remiles/core/firebase_service.dart';
 import 'package:remiles/models/load_model.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
-import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/marketplace_screen.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_manage_load_screen.dart';
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
 import 'package:remiles/models/user_model.dart';
 import 'package:flutter/material.dart';
@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 class BookedNow extends StatefulWidget {
   final LoadModel load;
   final VoidCallback? onLoadBooked;
-  
+
   const BookedNow({super.key, required this.load, this.onLoadBooked});
 
   @override
@@ -22,7 +22,8 @@ class _BookedNowState extends State<BookedNow> {
   String _currentStatus = '';
   String? _bookedByCarrierId; // Store bookedByCarrierId in state
   bool _isDescriptionExpanded = false;
-  String? _bookedByCarrierName; // Store carrier name who booked the load (for shipper view)
+  String?
+  _bookedByCarrierName; // Store carrier name who booked the load (for shipper view)
   Map<String, dynamic>? _escrowPaymentData; // Store escrow payment status
   bool _isLoadingEscrow = false;
 
@@ -45,7 +46,7 @@ class _BookedNowState extends State<BookedNow> {
   void didUpdateWidget(BookedNow oldWidget) {
     super.didUpdateWidget(oldWidget);
     // Refresh status when widget is updated
-    if (oldWidget.load.id != widget.load.id || 
+    if (oldWidget.load.id != widget.load.id ||
         oldWidget.load.status != widget.load.status ||
         oldWidget.load.bookedByCarrierId != widget.load.bookedByCarrierId) {
       _refreshLoadStatus();
@@ -62,12 +63,12 @@ class _BookedNowState extends State<BookedNow> {
             .collection('loads')
             .doc(widget.load.id)
             .get();
-        
+
         if (loadDoc.exists) {
           final loadData = loadDoc.data();
           final status = loadData?['status'] as String?;
           final bookedByCarrierId = loadData?['bookedByCarrierId'] as String?;
-          
+
           bool needsUpdate = false;
           if (status != null && status != _currentStatus) {
             needsUpdate = true;
@@ -75,7 +76,7 @@ class _BookedNowState extends State<BookedNow> {
           if (bookedByCarrierId != _bookedByCarrierId) {
             needsUpdate = true;
           }
-          
+
           if (needsUpdate && mounted) {
             setState(() {
               if (status != null) {
@@ -84,7 +85,8 @@ class _BookedNowState extends State<BookedNow> {
               _bookedByCarrierId = bookedByCarrierId;
             });
             // Load carrier name if bookedByCarrierId changed
-            if (bookedByCarrierId != null && bookedByCarrierId != _bookedByCarrierId) {
+            if (bookedByCarrierId != null &&
+                bookedByCarrierId != _bookedByCarrierId) {
               _loadCarrierName(bookedByCarrierId);
             }
             // Load escrow payment data if status changed to booked/in-transit
@@ -122,7 +124,7 @@ class _BookedNowState extends State<BookedNow> {
 
   void _viewCarrierProfile() {
     if (_bookedByCarrierId == null) return;
-    
+
     showDialog(
       context: context,
       builder: (context) => UserProfileDialog(
@@ -138,7 +140,9 @@ class _BookedNowState extends State<BookedNow> {
       context: context,
       builder: (context) => UserProfileDialog(
         userId: widget.load.shipperUid,
-        userName: widget.load.shipperName.isNotEmpty ? widget.load.shipperName : 'Shipper',
+        userName: widget.load.shipperName.isNotEmpty
+            ? widget.load.shipperName
+            : 'Shipper',
         userRole: UserRole.shipper,
       ),
     );
@@ -173,7 +177,6 @@ class _BookedNowState extends State<BookedNow> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -202,12 +205,12 @@ class _BookedNowState extends State<BookedNow> {
               children: [
                 DateChip(text: _formatDate(widget.load.pickupDate)),
                 Text(
-                    "Load ID #${widget.load.id.substring(0, 8)}",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
+                  "Load ID #${widget.load.id.substring(0, 8)}",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
+                ),
               ],
             ),
 
@@ -215,13 +218,17 @@ class _BookedNowState extends State<BookedNow> {
 
             /// From
             Row(
-              children:  [
+              children: [
                 Icon(Icons.location_on, color: primaryColor),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     "From : ${widget.load.originAddress}",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: primaryColor),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: primaryColor,
+                    ),
                   ),
                 ),
               ],
@@ -229,15 +236,20 @@ class _BookedNowState extends State<BookedNow> {
             const SizedBox(height: 12),
             DateChip(text: _formatDate(widget.load.deliveryDate)),
             const SizedBox(height: 12),
+
             /// To
             Row(
-              children:  [
+              children: [
                 Icon(Icons.location_on, color: primaryColor),
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     "To : ${widget.load.destinationAddress}",
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: primaryColor),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: primaryColor,
+                    ),
                   ),
                 ),
               ],
@@ -247,30 +259,46 @@ class _BookedNowState extends State<BookedNow> {
             /// Distance & Weight
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children:  [
+              children: [
                 Text(
                   "Distance : ${widget.load.distance.toStringAsFixed(0)} (mi)",
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: primaryColor,
+                  ),
                 ),
                 Text(
                   "Weight : ${widget.load.weight.toStringAsFixed(0)} lb",
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: primaryColor,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
 
             /// Equipment
-             Text(
+            Text(
               "Equipment Needed: ${widget.load.equipmentNeeded}",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: primaryColor,
+              ),
             ),
             const SizedBox(height: 8),
 
             /// Load Type
-             Text(
+            Text(
               "Load Type : ${widget.load.loadType}",
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: primaryColor),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: primaryColor,
+              ),
             ),
             const SizedBox(height: 8),
 
@@ -293,7 +321,9 @@ class _BookedNowState extends State<BookedNow> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          widget.load.shipperName.isNotEmpty ? widget.load.shipperName : "No shipper name provided",
+                          widget.load.shipperName.isNotEmpty
+                              ? widget.load.shipperName
+                              : "No shipper name provided",
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -342,8 +372,10 @@ class _BookedNowState extends State<BookedNow> {
                 ),
                 const SizedBox(width: 12),
                 Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.blue,
                     borderRadius: BorderRadius.circular(8),
@@ -351,7 +383,9 @@ class _BookedNowState extends State<BookedNow> {
                   child: Text(
                     "\$${widget.load.price.toStringAsFixed(0)}",
                     style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold),
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
@@ -367,7 +401,10 @@ class _BookedNowState extends State<BookedNow> {
                 ),
                 const SizedBox(width: 12),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: _getStatusColor(_currentStatus),
                     borderRadius: BorderRadius.circular(20),
@@ -390,46 +427,65 @@ class _BookedNowState extends State<BookedNow> {
                 ),
               ],
             ),
-            
+
             // Escrow payment message (only show if booked and escrow not deposited)
-            if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && 
+            if ((_currentStatus == 'booked' ||
+                    _currentStatus == 'in-transit') &&
                 _escrowPaymentData?['status'] != 'deposited') ...[
               const SizedBox(height: 20),
               _buildEscrowWaitingMessage(),
             ],
-            
+
             const SizedBox(height: 20),
 
             /// Accept Button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: (_currentStatus == 'active' || _currentStatus == 'available') && !_isBooking ? _bookLoad : null,
+                onPressed:
+                    (_currentStatus == 'active' ||
+                            _currentStatus == 'available') &&
+                        !_isBooking
+                    ? _bookLoad
+                    : null,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: (_currentStatus == 'active' || _currentStatus == 'available') ? primaryColor : Colors.grey,
+                  backgroundColor:
+                      (_currentStatus == 'active' ||
+                          _currentStatus == 'available')
+                      ? primaryColor
+                      : Colors.grey,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: _isBooking 
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                child: _isBooking
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      )
+                    : Text(
+                        (_currentStatus == 'active' ||
+                                _currentStatus == 'available')
+                            ? "Accept"
+                            : "Already ${_currentStatus.toUpperCase()}",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
                       ),
-                    )
-                  : Text(
-                      (_currentStatus == 'active' || _currentStatus == 'available') ? "Accept" : "Already ${_currentStatus.toUpperCase()}",
-                      style: const TextStyle(fontSize: 16, color: Colors.white),
-                    ),
               ),
             ),
 
             // Only show negotiate button for active/available loads
-            if (_currentStatus == 'active' || _currentStatus == 'available') ...[
+            if (_currentStatus == 'active' ||
+                _currentStatus == 'available') ...[
               const SizedBox(height: 20),
 
               SizedBox(
@@ -437,7 +493,7 @@ class _BookedNowState extends State<BookedNow> {
                 child: ElevatedButton(
                   onPressed: () => _navigateToNegotiation(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.greenAccent.shade200 ,
+                    backgroundColor: Colors.greenAccent.shade200,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -452,7 +508,9 @@ class _BookedNowState extends State<BookedNow> {
             ],
 
             // Show cancel button if load is booked by current user
-            if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && _isBookedByCurrentUser()) ...[
+            if ((_currentStatus == 'booked' ||
+                    _currentStatus == 'in-transit') &&
+                _isBookedByCurrentUser()) ...[
               const SizedBox(height: 20),
 
               SizedBox(
@@ -466,27 +524,31 @@ class _BookedNowState extends State<BookedNow> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: _isBooking 
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  child: _isBooking
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Text(
+                          "Cancel Booking",
+                          style: TextStyle(fontSize: 16, color: Colors.white),
                         ),
-                      )
-                    : const Text(
-                        "Cancel Booking",
-                        style: TextStyle(fontSize: 16, color: Colors.white),
-                      ),
                 ),
               ),
             ],
 
-           // Show "View on Map" button only if load was booked by current user
+            // Show "View on Map" button only if load was booked by current user
             //if ((_currentStatus == 'booked' || _currentStatus == 'in-transit') && _isBookedByCurrentUser()) ...[
             // Show "View on Map" button if load was booked by current user (any status except active/available)
-            if (_currentStatus != 'active' && _currentStatus != 'available' && _isBookedByCurrentUser()) ...[
+            if (_currentStatus != 'active' &&
+                _currentStatus != 'available' &&
+                _isBookedByCurrentUser()) ...[
               const SizedBox(height: 20),
 
               SizedBox(
@@ -522,14 +584,14 @@ class _BookedNowState extends State<BookedNow> {
 
   /// Build expandable description with read more/less
   Widget _buildExpandableDescription() {
-    final description = widget.load.description.isNotEmpty 
-        ? widget.load.description 
+    final description = widget.load.description.isNotEmpty
+        ? widget.load.description
         : "No description provided";
-    
+
     // Check if description is long enough to need truncation
     // Approximate: 3 lines at ~50 characters per line = 150 characters
     final needsTruncation = description.length > 150;
-    
+
     if (!needsTruncation) {
       // Short description, no need for expand/collapse
       return Text(
@@ -541,14 +603,16 @@ class _BookedNowState extends State<BookedNow> {
         ),
       );
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           description,
           maxLines: _isDescriptionExpanded ? null : 3,
-          overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          overflow: _isDescriptionExpanded
+              ? TextOverflow.visible
+              : TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -579,7 +643,7 @@ class _BookedNowState extends State<BookedNow> {
   /// Build tags from load data
   Widget _buildTags() {
     final tags = <String>[];
-    
+
     // Get tags from additionalData
     if (widget.load.additionalData != null) {
       final additionalData = widget.load.additionalData!;
@@ -596,12 +660,12 @@ class _BookedNowState extends State<BookedNow> {
         }
       }
     }
-    
+
     // If no tags found, return empty widget
     if (tags.isEmpty) {
       return const SizedBox.shrink();
     }
-    
+
     // Build tag widgets as grey pills
     return Wrap(
       spacing: 12,
@@ -631,9 +695,7 @@ class _BookedNowState extends State<BookedNow> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Cancel Booking',
           style: TextStyle(fontWeight: FontWeight.bold),
@@ -644,10 +706,7 @@ class _BookedNowState extends State<BookedNow> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(
-              'No',
-              style: TextStyle(color: Colors.grey),
-            ),
+            child: const Text('No', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -698,17 +757,17 @@ class _BookedNowState extends State<BookedNow> {
           _currentStatus = 'cancelled';
           _isBooking = false;
         });
-        
+
         // Refresh load status to ensure we have latest data from Firestore
         await _refreshLoadStatus();
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Booking cancelled successfully'),
             backgroundColor: Colors.orange,
           ),
         );
-        
+
         // Notify parent widget to refresh
         if (widget.onLoadBooked != null) {
           widget.onLoadBooked!();
@@ -717,7 +776,7 @@ class _BookedNowState extends State<BookedNow> {
         setState(() {
           _isBooking = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to cancel booking. Please try again.'),
@@ -729,7 +788,7 @@ class _BookedNowState extends State<BookedNow> {
       setState(() {
         _isBooking = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
@@ -741,8 +800,18 @@ class _BookedNowState extends State<BookedNow> {
 
   String _formatDate(DateTime date) {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
@@ -757,11 +826,7 @@ class _BookedNowState extends State<BookedNow> {
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.info_outline,
-            color: Colors.orange.shade700,
-            size: 20,
-          ),
+          Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -809,23 +874,16 @@ class _BookedNowState extends State<BookedNow> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           'Confirm Booking',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        content: const Text(
-          'Are you sure you want to accept this load?',
-        ),
+        content: const Text('Are you sure you want to accept this load?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.grey),
-            ),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -835,10 +893,7 @@ class _BookedNowState extends State<BookedNow> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text(
-              'Accept',
-              style: TextStyle(color: Colors.white),
-            ),
+            child: const Text('Accept', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -879,25 +934,25 @@ class _BookedNowState extends State<BookedNow> {
           // Update bookedByCarrierId after successful booking
           _bookedByCarrierId = user.uid;
         });
-        
+
         // Refresh load status to ensure we have latest data from Firestore
         await _refreshLoadStatus();
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Load booked successfully!'),
             backgroundColor: Colors.green,
           ),
         );
-        
+
         // Notify parent widget to refresh
         if (widget.onLoadBooked != null) {
           widget.onLoadBooked!();
         }
-        
+
         // Close the dialog and navigate to chat
         Navigator.of(context).pop();
-        
+
         // Navigate to chat with shipper
         if (context.mounted) {
           await _navigateToChat();
@@ -906,7 +961,7 @@ class _BookedNowState extends State<BookedNow> {
         setState(() {
           _isBooking = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to book load. Please try again.'),
@@ -918,7 +973,7 @@ class _BookedNowState extends State<BookedNow> {
       setState(() {
         _isBooking = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
@@ -937,12 +992,11 @@ class _BookedNowState extends State<BookedNow> {
       await Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => MarketplaceScreen(
-            initialLoadId: widget.load.id,
-          ),
+          builder: (context) =>
+              CarrierManageLoadScreen(initialLoadId: widget.load.id),
         ),
       );
-      
+
       // Refresh load status when returning from marketplace
       if (context.mounted) {
         await _refreshLoadStatus();
@@ -958,9 +1012,9 @@ class _BookedNowState extends State<BookedNow> {
     try {
       final user = FirebaseService.currentUser;
       if (user == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to chat')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Please log in to chat')));
         return;
       }
 
@@ -969,9 +1023,8 @@ class _BookedNowState extends State<BookedNow> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => const Center(
-            child: CircularProgressIndicator(),
-          ),
+          builder: (context) =>
+              const Center(child: CircularProgressIndicator()),
         );
       }
 
@@ -1002,7 +1055,7 @@ class _BookedNowState extends State<BookedNow> {
             ),
           ),
         );
-        
+
         // Refresh load status when returning from chat
         if (context.mounted) {
           await _refreshLoadStatus();
@@ -1030,9 +1083,6 @@ class _BookedNowState extends State<BookedNow> {
   }
 }
 
-
-
-
 class DateChip extends StatelessWidget {
   final String text;
 
@@ -1056,6 +1106,4 @@ class DateChip extends StatelessWidget {
       ),
     );
   }
-
 }
-

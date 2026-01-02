@@ -41,7 +41,7 @@ class _ProfileState extends State<Profile> {
   Future<void> _loadCarrierStats() async {
     final authProvider = context.read<AuthProvider>();
     final carrier = authProvider.carrierUser;
-    
+
     if (carrier != null) {
       try {
         final bookedLoads = await FirebaseService.getCarrierBookedLoads(
@@ -126,9 +126,11 @@ class _ProfileState extends State<Profile> {
       }
     } catch (e) {
       final appStateProvider = context.read<AppStateProvider>();
-      appStateProvider.showError('Failed to update profile picture. Please try again.');
+      appStateProvider.showError(
+        'Failed to update profile picture. Please try again.',
+      );
       print('Error updating profile picture: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -176,20 +178,14 @@ class _ProfileState extends State<Profile> {
             ),
             content: const Text(
               'Are you sure you want to delete your profile picture?',
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF666666),
-              ),
+              style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text(
                   'Cancel',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF666666),
-                  ),
+                  style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
                 ),
               ),
               TextButton(
@@ -247,9 +243,11 @@ class _ProfileState extends State<Profile> {
       }
     } catch (e) {
       final appStateProvider = context.read<AppStateProvider>();
-      appStateProvider.showError('Failed to delete profile picture. Please try again.');
+      appStateProvider.showError(
+        'Failed to delete profile picture. Please try again.',
+      );
       print('Error deleting profile picture: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -272,17 +270,17 @@ class _ProfileState extends State<Profile> {
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
     final carrier = authProvider.carrierUser;
-    final bool isTabletOrDesktop = MediaQuery.of(context).size.width > 600;
+    final media = MediaQuery.of(context);
+    final screenW = media.size.width;
+    final bool isWide = screenW >= 900;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
       body: CustomScrollView(
         slivers: [
           // Top Navigation
-          SliverToBoxAdapter(
-            child: TopNavigationBar(context),
-          ),
-          
+          SliverToBoxAdapter(child: TopNavigationBar(context)),
+
           // Profile Header with Gradient
           SliverToBoxAdapter(
             child: Container(
@@ -301,62 +299,89 @@ class _ProfileState extends State<Profile> {
                   bottomRight: Radius.circular(30),
                 ),
               ),
-              child: Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isTabletOrDesktop ? 100.0 : 20.0,
-                  vertical: 30,
-                ),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 20),
-                    // Profile Picture
-                    Stack(
-                      alignment: Alignment.center,
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isWide ? 100.0 : 20.0,
+                    vertical: 30,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 760),
+                    child: Column(
                       children: [
-                        Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.white.withOpacity(0.3),
-                                Colors.white.withOpacity(0.1),
-                              ],
-                            ),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.5),
-                              width: 3,
-                            ),
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _isUploadingImage ? null : _changeProfilePicture,
-                          child: Container(
-                            width: 130,
-                            height: 130,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(0.2),
-                                  blurRadius: 20,
-                                  offset: const Offset(0, 10),
+                        const SizedBox(height: 20),
+                        // Profile Picture
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Container(
+                              width: 140,
+                              height: 140,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.white.withOpacity(0.3),
+                                    Colors.white.withOpacity(0.1),
+                                  ],
                                 ),
-                              ],
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.5),
+                                  width: 3,
+                                ),
+                              ),
                             ),
-                            child: Stack(
-                              children: [
-                                ClipOval(
-                                  child: carrier?.profileImageUrl != null
-                                      ? Image.network(
-                                          carrier!.profileImageUrl!,
-                                          width: 130,
-                                          height: 130,
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (context, error, stackTrace) {
-                                            return Container(
+                            GestureDetector(
+                              onTap: _isUploadingImage
+                                  ? null
+                                  : _changeProfilePicture,
+                              child: Container(
+                                width: 130,
+                                height: 130,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.2),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 10),
+                                    ),
+                                  ],
+                                ),
+                                child: Stack(
+                                  children: [
+                                    ClipOval(
+                                      child: carrier?.profileImageUrl != null
+                                          ? Image.network(
+                                              carrier!.profileImageUrl!,
+                                              width: 130,
+                                              height: 130,
+                                              fit: BoxFit.cover,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                    return Container(
+                                                      width: 130,
+                                                      height: 130,
+                                                      decoration:
+                                                          const BoxDecoration(
+                                                            shape:
+                                                                BoxShape.circle,
+                                                            color: Color(
+                                                              0xFFF5F7FA,
+                                                            ),
+                                                          ),
+                                                      child: const Icon(
+                                                        Icons.person,
+                                                        size: 80,
+                                                        color: Color(
+                                                          0xFF43975A,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                            )
+                                          : Container(
                                               width: 130,
                                               height: 130,
                                               decoration: const BoxDecoration(
@@ -368,154 +393,166 @@ class _ProfileState extends State<Profile> {
                                                 size: 80,
                                                 color: Color(0xFF43975A),
                                               ),
-                                            );
-                                          },
-                                        )
-                                      : Container(
-                                          width: 130,
-                                          height: 130,
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Color(0xFFF5F7FA),
-                                          ),
-                                          child: const Icon(
-                                            Icons.person,
-                                            size: 80,
-                                            color: Color(0xFF43975A),
-                                          ),
-                                        ),
-                                ),
-                                if (_isUploadingImage)
-                                  Container(
-                                    width: 130,
-                                    height: 130,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: Colors.black.withOpacity(0.5),
+                                            ),
                                     ),
-                                    child: const Center(
-                                      child: SizedBox(
-                                        width: 30,
-                                        height: 30,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 3,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    if (_isUploadingImage)
+                                      Container(
+                                        width: 130,
+                                        height: 130,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.black.withOpacity(0.5),
+                                        ),
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 30,
+                                            height: 30,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 3,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                    Colors.white,
+                                                  ),
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ),
-                                if (!_isUploadingImage)
-                                  Positioned(
-                                    bottom: 0,
-                                    right: 0,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        GestureDetector(
-                                          onTap: _changeProfilePicture,
-                                          child: Container(
-                                            width: 36,
-                                            height: 36,
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              color: const Color(0xFF43975A),
-                                              border: Border.all(color: Colors.white, width: 3),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black.withOpacity(0.2),
-                                                  blurRadius: 8,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: const Icon(
-                                              Icons.camera_alt,
-                                              color: Colors.white,
-                                              size: 18,
-                                            ),
-                                          ),
-                                        ),
-                                        if (carrier?.profileImageUrl != null && carrier!.profileImageUrl!.isNotEmpty) ...[
-                                          const SizedBox(width: 8),
-                                          GestureDetector(
-                                            onTap: _deleteProfilePicture,
-                                            child: Container(
-                                              width: 36,
-                                              height: 36,
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                color: Colors.red,
-                                                border: Border.all(color: Colors.white, width: 3),
-                                                boxShadow: [
-                                                  BoxShadow(
-                                                    color: Colors.black.withOpacity(0.2),
-                                                    blurRadius: 8,
-                                                    offset: const Offset(0, 2),
+                                    if (!_isUploadingImage)
+                                      Positioned(
+                                        bottom: 0,
+                                        right: 0,
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            GestureDetector(
+                                              onTap: _changeProfilePicture,
+                                              child: Container(
+                                                width: 36,
+                                                height: 36,
+                                                decoration: BoxDecoration(
+                                                  shape: BoxShape.circle,
+                                                  color: const Color(
+                                                    0xFF43975A,
                                                   ),
-                                                ],
-                                              ),
-                                              child: const Icon(
-                                                Icons.delete,
-                                                color: Colors.white,
-                                                size: 18,
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 3,
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black
+                                                          .withOpacity(0.2),
+                                                      blurRadius: 8,
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                child: const Icon(
+                                                  Icons.camera_alt,
+                                                  color: Colors.white,
+                                                  size: 18,
+                                                ),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                              ],
+                                            if (carrier?.profileImageUrl !=
+                                                    null &&
+                                                carrier!
+                                                    .profileImageUrl!
+                                                    .isNotEmpty) ...[
+                                              const SizedBox(width: 8),
+                                              GestureDetector(
+                                                onTap: _deleteProfilePicture,
+                                                child: Container(
+                                                  width: 36,
+                                                  height: 36,
+                                                  decoration: BoxDecoration(
+                                                    shape: BoxShape.circle,
+                                                    color: Colors.red,
+                                                    border: Border.all(
+                                                      color: Colors.white,
+                                                      width: 3,
+                                                    ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: Colors.black
+                                                            .withOpacity(0.2),
+                                                        blurRadius: 8,
+                                                        offset: const Offset(
+                                                          0,
+                                                          2,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.delete,
+                                                    color: Colors.white,
+                                                    size: 18,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
+                        const SizedBox(height: 24),
+                        // Company Name
+                        Text(
+                          carrier?.companyName ?? 'Company Name',
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
+                            fontWeight: FontWeight.bold,
+                            fontSize: 24,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 16),
+                        // Stats Row
+                        if (carrier != null)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildStatChip(
+                                icon: Icons.star_rounded,
+                                value: carrier.rating != null
+                                    ? '${carrier.rating!.toStringAsFixed(1)}'
+                                    : 'N/A',
+                                color: const Color(0xFFFDD610),
+                              ),
+                              const SizedBox(width: 12),
+                              _buildVerifiedChip(
+                                isVerified:
+                                    (carrier.isVerified ||
+                                    carrier.isPhoneVerified),
+                              ),
+                              const SizedBox(width: 12),
+                              _buildStatChip(
+                                icon: Icons.local_shipping_rounded,
+                                value: _isLoadingStats
+                                    ? '...'
+                                    : '${_completedOrders ?? carrier.totalDeliveries ?? 0}',
+                                color: Colors.white,
+                                isLoading: _isLoadingStats,
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 30),
                       ],
                     ),
-                    const SizedBox(height: 24),
-                    // Company Name
-                    Text(
-                      carrier?.companyName ?? 'Company Name',
-                      style: const TextStyle(
-                        fontFamily: 'Roboto',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 24,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
-                      ),
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 16),
-                    // Stats Row
-                    if (carrier != null)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildStatChip(
-                            icon: Icons.star_rounded,
-                            value: carrier.rating != null
-                                ? '${carrier.rating!.toStringAsFixed(1)}'
-                                : 'N/A',
-                            color: const Color(0xFFFDD610),
-                          ),
-                          const SizedBox(width: 12),
-                          _buildVerifiedChip(
-                            isVerified: (carrier.isVerified || carrier.isPhoneVerified),
-                          ),
-                          const SizedBox(width: 12),
-                          _buildStatChip(
-                            icon: Icons.local_shipping_rounded,
-                            value: _isLoadingStats
-                                ? '...'
-                                : '${_completedOrders ?? carrier.totalDeliveries ?? 0}',
-                            color: Colors.white,
-                            isLoading: _isLoadingStats,
-                          ),
-                        ],
-                      ),
-                    const SizedBox(height: 30),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -524,240 +561,258 @@ class _ProfileState extends State<Profile> {
           // Main Content
           SliverPadding(
             padding: EdgeInsets.symmetric(
-              horizontal: isTabletOrDesktop ? 100.0 : 20.0,
+              horizontal: isWide ? 100.0 : 20.0,
               vertical: 24,
             ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                // Stats Cards
-                if (carrier != null) ...[
-                  Row(
+            sliver: SliverToBoxAdapter(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Column(
                     children: [
-                      Expanded(
-                        child: _buildStatCard(
-                          icon: Icons.star_rounded,
-                          label: 'Rating',
-                          value: carrier.rating != null
-                              ? '${carrier.rating!.toStringAsFixed(1)}'
-                              : 'N/A',
-                          color: const Color(0xFFFDD610),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildStatCard(
-                          icon: Icons.local_shipping_rounded,
-                          label: 'Deliveries',
-                          value: _isLoadingStats
-                              ? '...'
-                              : '${_completedOrders ?? carrier.totalDeliveries ?? 0}',
-                          color: const Color(0xFF43975A),
-                          isLoading: _isLoadingStats,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                ],
-
-                // Section Title
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    'Account Settings',
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      color: Color(0xFF1A1A1A),
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-
-                // Profile Options
-                _buildModernProfileOption(
-                  'Account Details',
-                  Icons.account_circle_rounded,
-                  'Manage your personal information',
-                  () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AccountDetailsPage(),
-                      ),
-                    );
-                    _loadCarrierStats();
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildModernProfileOption(
-                  'Payment Method',
-                  Icons.payment_rounded,
-                  'Manage payment methods',
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CarrierPaymentPage(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildModernProfileOption(
-                  'Load Preferences',
-                  Icons.tune_rounded,
-                  'Customize your load preferences',
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CarrierPreferencesPage(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildModernProfileOption(
-                  'Documents',
-                  Icons.description_rounded,
-                  'Manage your documents',
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ProfileDocumentManagment(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _buildModernProfileOption(
-                  'Boost My Profile',
-                  Icons.rocket_launch_rounded,
-                  'Promote your profile',
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CarrierBoostMyProfile(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-
-                // Section Title
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    'Support & More',
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                      color: Color(0xFF1A1A1A),
-                      letterSpacing: 0.3,
-                    ),
-                  ),
-                ),
-
-                _buildModernProfileOption(
-                  'Settings',
-                  Icons.settings_rounded,
-                  'App settings and preferences',
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SettingsPage(),
-                      ),
-                    );
-                  },
-                ),
-                // App Settings - only visible in debug mode
-                if (kDebugMode) ...[
-                  const SizedBox(height: 12),
-                  _buildModernProfileOption(
-                    'App Settings',
-                    Icons.admin_panel_settings_rounded,
-                    'Developer settings',
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AppSettingsPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-                const SizedBox(height: 12),
-                _buildModernProfileOption(
-                  'Help & Legal',
-                  Icons.help_outline_rounded,
-                  'Get help and view legal info',
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const CarrierHelpLegalPage(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 32),
-
-                // Logout Button
-                Container(
-                  width: double.infinity,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.red.shade400,
-                        Colors.red.shade600,
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withOpacity(0.3),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: () => _showLogoutDialog(context),
-                      borderRadius: BorderRadius.circular(16),
-                      child: const Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                      // Stats Cards
+                      if (carrier != null) ...[
+                        Row(
                           children: [
-                            Icon(Icons.logout_rounded, color: Colors.white, size: 22),
-                            SizedBox(width: 12),
-                            Text(
-                              'Log Out',
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                                color: Colors.white,
-                                letterSpacing: 0.5,
+                            Expanded(
+                              child: _buildStatCard(
+                                icon: Icons.star_rounded,
+                                label: 'Rating',
+                                value: carrier.rating != null
+                                    ? '${carrier.rating!.toStringAsFixed(1)}'
+                                    : 'N/A',
+                                color: const Color(0xFFFDD610),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildStatCard(
+                                icon: Icons.local_shipping_rounded,
+                                label: 'Deliveries',
+                                value: _isLoadingStats
+                                    ? '...'
+                                    : '${_completedOrders ?? carrier.totalDeliveries ?? 0}',
+                                color: const Color(0xFF43975A),
+                                isLoading: _isLoadingStats,
                               ),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      // Section Title
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            'Account Settings',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              color: Color(0xFF1A1A1A),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
+
+                      // Profile Options
+                      _buildModernProfileOption(
+                        'Account Details',
+                        Icons.account_circle_rounded,
+                        'Manage your personal information',
+                        () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AccountDetailsPage(),
+                            ),
+                          );
+                          _loadCarrierStats();
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildModernProfileOption(
+                        'Payment Method',
+                        Icons.payment_rounded,
+                        'Manage payment methods',
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const CarrierPaymentPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildModernProfileOption(
+                        'Load Preferences',
+                        Icons.tune_rounded,
+                        'Customize your load preferences',
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const CarrierPreferencesPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildModernProfileOption(
+                        'Documents',
+                        Icons.description_rounded,
+                        'Manage your documents',
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const ProfileDocumentManagment(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      _buildModernProfileOption(
+                        'Boost My Profile',
+                        Icons.rocket_launch_rounded,
+                        'Promote your profile',
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const CarrierBoostMyProfile(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Section Title
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          padding: EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            'Support & More',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              color: Color(0xFF1A1A1A),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      _buildModernProfileOption(
+                        'Settings',
+                        Icons.settings_rounded,
+                        'App settings and preferences',
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const SettingsPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      // App Settings - only visible in debug mode
+                      if (kDebugMode) ...[
+                        const SizedBox(height: 12),
+                        _buildModernProfileOption(
+                          'App Settings',
+                          Icons.admin_panel_settings_rounded,
+                          'Developer settings',
+                          () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AppSettingsPage(),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      _buildModernProfileOption(
+                        'Help & Legal',
+                        Icons.help_outline_rounded,
+                        'Get help and view legal info',
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  const CarrierHelpLegalPage(),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Logout Button
+                      Container(
+                        width: double.infinity,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.red.shade400, Colors.red.shade600],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.3),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => _showLogoutDialog(context),
+                            borderRadius: BorderRadius.circular(16),
+                            child: const Center(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.logout_rounded,
+                                    color: Colors.white,
+                                    size: 22,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Text(
+                                    'Log Out',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 18,
+                                      color: Colors.white,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 32),
-              ]),
+              ),
             ),
           ),
         ],
@@ -781,20 +836,14 @@ class _ProfileState extends State<Profile> {
           ),
           content: const Text(
             'Are you sure you want to log out?',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF666666),
-            ),
+            style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
                 'Cancel',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
               ),
             ),
             TextButton(
@@ -826,15 +875,15 @@ class _ProfileState extends State<Profile> {
 
     try {
       appStateProvider.showLoadingWithMessage('Logging out...');
-      
+
       // Clear payment-related providers before logout
       paymentMethodsProvider.clear();
       carrierPaymentsProvider.clear();
-      
+
       await authProvider.signOut();
-      
+
       appStateProvider.showSuccess();
-      
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -843,9 +892,9 @@ class _ProfileState extends State<Profile> {
           duration: Duration(seconds: 2),
         ),
       );
-      
+
       print('Logout successful, navigating to AuthWrapper');
-      
+
       // Navigate directly to AuthWrapper which will handle the welcome screen
       if (context.mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -865,230 +914,216 @@ class _ProfileState extends State<Profile> {
     required Color color,
     bool isLoading = false,
   }) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.2),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(
-        color: Colors.white.withOpacity(0.3),
-        width: 1,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
       ),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 16),
-        const SizedBox(width: 6),
-        isLoading
-            ? const SizedBox(
-                width: 12,
-                height: 12,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 6),
+          isLoading
+              ? const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                )
+              : Text(
+                  value,
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
-              )
-            : Text(
-                value,
-                style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
   }
 
   Widget _buildVerifiedChip({required bool isVerified}) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(
-      color: isVerified
-          ? const Color(0xFF81AB3A).withOpacity(0.3)
-          : Colors.white.withOpacity(0.2),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
         color: isVerified
-            ? const Color(0xFF81AB3A)
-            : Colors.white.withOpacity(0.3),
-        width: isVerified ? 1.5 : 1,
+            ? const Color(0xFF81AB3A).withOpacity(0.3)
+            : Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isVerified
+              ? const Color(0xFF81AB3A)
+              : Colors.white.withOpacity(0.3),
+          width: isVerified ? 1.5 : 1,
+        ),
       ),
-    ),
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            color: isVerified
-                ? const Color(0xFF81AB3A)
-                : Colors.grey.shade400,
-            shape: BoxShape.circle,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: isVerified
+                  ? const Color(0xFF81AB3A)
+                  : Colors.grey.shade400,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.check_rounded, color: Colors.white, size: 12),
           ),
-          child: Icon(
-            Icons.check_rounded,
-            color: Colors.white,
-            size: 12,
+          const SizedBox(width: 6),
+          Text(
+            isVerified ? 'Verified' : 'Unverified',
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isVerified ? Colors.white : Colors.white.withOpacity(0.8),
+            ),
           ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          isVerified ? 'Verified' : 'Unverified',
-          style: TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: isVerified ? Colors.white : Colors.white.withOpacity(0.8),
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
   }
 
   Widget _buildStatCard({
-  required IconData icon,
-  required String label,
-  required String value,
-  required Color color,
-  bool isLoading = false,
-}) {
-  return Container(
-    padding: const EdgeInsets.all(20),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withOpacity(0.08),
-          blurRadius: 20,
-          offset: const Offset(0, 4),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+    bool isLoading = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          isLoading
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Text(
+                  value,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModernProfileOption(
+    String title,
+    IconData icon,
+    String subtitle,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200, width: 1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'Roboto',
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.grey.shade600,
-          ),
-        ),
-        const SizedBox(height: 4),
-        isLoading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : Text(
-                value,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: color,
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF43975A).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: const Color(0xFF43975A), size: 24),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 13,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-      ],
-    ),
-  );
-}
-
-Widget _buildModernProfileOption(
-  String title,
-  IconData icon,
-  String subtitle,
-  VoidCallback onTap,
-) {
-  return Material(
-    color: Colors.transparent,
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.grey.shade200,
-            width: 1,
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                color: Colors.grey.shade400,
+                size: 18,
+              ),
+            ],
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF43975A).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: const Color(0xFF43975A),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontFamily: 'Roboto',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 13,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              color: Colors.grey.shade400,
-              size: 18,
-            ),
-          ],
         ),
       ),
-    ),
-  );
+    );
   }
 }

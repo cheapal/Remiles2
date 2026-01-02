@@ -1,12 +1,11 @@
 import 'package:remiles/core/firebase_service.dart';
-import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/main_page.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_main_page.dart';
 import 'package:remiles/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-
 
 class CarrierDashboard3 extends StatefulWidget {
   const CarrierDashboard3({super.key});
@@ -23,17 +22,18 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
   bool? _isCarbonFootprintInterested = null;
   bool _saving = false;
   bool _isLoading = true;
-  
+
   // Form controller
-  final TextEditingController _businessNumberController = TextEditingController();
-  
+  final TextEditingController _businessNumberController =
+      TextEditingController();
+
   // Image picker
   final ImagePicker _picker = ImagePicker();
-  
+
   // Image storage
   File? _driversAbstractImage;
   File? _backgroundCheckImage;
-  
+
   // Image URLs from saved data
   String? _driversAbstractUrl;
   String? _backgroundCheckUrl;
@@ -44,8 +44,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
     _progressController1 = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
-    )
-      ..forward();
+    )..forward();
     _loadSavedData();
   }
 
@@ -60,19 +59,20 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         final savedData = await FirebaseService.getCarrierDashboardResponse(
           carrier.uid,
           'dashboard_3_business_number',
         );
-        
+
         if (savedData != null) {
           setState(() {
             _businessNumberController.text = savedData['businessNumber'] ?? '';
             _isGstRegistered = savedData['isGstRegistered'] ?? false;
-            _isCarbonFootprintInterested = savedData['isCarbonFootprintInterested'];
-            
+            _isCarbonFootprintInterested =
+                savedData['isCarbonFootprintInterested'];
+
             // Store image URLs for restoration
             _driversAbstractUrl = savedData['driversAbstractUrl'];
             _backgroundCheckUrl = savedData['backgroundCheckUrl'];
@@ -102,9 +102,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
     if (_isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFFFFFEF6),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -128,9 +126,9 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
                   image: isWide
                       ? null
                       : const DecorationImage(
-                    image: AssetImage('assets/top_leather.png'),
-                    fit: BoxFit.cover,
-                  ),
+                          image: AssetImage('assets/top_leather.png'),
+                          fit: BoxFit.cover,
+                        ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.2),
@@ -246,7 +244,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
                         context: context,
                         hintText: "What is your Business Number (BN)?",
                         subtext:
-                        "15-digit CRA-assigned number used for tax purposes.",
+                            "15-digit CRA-assigned number used for tax purposes.",
                         controller: _businessNumberController,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
@@ -316,7 +314,10 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
                                       height: 24,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : const Text(
@@ -349,9 +350,9 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
           image: isWide
               ? null
               : const DecorationImage(
-            image: AssetImage('assets/nav_leather.png'),
-            fit: BoxFit.cover,
-          ),
+                  image: AssetImage('assets/nav_leather.png'),
+                  fit: BoxFit.cover,
+                ),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(65),
             topRight: Radius.circular(65),
@@ -405,7 +406,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
   }
 
   // ===== Methods =====
-  
+
   Future<void> _pickImage(String imageType) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -414,13 +415,14 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
         maxHeight: 1800,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           switch (imageType) {
             case 'drivers_abstract':
               _driversAbstractImage = File(image.path);
-              _driversAbstractUrl = null; // Clear URL when new image is selected
+              _driversAbstractUrl =
+                  null; // Clear URL when new image is selected
               break;
             case 'background_check':
               _backgroundCheckImage = File(image.path);
@@ -428,7 +430,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
               break;
           }
         });
-        
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -440,18 +442,19 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
       }
     } catch (e) {
       String errorMessage = 'Error picking image';
-      
+
       // Handle specific permission errors
-      if (e.toString().contains('Permission denied') || 
+      if (e.toString().contains('Permission denied') ||
           e.toString().contains('permission')) {
-        errorMessage = 'Permission denied. Please allow access to photos in app settings.';
+        errorMessage =
+            'Permission denied. Please allow access to photos in app settings.';
       } else if (e.toString().contains('User cancelled')) {
         // User cancelled, don't show error
         return;
       } else {
         errorMessage = 'Error picking image: ${e.toString()}';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -463,7 +466,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
       }
     }
   }
-  
+
   Future<void> _handleSubmit() async {
     // Validate required fields
     final businessNumber = _businessNumberController.text.trim();
@@ -471,17 +474,20 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
       _showAlertDialog(context, 'Please enter your Business Number (BN).');
       return;
     }
-    
+
     if (businessNumber.length != 15) {
-      _showAlertDialog(context, 'Business Number (BN) must be exactly 15 digits.');
+      _showAlertDialog(
+        context,
+        'Business Number (BN) must be exactly 15 digits.',
+      );
       return;
     }
-    
+
     setState(() => _saving = true);
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         // Upload optional images if new ones were selected
         String? driversAbstractUrl = _driversAbstractUrl;
@@ -492,7 +498,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
             _driversAbstractImage!,
           );
         }
-        
+
         String? backgroundCheckUrl = _backgroundCheckUrl;
         if (_backgroundCheckImage != null) {
           backgroundCheckUrl = await FirebaseService.uploadCarrierDocument(
@@ -501,21 +507,22 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
             _backgroundCheckImage!,
           );
         }
-        
+
         final response = {
           'driversAbstractUrl': driversAbstractUrl,
           'backgroundCheckUrl': backgroundCheckUrl,
           'businessNumber': _businessNumberController.text.trim(),
           'isGstRegistered': _isGstRegistered,
-          'isCarbonFootprintInterested': _isCarbonFootprintInterested, // Can be true, false, or null
-          'carbonFootprintStatus': _isCarbonFootprintInterested == true 
-              ? 'interested' 
-              : _isCarbonFootprintInterested == false 
-                  ? 'maybe_later' 
-                  : 'remind_later',
+          'isCarbonFootprintInterested':
+              _isCarbonFootprintInterested, // Can be true, false, or null
+          'carbonFootprintStatus': _isCarbonFootprintInterested == true
+              ? 'interested'
+              : _isCarbonFootprintInterested == false
+              ? 'maybe_later'
+              : 'remind_later',
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveCarrierDashboardResponse(
           carrier.uid,
           'dashboard_3_business_number',
@@ -523,17 +530,17 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
-        print('Carrier Dashboard 3 response saved successfully');
       }
-      
+
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (context) => const MainPage(),
+          builder: (context) => const CarrierDashboardMainPage(),
         ),
         (route) => false, // Remove all previous routes
       );
@@ -551,7 +558,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
       if (mounted) setState(() => _saving = false);
     }
   }
-  
+
   void _showAlertDialog(BuildContext context, String message) {
     showDialog(
       context: context,
@@ -652,7 +659,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
     VoidCallback? onTap,
   }) {
     final hasImage = image != null || imageUrl != null;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -820,8 +827,9 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
                 width: 34,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFF497A57) : const Color(
-                      0xFFF8F8F8),
+                  color: isSelected
+                      ? const Color(0xFF497A57)
+                      : const Color(0xFFF8F8F8),
                   borderRadius: BorderRadius.circular(5),
                   boxShadow: const [
                     BoxShadow(

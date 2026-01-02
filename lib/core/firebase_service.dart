@@ -9,6 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
 import 'app_config.dart';
 import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 import 'dart:async';
 import '../models/user_model.dart';
 import '../models/shipper_model.dart';
@@ -44,7 +45,8 @@ class FirebaseService {
   static CollectionReference get carriers => _firestore.collection('carriers');
   static CollectionReference get loads => _firestore.collection('loads');
   static CollectionReference get listings => _firestore.collection('listings');
-  static CollectionReference get conversations => _firestore.collection('conversations');
+  static CollectionReference get conversations =>
+      _firestore.collection('conversations');
   static CollectionReference get messages => _firestore.collection('messages');
   static CollectionReference get bookings => _firestore.collection('bookings');
   static CollectionReference get offers => _firestore.collection('offers');
@@ -56,20 +58,23 @@ class FirebaseService {
 
   // Analytics methods according to official docs
   static FirebaseAnalytics get analytics => _analytics;
-  
+
   // Log custom event with proper parameter validation
-  static Future<void> logEvent(String name, {Map<String, Object>? parameters}) async {
+  static Future<void> logEvent(
+    String name, {
+    Map<String, Object>? parameters,
+  }) async {
     try {
       // Validate event name (max 40 characters as per official docs)
       if (name.length > 40) {
         throw ArgumentError('Event name must be 40 characters or fewer');
       }
-      
+
       // Validate parameters (max 25 parameters as per official docs)
       if (parameters != null && parameters.length > 25) {
         throw ArgumentError('Event can have at most 25 parameters');
       }
-      
+
       await _analytics.logEvent(name: name, parameters: parameters);
     } catch (e) {
       if (AppConfig.enableDebugLogging) {
@@ -77,28 +82,28 @@ class FirebaseService {
       }
     }
   }
-  
+
   // Helper method to convert dynamic parameters to Object parameters
   static Map<String, Object> _convertParameters(Map<String, dynamic>? params) {
     if (params == null) return {};
     return params.map((key, value) => MapEntry(key, value as Object));
   }
-  
+
   // Public version for external use
   static Map<String, Object> convertParameters(Map<String, dynamic>? params) {
     if (params == null) return {};
     return params.map((key, value) => MapEntry(key, value as Object));
   }
-  
+
   // User properties for analytics
   static Future<void> setUserProperty(String name, String? value) async {
     await _analytics.setUserProperty(name: name, value: value);
   }
-  
+
   static Future<void> setUserId(String? userId) async {
     await _analytics.setUserId(id: userId);
   }
-  
+
   // Test method to verify analytics is working (debug only)
   static Future<void> testAnalytics() async {
     if (!AppConfig.enableTestEvents) {
@@ -107,15 +112,18 @@ class FirebaseService {
       }
       return;
     }
-    
+
     try {
       // Add timeout to prevent hanging
-      await logEvent('analytics_test', parameters: _convertParameters({
-        'test_timestamp': DateTime.now().millisecondsSinceEpoch,
-        'test_success': 'true',
-        'build_mode': AppConfig.buildMode,
-        'app_version': AppConfig.versionInfo,
-      })).timeout(
+      await logEvent(
+        'analytics_test',
+        parameters: _convertParameters({
+          'test_timestamp': DateTime.now().millisecondsSinceEpoch,
+          'test_success': 'true',
+          'build_mode': AppConfig.buildMode,
+          'app_version': AppConfig.versionInfo,
+        }),
+      ).timeout(
         const Duration(seconds: 10),
         onTimeout: () {
           if (AppConfig.enableDebugLogging) {
@@ -135,9 +143,13 @@ class FirebaseService {
 
   // Crashlytics methods according to official docs
   static FirebaseCrashlytics get crashlytics => _crashlytics;
-  
+
   // Record non-fatal error with proper error handling
-  static Future<void> recordError(dynamic exception, StackTrace? stackTrace, {String? reason}) async {
+  static Future<void> recordError(
+    dynamic exception,
+    StackTrace? stackTrace, {
+    String? reason,
+  }) async {
     try {
       await _crashlytics.recordError(exception, stackTrace, reason: reason);
     } catch (e) {
@@ -146,7 +158,7 @@ class FirebaseService {
       }
     }
   }
-  
+
   // Record custom log message
   static Future<void> log(String message) async {
     try {
@@ -157,7 +169,7 @@ class FirebaseService {
       }
     }
   }
-  
+
   // Set custom key-value pair
   static Future<void> setCustomKey(String key, dynamic value) async {
     try {
@@ -168,7 +180,7 @@ class FirebaseService {
       }
     }
   }
-  
+
   // Set user identifier
   static Future<void> setUserIdentifier(String identifier) async {
     try {
@@ -188,30 +200,35 @@ class FirebaseService {
       }
       return;
     }
-    
+
     try {
       if (AppConfig.enableDebugLogging) {
         print('Starting Crashlytics test...');
       }
-      
+
       // Test 1: Set user identifier (this usually works even if other methods fail)
-      await setUserIdentifier('test_user_${DateTime.now().millisecondsSinceEpoch}');
+      await setUserIdentifier(
+        'test_user_${DateTime.now().millisecondsSinceEpoch}',
+      );
       if (AppConfig.enableDebugLogging) {
         print('✓ User identifier set successfully');
       }
-      
+
       // Test 2: Set custom key (this usually works)
-      await setCustomKey('test_key', 'test_value_${DateTime.now().millisecondsSinceEpoch}');
+      await setCustomKey(
+        'test_key',
+        'test_value_${DateTime.now().millisecondsSinceEpoch}',
+      );
       if (AppConfig.enableDebugLogging) {
         print('✓ Custom key set successfully');
       }
-      
+
       // Test 3: Log message (this might fail with 404)
       await log('Crashlytics test log - ${DateTime.now().toIso8601String()}');
       if (AppConfig.enableDebugLogging) {
         print('✓ Log message sent successfully');
       }
-      
+
       // Test 4: Record non-fatal error (this might fail with 404)
       await recordError(
         'Test non-fatal error from ${AppConfig.buildMode} mode',
@@ -221,9 +238,11 @@ class FirebaseService {
       if (AppConfig.enableDebugLogging) {
         print('✓ Non-fatal error recorded successfully');
       }
-      
+
       if (AppConfig.enableDebugLogging) {
-        print('Crashlytics test completed. Some methods may fail with 404 if Crashlytics is not fully enabled in Firebase Console.');
+        print(
+          'Crashlytics test completed. Some methods may fail with 404 if Crashlytics is not fully enabled in Firebase Console.',
+        );
         print('Check Firebase Console > Crashlytics in a few minutes');
       }
     } catch (e) {
@@ -248,7 +267,10 @@ class FirebaseService {
   static Future<bool> isCrashlyticsWorking() async {
     try {
       // Try to set a custom key to test if Crashlytics is responsive
-      await _crashlytics.setCustomKey('health_check', DateTime.now().millisecondsSinceEpoch);
+      await _crashlytics.setCustomKey(
+        'health_check',
+        DateTime.now().millisecondsSinceEpoch,
+      );
       return true;
     } catch (e) {
       if (AppConfig.enableDebugLogging) {
@@ -262,20 +284,25 @@ class FirebaseService {
   static Future<void> manualCrashlyticsTest() async {
     try {
       print('Starting manual Crashlytics test...');
-      
+
       // Test 1: Set user identifier (usually works)
-      await setUserIdentifier('manual_test_user_${DateTime.now().millisecondsSinceEpoch}');
+      await setUserIdentifier(
+        'manual_test_user_${DateTime.now().millisecondsSinceEpoch}',
+      );
       print('✓ User identifier set successfully');
-      
+
       // Test 2: Set custom keys (usually works)
       await setCustomKey('manual_test_key', 'manual_test_value');
-      await setCustomKey('test_timestamp', DateTime.now().millisecondsSinceEpoch);
+      await setCustomKey(
+        'test_timestamp',
+        DateTime.now().millisecondsSinceEpoch,
+      );
       print('✓ Custom keys set successfully');
-      
+
       // Test 3: Log a custom message (might fail with 404)
       await log('Manual test log - ${DateTime.now().toIso8601String()}');
       print('✓ Log message sent successfully');
-      
+
       // Test 4: Record a non-fatal error (might fail with 404)
       await recordError(
         'Manual test error - ${DateTime.now().toIso8601String()}',
@@ -283,54 +310,79 @@ class FirebaseService {
         reason: 'Manual UI test',
       );
       print('✓ Non-fatal error recorded successfully');
-      
+
       print('Manual Crashlytics test completed!');
-      print('Note: 404 errors are common if Crashlytics is not fully enabled in Firebase Console');
+      print(
+        'Note: 404 errors are common if Crashlytics is not fully enabled in Firebase Console',
+      );
       print('Check Firebase Console > Crashlytics in 5-10 minutes');
-      
     } catch (e) {
       print('Manual Crashlytics test failed: $e');
     }
   }
 
   // User management methods
-  static Future<UserCredential?> signInWithEmailAndPassword(String email, String password) async {
+  static Future<UserCredential?> signInWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
     try {
-      final result = await _auth.signInWithEmailAndPassword(email: email, password: password);
+      final result = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
       // Log successful sign in
-      await logEvent('login', parameters: _convertParameters({
-        'method': 'email_password',
-        'success': 'true',
-      }));
+      await logEvent(
+        'login',
+        parameters: _convertParameters({
+          'method': 'email_password',
+          'success': 'true',
+        }),
+      );
       return result;
     } catch (e) {
       // Log failed sign in
-      await logEvent('login', parameters: _convertParameters({
-        'method': 'email_password',
-        'success': 'false',
-        'error': e.toString(),
-      }));
+      await logEvent(
+        'login',
+        parameters: _convertParameters({
+          'method': 'email_password',
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
       await recordError(e, StackTrace.current, reason: 'Sign in failed');
       rethrow;
     }
   }
 
-  static Future<UserCredential?> createUserWithEmailAndPassword(String email, String password) async {
+  static Future<UserCredential?> createUserWithEmailAndPassword(
+    String email,
+    String password,
+  ) async {
     try {
-      final result = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      final result = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
       // Log successful user creation
-      await logEvent('sign_up', parameters: _convertParameters({
-        'method': 'email_password',
-        'success': 'true',
-      }));
+      await logEvent(
+        'sign_up',
+        parameters: _convertParameters({
+          'method': 'email_password',
+          'success': 'true',
+        }),
+      );
       return result;
     } catch (e) {
       // Log failed user creation
-      await logEvent('sign_up', parameters: _convertParameters({
-        'method': 'email_password',
-        'success': 'false',
-        'error': e.toString(),
-      }));
+      await logEvent(
+        'sign_up',
+        parameters: _convertParameters({
+          'method': 'email_password',
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
       await recordError(e, StackTrace.current, reason: 'User creation failed');
       rethrow;
     }
@@ -340,15 +392,19 @@ class FirebaseService {
     try {
       await _auth.signOut();
       // Log successful sign out
-      await logEvent('logout', parameters: _convertParameters({
-        'success': 'true',
-      }));
+      await logEvent(
+        'logout',
+        parameters: _convertParameters({'success': 'true'}),
+      );
     } catch (e) {
       // Log failed sign out
-      await logEvent('logout', parameters: _convertParameters({
-        'success': 'false',
-        'error': e.toString(),
-      }));
+      await logEvent(
+        'logout',
+        parameters: _convertParameters({
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
       await recordError(e, StackTrace.current, reason: 'Sign out failed');
       rethrow;
     }
@@ -358,12 +414,16 @@ class FirebaseService {
   static Future<UserCredential?> signInWithGoogle() async {
     try {
       // Web client ID for Google Sign-In (use the web client ID from Google Console / Firebase)
-      const String clientId = '60865903848-qufrm62v42k4kuh30jr022dr2mjcim5i.apps.googleusercontent.com';
-      
+      const String clientId =
+          '60865903848-qufrm62v42k4kuh30jr022dr2mjcim5i.apps.googleusercontent.com';
+
       // Platform-aware GoogleSignIn: web uses clientId, others use severClientId
       final GoogleSignIn googleSignIn = kIsWeb
-          ? GoogleSignIn(scopes: ['email','profile'], clientId: clientId)
-          : GoogleSignIn(scopes: ['email','profile'], serverClientId: clientId);
+          ? GoogleSignIn(scopes: ['email', 'profile'], clientId: clientId)
+          : GoogleSignIn(
+              scopes: ['email', 'profile'],
+              serverClientId: clientId,
+            );
 
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
@@ -374,7 +434,8 @@ class FirebaseService {
       }
 
       // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       // Check if idToken is available (required for Firebase Auth)
       if (googleAuth.idToken == null) {
@@ -391,30 +452,40 @@ class FirebaseService {
       final userCredential = await _auth.signInWithCredential(credential);
 
       // Log successful sign in
-      await logEvent('login', parameters: _convertParameters({
-        'method': 'google',
-        'success': 'true',
-      }));
+      await logEvent(
+        'login',
+        parameters: _convertParameters({'method': 'google', 'success': 'true'}),
+      );
 
       return userCredential;
     } catch (e) {
       // Log failed sign in
-      await logEvent('login', parameters: _convertParameters({
-        'method': 'google',
-        'success': 'false',
-        'error': e.toString(),
-      }));
+      await logEvent(
+        'login',
+        parameters: _convertParameters({
+          'method': 'google',
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
       await recordError(e, StackTrace.current, reason: 'Google sign in failed');
       rethrow;
     }
   }
 
   // Firestore data methods
-  static Future<void> createUserDocument(String userId, Map<String, dynamic> userData) async {
+  static Future<void> createUserDocument(
+    String userId,
+    Map<String, dynamic> userData,
+  ) async {
     try {
       await users.doc(userId).set(userData);
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Create user document failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Create user document failed',
+      );
       rethrow;
     }
   }
@@ -423,16 +494,27 @@ class FirebaseService {
     try {
       return await users.doc(userId).get();
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Get user document failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Get user document failed',
+      );
       rethrow;
     }
   }
 
-  static Future<void> updateUserDocument(String userId, Map<String, dynamic> updates) async {
+  static Future<void> updateUserDocument(
+    String userId,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       await users.doc(userId).update(updates);
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Update user document failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Update user document failed',
+      );
       rethrow;
     }
   }
@@ -467,11 +549,17 @@ class FirebaseService {
       // If the file doesn't exist, that's fine – nothing to delete.
       if (e is FirebaseException && e.code == 'object-not-found') {
         if (AppConfig.enableDebugLogging) {
-          print('deleteFileFromURL: object not found, skipping delete for $url');
+          print(
+            'deleteFileFromURL: object not found, skipping delete for $url',
+          );
         }
         return;
       }
-      await recordError(e, StackTrace.current, reason: 'File deletion from URL failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'File deletion from URL failed',
+      );
       rethrow;
     }
   }
@@ -525,7 +613,10 @@ class FirebaseService {
     }
   }
 
-  static Future<void> updateShipper(String uid, Map<String, dynamic> updates) async {
+  static Future<void> updateShipper(
+    String uid,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       await shippers.doc(uid).update(updates);
     } catch (e) {
@@ -534,7 +625,10 @@ class FirebaseService {
     }
   }
 
-  static Future<void> updateCarrier(String uid, Map<String, dynamic> updates) async {
+  static Future<void> updateCarrier(
+    String uid,
+    Map<String, dynamic> updates,
+  ) async {
     try {
       await carriers.doc(uid).update(updates);
     } catch (e) {
@@ -573,7 +667,11 @@ class FirebaseService {
           return await getCarrier(uid);
       }
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Get user by role failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Get user by role failed',
+      );
       rethrow;
     }
   }
@@ -623,7 +721,11 @@ class FirebaseService {
       // Phone number is available
       return true;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Check phone number availability failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Check phone number availability failed',
+      );
       // On error, return true to allow the user to proceed (fail open)
       return true;
     }
@@ -644,30 +746,43 @@ class FirebaseService {
 
       if (userCredential.user != null) {
         // Create shipper document in Firestore
-        final shipper = shipperData.copyWithShipper(uid: userCredential.user!.uid);
-        print('FirebaseService: Creating shipper with isOnboardingComplete: ${shipper.isOnboardingComplete}');
+        final shipper = shipperData.copyWithShipper(
+          uid: userCredential.user!.uid,
+        );
+        print(
+          'FirebaseService: Creating shipper with isOnboardingComplete: ${shipper.isOnboardingComplete}',
+        );
         await createShipper(shipper);
         print('FirebaseService: Shipper created successfully');
-        
+
         // Set user properties for analytics
         await setUserId(userCredential.user!.uid);
         await setUserProperty('user_type', 'shipper');
-        await setUserProperty('onboarding_complete', shipper.isOnboardingComplete.toString());
-        
+        await setUserProperty(
+          'onboarding_complete',
+          shipper.isOnboardingComplete.toString(),
+        );
+
         // Log shipper signup event
-        await logEvent('shipper_signup', parameters: _convertParameters({
-          'success': 'true',
-          'onboarding_complete': shipper.isOnboardingComplete,
-        }));
+        await logEvent(
+          'shipper_signup',
+          parameters: _convertParameters({
+            'success': 'true',
+            'onboarding_complete': shipper.isOnboardingComplete,
+          }),
+        );
       }
 
       return userCredential;
     } catch (e) {
       // Log failed shipper signup
-      await logEvent('shipper_signup', parameters: _convertParameters({
-        'success': 'false',
-        'error': e.toString(),
-      }));
+      await logEvent(
+        'shipper_signup',
+        parameters: _convertParameters({
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
       await recordError(e, StackTrace.current, reason: 'Shipper signup failed');
       rethrow;
     }
@@ -687,28 +802,39 @@ class FirebaseService {
 
       if (userCredential.user != null) {
         // Create carrier document in Firestore
-        final carrier = carrierData.copyWithCarrier(uid: userCredential.user!.uid);
+        final carrier = carrierData.copyWithCarrier(
+          uid: userCredential.user!.uid,
+        );
         await createCarrier(carrier);
-        
+
         // Set user properties for analytics
         await setUserId(userCredential.user!.uid);
         await setUserProperty('user_type', 'carrier');
-        await setUserProperty('onboarding_complete', carrier.isOnboardingComplete.toString());
-        
+        await setUserProperty(
+          'onboarding_complete',
+          carrier.isOnboardingComplete.toString(),
+        );
+
         // Log carrier signup event
-        await logEvent('carrier_signup', parameters: _convertParameters({
-          'success': 'true',
-          'onboarding_complete': carrier.isOnboardingComplete,
-        }));
+        await logEvent(
+          'carrier_signup',
+          parameters: _convertParameters({
+            'success': 'true',
+            'onboarding_complete': carrier.isOnboardingComplete,
+          }),
+        );
       }
 
       return userCredential;
     } catch (e) {
       // Log failed carrier signup
-      await logEvent('carrier_signup', parameters: _convertParameters({
-        'success': 'false',
-        'error': e.toString(),
-      }));
+      await logEvent(
+        'carrier_signup',
+        parameters: _convertParameters({
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
       await recordError(e, StackTrace.current, reason: 'Carrier signup failed');
       rethrow;
     }
@@ -725,23 +851,33 @@ class FirebaseService {
       // Set user properties for analytics when getting current user data
       await setUserId(user.uid);
       await setUserProperty('user_type', role.name);
-      
+
       final userData = await getUserByRole(user.uid, role);
-      
+
       // Set additional user properties based on user type
       if (userData != null) {
         if (role == UserRole.shipper) {
           final shipper = userData as ShipperModel;
-          await setUserProperty('onboarding_complete', shipper.isOnboardingComplete.toString());
+          await setUserProperty(
+            'onboarding_complete',
+            shipper.isOnboardingComplete.toString(),
+          );
         } else if (role == UserRole.carrier) {
           final carrier = userData as CarrierModel;
-          await setUserProperty('onboarding_complete', carrier.isOnboardingComplete.toString());
+          await setUserProperty(
+            'onboarding_complete',
+            carrier.isOnboardingComplete.toString(),
+          );
         }
       }
 
       return userData;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Get current user data failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Get current user data failed',
+      );
       rethrow;
     }
   }
@@ -755,26 +891,33 @@ class FirebaseService {
     try {
       final carrierRef = carriers.doc(carrierId);
       final carrierDoc = await carrierRef.get();
-      
+
       if (!carrierDoc.exists) {
         throw Exception('Carrier document not found');
       }
-      
+
       final carrierData = carrierDoc.data() as Map<String, dynamic>;
       final currentOnboardingData = carrierData['onboardingData'] != null
           ? CarrierOnboardingData.fromFirestore(carrierData['onboardingData'])
           : CarrierOnboardingData();
-      
-      final updatedOnboardingData = currentOnboardingData.addResponse(screenName, response);
-      
+
+      final updatedOnboardingData = currentOnboardingData.addResponse(
+        screenName,
+        response,
+      );
+
       await carrierRef.update({
         'onboardingData': updatedOnboardingData.toFirestore(),
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       print('Onboarding response saved for screen: $screenName');
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Save carrier onboarding response failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Save carrier onboarding response failed',
+      );
       rethrow;
     }
   }
@@ -783,60 +926,76 @@ class FirebaseService {
     try {
       final carrierRef = carriers.doc(carrierId);
       final carrierDoc = await carrierRef.get();
-      
+
       if (!carrierDoc.exists) {
         throw Exception('Carrier document not found');
       }
-      
+
       final carrierData = carrierDoc.data() as Map<String, dynamic>;
       final currentOnboardingData = carrierData['onboardingData'] != null
           ? CarrierOnboardingData.fromFirestore(carrierData['onboardingData'])
           : CarrierOnboardingData();
-      
+
       final completedOnboardingData = currentOnboardingData.markComplete();
-      
+
       await carrierRef.update({
         'onboardingData': completedOnboardingData.toFirestore(),
         'isOnboardingComplete': true,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      
+
       // Update user property for analytics
       await setUserProperty('onboarding_complete', 'true');
-      
+
       // Log onboarding completion event
-      await logEvent('onboarding_complete', parameters: _convertParameters({
-        'user_type': 'carrier',
-        'success': 'true',
-      }));
-      
+      await logEvent(
+        'onboarding_complete',
+        parameters: _convertParameters({
+          'user_type': 'carrier',
+          'success': 'true',
+        }),
+      );
+
       print('Carrier onboarding marked as complete');
     } catch (e) {
       // Log failed onboarding completion
-      await logEvent('onboarding_complete', parameters: _convertParameters({
-        'user_type': 'carrier',
-        'success': 'false',
-        'error': e.toString(),
-      }));
-      await recordError(e, StackTrace.current, reason: 'Mark carrier onboarding complete failed');
+      await logEvent(
+        'onboarding_complete',
+        parameters: _convertParameters({
+          'user_type': 'carrier',
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Mark carrier onboarding complete failed',
+      );
       rethrow;
     }
   }
 
-  static Future<CarrierOnboardingData?> getCarrierOnboardingData(String carrierId) async {
+  static Future<CarrierOnboardingData?> getCarrierOnboardingData(
+    String carrierId,
+  ) async {
     try {
       final carrierDoc = await carriers.doc(carrierId).get();
-      
+
       if (!carrierDoc.exists) {
         return null;
       }
-      
+
       final carrierData = carrierDoc.data() as Map<String, dynamic>;
       return carrierData['onboardingData'] != null
           ? CarrierOnboardingData.fromFirestore(carrierData['onboardingData'])
           : null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Get carrier onboarding data failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Get carrier onboarding data failed',
+      );
       rethrow;
     }
   }
@@ -846,17 +1005,27 @@ class FirebaseService {
       final onboardingData = await getCarrierOnboardingData(carrierId);
       return onboardingData?.isCompleted ?? false;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Check carrier onboarding complete failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Check carrier onboarding complete failed',
+      );
       return false;
     }
   }
 
-  static Future<List<String>> getCompletedOnboardingScreens(String carrierId) async {
+  static Future<List<String>> getCompletedOnboardingScreens(
+    String carrierId,
+  ) async {
     try {
       final onboardingData = await getCarrierOnboardingData(carrierId);
       return onboardingData?.completedScreens ?? [];
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Get completed onboarding screens failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Get completed onboarding screens failed',
+      );
       return [];
     }
   }
@@ -880,7 +1049,10 @@ class FirebaseService {
           ? ShipperOnboardingData.fromFirestore(shipperData['onboardingData'])
           : const ShipperOnboardingData();
 
-      final updatedOnboardingData = currentOnboardingData.addResponse(screenName, response);
+      final updatedOnboardingData = currentOnboardingData.addResponse(
+        screenName,
+        response,
+      );
 
       await shipperRef.update({
         'onboardingData': updatedOnboardingData.toFirestore(),
@@ -889,7 +1061,11 @@ class FirebaseService {
 
       print('Shipper onboarding response saved for screen: $screenName');
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Save shipper onboarding response failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Save shipper onboarding response failed',
+      );
       rethrow;
     }
   }
@@ -918,27 +1094,39 @@ class FirebaseService {
 
       // Update user property for analytics
       await setUserProperty('onboarding_complete', 'true');
-      
+
       // Log onboarding completion event
-      await logEvent('onboarding_complete', parameters: _convertParameters({
-        'user_type': 'shipper',
-        'success': 'true',
-      }));
+      await logEvent(
+        'onboarding_complete',
+        parameters: _convertParameters({
+          'user_type': 'shipper',
+          'success': 'true',
+        }),
+      );
 
       print('Shipper onboarding marked as complete');
     } catch (e) {
       // Log failed onboarding completion
-      await logEvent('onboarding_complete', parameters: _convertParameters({
-        'user_type': 'shipper',
-        'success': 'false',
-        'error': e.toString(),
-      }));
-      await recordError(e, StackTrace.current, reason: 'Mark shipper onboarding complete failed');
+      await logEvent(
+        'onboarding_complete',
+        parameters: _convertParameters({
+          'user_type': 'shipper',
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Mark shipper onboarding complete failed',
+      );
       rethrow;
     }
   }
 
-  static Future<ShipperOnboardingData?> getShipperOnboardingData(String shipperId) async {
+  static Future<ShipperOnboardingData?> getShipperOnboardingData(
+    String shipperId,
+  ) async {
     try {
       final shipperDoc = await shippers.doc(shipperId).get();
 
@@ -951,7 +1139,11 @@ class FirebaseService {
           ? ShipperOnboardingData.fromFirestore(shipperData['onboardingData'])
           : null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Get shipper onboarding data failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Get shipper onboarding data failed',
+      );
       rethrow;
     }
   }
@@ -961,7 +1153,11 @@ class FirebaseService {
       final onboardingData = await getShipperOnboardingData(shipperId);
       return onboardingData?.isCompleted ?? false;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Check shipper onboarding complete failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Check shipper onboarding complete failed',
+      );
       return false;
     }
   }
@@ -980,7 +1176,11 @@ class FirebaseService {
           .doc(screenKey)
           .set(response, SetOptions(merge: true));
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to save shipper dashboard response');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save shipper dashboard response',
+      );
       rethrow;
     }
   }
@@ -997,10 +1197,14 @@ class FirebaseService {
           .collection('dashboard_responses')
           .doc(screenKey)
           .get();
-      
+
       return doc.exists ? doc.data() : null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get shipper dashboard response');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get shipper dashboard response',
+      );
       return null;
     }
   }
@@ -1009,12 +1213,22 @@ class FirebaseService {
   static Future<bool> isShipperDashboardComplete(String shipperUid) async {
     try {
       // Check if all three dashboard steps are completed
-      final dashboard2 = await getShipperDashboardResponse(shipperUid, 'dashboard_2_business_info');
-      final dashboard3 = await getShipperDashboardResponse(shipperUid, 'dashboard_3_business_number');
-      
+      final dashboard2 = await getShipperDashboardResponse(
+        shipperUid,
+        'dashboard_2_business_info',
+      );
+      final dashboard3 = await getShipperDashboardResponse(
+        shipperUid,
+        'dashboard_3_business_number',
+      );
+
       return dashboard2 != null && dashboard3 != null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Check shipper dashboard complete failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Check shipper dashboard complete failed',
+      );
       return false;
     }
   }
@@ -1027,13 +1241,19 @@ class FirebaseService {
   ) async {
     try {
       // On mobile, imageFile is a File. On web, this path should not be used.
-      final ref = _storage.ref().child('shippers/$shipperUid/documents/$imageType.jpg');
+      final ref = _storage.ref().child(
+        'shippers/$shipperUid/documents/$imageType.jpg',
+      );
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload image');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload image',
+      );
       return null;
     }
   }
@@ -1052,13 +1272,22 @@ class FirebaseService {
       return null;
     }
     try {
-      final ref = _storage.ref().child('shippers/$shipperUid/documents/$imageType.jpg');
-      final uploadTask = ref.putData(bytes, SettableMetadata(contentType: mimeType));
+      final ref = _storage.ref().child(
+        'shippers/$shipperUid/documents/$imageType.jpg',
+      );
+      final uploadTask = ref.putData(
+        bytes,
+        SettableMetadata(contentType: mimeType),
+      );
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload image bytes');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload image bytes',
+      );
       return null;
     }
   }
@@ -1069,13 +1298,19 @@ class FirebaseService {
     File imageFile,
   ) async {
     try {
-      final ref = _storage.ref().child('carriers/$carrierUid/profile/profile_image.jpg');
+      final ref = _storage.ref().child(
+        'carriers/$carrierUid/profile/profile_image.jpg',
+      );
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload carrier profile image');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload carrier profile image',
+      );
       return null;
     }
   }
@@ -1086,13 +1321,19 @@ class FirebaseService {
     File imageFile,
   ) async {
     try {
-      final ref = _storage.ref().child('shippers/$shipperUid/profile/profile_image.jpg');
+      final ref = _storage.ref().child(
+        'shippers/$shipperUid/profile/profile_image.jpg',
+      );
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload shipper profile image');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload shipper profile image',
+      );
       return null;
     }
   }
@@ -1111,7 +1352,11 @@ class FirebaseService {
           .doc(screenKey)
           .set(response, SetOptions(merge: true));
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to save carrier dashboard response');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save carrier dashboard response',
+      );
       rethrow;
     }
   }
@@ -1128,10 +1373,14 @@ class FirebaseService {
           .collection('dashboard_responses')
           .doc(screenKey)
           .get();
-      
+
       return doc.exists ? doc.data() : null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get carrier dashboard response');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get carrier dashboard response',
+      );
       return null;
     }
   }
@@ -1140,12 +1389,22 @@ class FirebaseService {
   static Future<bool> isCarrierDashboardComplete(String carrierUid) async {
     try {
       // Check if both dashboard steps are completed
-      final dashboard2 = await getCarrierDashboardResponse(carrierUid, 'dashboard_2_business_info');
-      final dashboard3 = await getCarrierDashboardResponse(carrierUid, 'dashboard_3_business_number');
-      
+      final dashboard2 = await getCarrierDashboardResponse(
+        carrierUid,
+        'dashboard_2_business_info',
+      );
+      final dashboard3 = await getCarrierDashboardResponse(
+        carrierUid,
+        'dashboard_3_business_number',
+      );
+
       return dashboard2 != null && dashboard3 != null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Check carrier dashboard complete failed');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Check carrier dashboard complete failed',
+      );
       return false;
     }
   }
@@ -1157,13 +1416,19 @@ class FirebaseService {
     File imageFile,
   ) async {
     try {
-      final ref = _storage.ref().child('carriers/$carrierUid/documents/$documentType.jpg');
+      final ref = _storage.ref().child(
+        'carriers/$carrierUid/documents/$documentType.jpg',
+      );
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload carrier document');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload carrier document',
+      );
       return null;
     }
   }
@@ -1174,18 +1439,26 @@ class FirebaseService {
       final user = _auth.currentUser;
       if (user != null) {
         await user.updatePassword(newPassword);
-        await logEvent('password_update', parameters: _convertParameters({
-          'success': 'true',
-        }));
+        await logEvent(
+          'password_update',
+          parameters: _convertParameters({'success': 'true'}),
+        );
       } else {
         throw Exception('User not authenticated');
       }
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to update password');
-      await logEvent('password_update', parameters: _convertParameters({
-        'success': 'false',
-        'error': e.toString(),
-      }));
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to update password',
+      );
+      await logEvent(
+        'password_update',
+        parameters: _convertParameters({
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
       rethrow;
     }
   }
@@ -1204,7 +1477,11 @@ class FirebaseService {
         throw Exception('User not authenticated');
       }
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to reauthenticate user');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to reauthenticate user',
+      );
       rethrow;
     }
   }
@@ -1218,13 +1495,16 @@ class FirebaseService {
     Function(String)? onCodeSent,
   }) async {
     final completer = Completer<String>();
-    
+
     try {
       // Log analytics event for sending OTP
-      await logEvent('phone_otp_send_attempt', parameters: _convertParameters({
-        'phone_number_length': phoneNumber.length.toString(),
-        'has_country_code': phoneNumber.startsWith('+').toString(),
-      }));
+      await logEvent(
+        'phone_otp_send_attempt',
+        parameters: _convertParameters({
+          'phone_number_length': phoneNumber.length.toString(),
+          'has_country_code': phoneNumber.startsWith('+').toString(),
+        }),
+      );
 
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
@@ -1249,34 +1529,47 @@ class FirebaseService {
                   'phoneNumber': phoneNumber,
                 });
               }
-              
+
               // Log successful auto-verification
-              await logEvent('phone_verification_auto_completed', parameters: _convertParameters({
-                'user_role': role.toString().split('.').last,
-              }));
+              await logEvent(
+                'phone_verification_auto_completed',
+                parameters: _convertParameters({
+                  'user_role': role.toString().split('.').last,
+                }),
+              );
             }
           }
         },
         verificationFailed: (FirebaseAuthException e) async {
           // Log analytics for failed verification
-          await logEvent('phone_otp_send_failed', parameters: _convertParameters({
-            'error_code': e.code,
-            'error_message': e.message ?? 'Unknown error',
-          }));
-          
+          await logEvent(
+            'phone_otp_send_failed',
+            parameters: _convertParameters({
+              'error_code': e.code,
+              'error_message': e.message ?? 'Unknown error',
+            }),
+          );
+
           // Record error in Crashlytics
-          await recordError(e, StackTrace.current, reason: 'Phone OTP send failed: ${e.code}');
-          
+          await recordError(
+            e,
+            StackTrace.current,
+            reason: 'Phone OTP send failed: ${e.code}',
+          );
+
           if (!completer.isCompleted) {
             completer.completeError(e);
           }
         },
         codeSent: (String verificationId, int? resendToken) async {
           // Log successful OTP send
-          await logEvent('phone_otp_sent', parameters: _convertParameters({
-            'has_resend_token': (resendToken != null).toString(),
-          }));
-          
+          await logEvent(
+            'phone_otp_sent',
+            parameters: _convertParameters({
+              'has_resend_token': (resendToken != null).toString(),
+            }),
+          );
+
           if (onCodeSent != null) {
             onCodeSent(verificationId);
           }
@@ -1292,15 +1585,20 @@ class FirebaseService {
         },
         timeout: const Duration(seconds: 60),
       );
-      
+
       return completer.future;
     } catch (e) {
       // Log analytics for exception
-      await logEvent('phone_otp_send_error', parameters: _convertParameters({
-        'error': e.toString(),
-      }));
-      
-      await recordError(e, StackTrace.current, reason: 'Failed to send phone OTP');
+      await logEvent(
+        'phone_otp_send_error',
+        parameters: _convertParameters({'error': e.toString()}),
+      );
+
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to send phone OTP',
+      );
       if (!completer.isCompleted) {
         completer.completeError(e);
       }
@@ -1318,10 +1616,13 @@ class FirebaseService {
   }) async {
     try {
       // Log analytics event for verification attempt
-      await logEvent('phone_otp_verify_attempt', parameters: _convertParameters({
-        'user_role': userRole.toString().split('.').last,
-        'otp_length': smsCode.length.toString(),
-      }));
+      await logEvent(
+        'phone_otp_verify_attempt',
+        parameters: _convertParameters({
+          'user_role': userRole.toString().split('.').last,
+          'otp_length': smsCode.length.toString(),
+        }),
+      );
 
       final credential = PhoneAuthProvider.credential(
         verificationId: verificationId,
@@ -1332,7 +1633,7 @@ class FirebaseService {
       if (user != null) {
         // Link phone number to user account
         await user.updatePhoneNumber(credential);
-        
+
         // Update Firestore with verified phone number
         final updateData = {
           'isPhoneVerified': true,
@@ -1346,32 +1647,49 @@ class FirebaseService {
         }
 
         // Log successful verification
-        await logEvent('phone_verification_success', parameters: _convertParameters({
-          'user_role': userRole.toString().split('.').last,
-          'phone_number_length': phoneNumber.length.toString(),
-        }));
+        await logEvent(
+          'phone_verification_success',
+          parameters: _convertParameters({
+            'user_role': userRole.toString().split('.').last,
+            'phone_number_length': phoneNumber.length.toString(),
+          }),
+        );
       } else {
         throw Exception('User not authenticated');
       }
     } on FirebaseAuthException catch (e) {
       // Log analytics for Firebase auth errors
-      await logEvent('phone_otp_verify_failed', parameters: _convertParameters({
-        'error_code': e.code,
-        'error_message': e.message ?? 'Unknown error',
-        'user_role': userRole.toString().split('.').last,
-      }));
-      
+      await logEvent(
+        'phone_otp_verify_failed',
+        parameters: _convertParameters({
+          'error_code': e.code,
+          'error_message': e.message ?? 'Unknown error',
+          'user_role': userRole.toString().split('.').last,
+        }),
+      );
+
       // Record error in Crashlytics
-      await recordError(e, StackTrace.current, reason: 'Phone OTP verification failed: ${e.code}');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Phone OTP verification failed: ${e.code}',
+      );
       rethrow;
     } catch (e) {
       // Log analytics for general errors
-      await logEvent('phone_otp_verify_error', parameters: _convertParameters({
-        'error': e.toString(),
-        'user_role': userRole.toString().split('.').last,
-      }));
-      
-      await recordError(e, StackTrace.current, reason: 'Failed to verify phone OTP');
+      await logEvent(
+        'phone_otp_verify_error',
+        parameters: _convertParameters({
+          'error': e.toString(),
+          'user_role': userRole.toString().split('.').last,
+        }),
+      );
+
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to verify phone OTP',
+      );
       rethrow;
     }
   }
@@ -1380,19 +1698,42 @@ class FirebaseService {
   static Future<String?> uploadLoadDocument(
     String shipperUid,
     String loadId,
-    File documentFile,
+    dynamic document, // XFile or File
   ) async {
     try {
       // Get file name
-      final fileName = documentFile.path.split('/').last;
-      
-      final ref = _storage.ref().child('shippers/$shipperUid/loads/$loadId/documents/$fileName');
-      final uploadTask = ref.putFile(documentFile);
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
+      String fileName;
+      if (document is XFile) {
+        fileName = document.name;
+      } else {
+        fileName = (document as File).path.split('/').last;
+      }
+
+      final ref = _storage.ref().child(
+        'shippers/$shipperUid/loads/$loadId/documents/$fileName',
+      );
+
+      if (kIsWeb) {
+        final xfile = document as XFile;
+        final bytes = await xfile.readAsBytes();
+        final uploadTask = ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'application/octet-stream'), // Default
+        );
+        final snapshot = await uploadTask;
+        return await snapshot.ref.getDownloadURL();
+      } else {
+        final file = document is XFile ? File(document.path) : document as File;
+        final uploadTask = ref.putFile(file);
+        final snapshot = await uploadTask;
+        return await snapshot.ref.getDownloadURL();
+      }
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload load document');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload load document',
+      );
       return null;
     }
   }
@@ -1411,21 +1752,31 @@ class FirebaseService {
           .collection('loads')
           .doc(loadId)
           .set(loadData);
-      
+
       // Log load creation event
-      await logEvent('load_created', parameters: _convertParameters({
-        'load_id': loadId,
-        'load_type': loadData['loadType'] ?? 'unknown',
-        'equipment_needed': loadData['equipmentNeeded'] ?? 'unknown',
-        'success': 'true',
-      }));
+      await logEvent(
+        'load_created',
+        parameters: _convertParameters({
+          'load_id': loadId,
+          'load_type': loadData['loadType'] ?? 'unknown',
+          'equipment_needed': loadData['equipmentNeeded'] ?? 'unknown',
+          'success': 'true',
+        }),
+      );
     } catch (e) {
       // Log failed load creation
-      await logEvent('load_created', parameters: _convertParameters({
-        'success': 'false',
-        'error': e.toString(),
-      }));
-      await recordError(e, StackTrace.current, reason: 'Failed to save shipper load');
+      await logEvent(
+        'load_created',
+        parameters: _convertParameters({
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save shipper load',
+      );
       rethrow;
     }
   }
@@ -1446,7 +1797,11 @@ class FirebaseService {
           .doc(loadId)
           .update(loadData);
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to update shipper load');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to update shipper load',
+      );
       rethrow;
     }
   }
@@ -1463,7 +1818,11 @@ class FirebaseService {
           .doc(ticketId)
           .set(supportData);
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to save support ticket');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save support ticket',
+      );
       rethrow;
     }
   }
@@ -1481,7 +1840,11 @@ class FirebaseService {
           .doc('user_preferences')
           .set(preferencesData, SetOptions(merge: true));
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to save user preferences');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save user preferences',
+      );
       rethrow;
     }
   }
@@ -1495,10 +1858,14 @@ class FirebaseService {
           .collection('preferences')
           .doc('user_preferences')
           .get();
-      
+
       return doc.exists ? doc.data() : null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get user preferences');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get user preferences',
+      );
       return null;
     }
   }
@@ -1509,34 +1876,38 @@ class FirebaseService {
     Map<String, dynamic> preferencesData,
   ) async {
     try {
-      await _firestore
-          .collection('shippers')
-          .doc(shipperUid)
-          .update({
+      await _firestore.collection('shippers').doc(shipperUid).update({
         'preferences': preferencesData,
         'updatedAt': DateTime.now().toIso8601String(),
       });
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to save shipper preferences');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save shipper preferences',
+      );
       rethrow;
     }
   }
 
   // Get shipper preferences (from shipper document)
-  static Future<Map<String, dynamic>?> getShipperPreferences(String shipperUid) async {
+  static Future<Map<String, dynamic>?> getShipperPreferences(
+    String shipperUid,
+  ) async {
     try {
-      final doc = await _firestore
-          .collection('shippers')
-          .doc(shipperUid)
-          .get();
-      
+      final doc = await _firestore.collection('shippers').doc(shipperUid).get();
+
       if (doc.exists) {
         final data = doc.data();
         return data?['preferences'] as Map<String, dynamic>?;
       }
       return null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get shipper preferences');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get shipper preferences',
+      );
       return null;
     }
   }
@@ -1576,7 +1947,6 @@ class FirebaseService {
         query = query.where('equipmentNeeded', isEqualTo: equipmentType);
       }
 
-
       // Note: City filtering will be done client-side due to Firestore limitations
       // with compound queries and text search
 
@@ -1604,23 +1974,44 @@ class FirebaseService {
         bool matchesSearch = true;
         if (searchQuery.isNotEmpty) {
           final searchLower = searchQuery.toLowerCase();
-          matchesSearch = (load['originAddress']?.toString().toLowerCase().contains(searchLower) ?? false) ||
-                         (load['destinationAddress']?.toString().toLowerCase().contains(searchLower) ?? false) ||
-                         (load['loadType']?.toString().toLowerCase().contains(searchLower) ?? false) ||
-                         (load['loadDescription']?.toString().toLowerCase().contains(searchLower) ?? false) ||
-                         (load['equipmentNeeded']?.toString().toLowerCase().contains(searchLower) ?? false);
+          matchesSearch =
+              (load['originAddress']?.toString().toLowerCase().contains(
+                    searchLower,
+                  ) ??
+                  false) ||
+              (load['destinationAddress']?.toString().toLowerCase().contains(
+                    searchLower,
+                  ) ??
+                  false) ||
+              (load['loadType']?.toString().toLowerCase().contains(
+                    searchLower,
+                  ) ??
+                  false) ||
+              (load['loadDescription']?.toString().toLowerCase().contains(
+                    searchLower,
+                  ) ??
+                  false) ||
+              (load['equipmentNeeded']?.toString().toLowerCase().contains(
+                    searchLower,
+                  ) ??
+                  false);
         }
 
         // Apply origin city filter
         bool matchesOriginCity = true;
         if (originCity != 'all') {
-          matchesOriginCity = load['originAddress']?.toString().contains(originCity) ?? false;
+          matchesOriginCity =
+              load['originAddress']?.toString().contains(originCity) ?? false;
         }
 
         // Apply destination city filter
         bool matchesDestinationCity = true;
         if (destinationCity != 'all') {
-          matchesDestinationCity = load['destinationAddress']?.toString().contains(destinationCity) ?? false;
+          matchesDestinationCity =
+              load['destinationAddress']?.toString().contains(
+                destinationCity,
+              ) ??
+              false;
         }
 
         return matchesSearch && matchesOriginCity && matchesDestinationCity;
@@ -1633,7 +2024,11 @@ class FirebaseService {
         'totalCount': filteredLoads.length,
       };
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get shipper loads');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get shipper loads',
+      );
       return {
         'loads': <Map<String, dynamic>>[],
         'lastDocument': null,
@@ -1664,9 +2059,9 @@ class FirebaseService {
       for (final doc in snapshot.docs) {
         final data = doc.data();
         final status = data['status']?.toString() ?? 'active';
-        
+
         stats['total'] = (stats['total'] ?? 0) + 1;
-        
+
         if (stats.containsKey(status)) {
           stats[status] = (stats[status] ?? 0) + 1;
         }
@@ -1674,7 +2069,11 @@ class FirebaseService {
 
       return stats;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get shipper load stats');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get shipper load stats',
+      );
       return {
         'active': 0,
         'inTransit': 0,
@@ -1699,20 +2098,21 @@ class FirebaseService {
           .collection('loads')
           .doc(loadId)
           .update({
-        'status': newStatus,
-        'updatedAt': DateTime.now().toIso8601String(),
-      });
+            'status': newStatus,
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to update load status');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to update load status',
+      );
       rethrow;
     }
   }
 
   // Delete load and all associated documents
-  static Future<void> deleteLoad(
-    String shipperUid,
-    String loadId,
-  ) async {
+  static Future<void> deleteLoad(String shipperUid, String loadId) async {
     try {
       // First, get the load data to find document URLs
       final loadDoc = await _firestore
@@ -1721,10 +2121,10 @@ class FirebaseService {
           .collection('loads')
           .doc(loadId)
           .get();
-      
+
       if (loadDoc.exists) {
         final loadData = loadDoc.data();
-        
+
         // Delete associated documents from Storage
         if (loadData != null) {
           // Delete additional document if it exists
@@ -1735,31 +2135,45 @@ class FirebaseService {
               await ref.delete();
             } catch (e) {
               // Log error but don't fail the entire operation
-              await recordError(e, StackTrace.current, reason: 'Failed to delete load document from storage');
+              await recordError(
+                e,
+                StackTrace.current,
+                reason: 'Failed to delete load document from storage',
+              );
             }
           }
         }
-        
+
         // Also try to delete the entire load documents folder
         try {
-          final loadDocumentsRef = _storage.ref().child('shippers/$shipperUid/loads/$loadId');
+          final loadDocumentsRef = _storage.ref().child(
+            'shippers/$shipperUid/loads/$loadId',
+          );
           final listResult = await loadDocumentsRef.listAll();
-          
+
           // Delete all files in the load documents folder
           for (final item in listResult.items) {
             try {
               await item.delete();
             } catch (e) {
               // Log individual file deletion errors but continue
-              await recordError(e, StackTrace.current, reason: 'Failed to delete individual load document file');
+              await recordError(
+                e,
+                StackTrace.current,
+                reason: 'Failed to delete individual load document file',
+              );
             }
           }
         } catch (e) {
           // Log folder deletion error but don't fail the entire operation
-          await recordError(e, StackTrace.current, reason: 'Failed to delete load documents folder');
+          await recordError(
+            e,
+            StackTrace.current,
+            reason: 'Failed to delete load documents folder',
+          );
         }
       }
-      
+
       // Delete the Firestore document
       await _firestore
           .collection('shippers')
@@ -1774,10 +2188,7 @@ class FirebaseService {
   }
 
   // Mark load as booked
-  static Future<void> markLoadAsBooked(
-    String shipperUid,
-    String loadId,
-  ) async {
+  static Future<void> markLoadAsBooked(String shipperUid, String loadId) async {
     try {
       await _firestore
           .collection('shippers')
@@ -1785,25 +2196,32 @@ class FirebaseService {
           .collection('loads')
           .doc(loadId)
           .update({
-        'isBooked': true,
-        'status': 'booked', // Update status to booked
-        'bookedAt': DateTime.now().toIso8601String(),
-        'updatedAt': DateTime.now().toIso8601String(),
-      });
-      
+            'isBooked': true,
+            'status': 'booked', // Update status to booked
+            'bookedAt': DateTime.now().toIso8601String(),
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
+
       // Log load booking event
-      await logEvent('load_booked', parameters: _convertParameters({
-        'load_id': loadId,
-        'success': 'true',
-      }));
+      await logEvent(
+        'load_booked',
+        parameters: _convertParameters({'load_id': loadId, 'success': 'true'}),
+      );
     } catch (e) {
       // Log failed load booking
-      await logEvent('load_booked', parameters: _convertParameters({
-        'load_id': loadId,
-        'success': 'false',
-        'error': e.toString(),
-      }));
-      await recordError(e, StackTrace.current, reason: 'Failed to mark load as booked');
+      await logEvent(
+        'load_booked',
+        parameters: _convertParameters({
+          'load_id': loadId,
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to mark load as booked',
+      );
       rethrow;
     }
   }
@@ -1820,13 +2238,17 @@ class FirebaseService {
           .collection('loads')
           .doc(loadId)
           .update({
-        'isBooked': false,
-        'status': 'active', // Restore status to active
-        'bookedAt': null,
-        'updatedAt': DateTime.now().toIso8601String(),
-      });
+            'isBooked': false,
+            'status': 'active', // Restore status to active
+            'bookedAt': null,
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to unmark load as booked');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to unmark load as booked',
+      );
       rethrow;
     }
   }
@@ -1835,40 +2257,60 @@ class FirebaseService {
   static Future<String> createProductListing(ProductListing listing) async {
     try {
       final docRef = await listings.add(listing.toFirestore());
-      
+
       // Log listing creation event
-      await logEvent('listing_created', parameters: _convertParameters({
-        'listing_id': docRef.id,
-        'shipper_uid': listing.shipperUid,
-        'condition': listing.condition,
-        'price': listing.price,
-        'success': 'true',
-      }));
-      
+      await logEvent(
+        'listing_created',
+        parameters: _convertParameters({
+          'listing_id': docRef.id,
+          'shipper_uid': listing.shipperUid,
+          'condition': listing.condition,
+          'price': listing.price,
+          'success': 'true',
+        }),
+      );
+
       return docRef.id;
     } catch (e) {
       // Log failed listing creation
-      await logEvent('listing_created', parameters: _convertParameters({
-        'success': 'false',
-        'error': e.toString(),
-      }));
-      await recordError(e, StackTrace.current, reason: 'Failed to create product listing');
+      await logEvent(
+        'listing_created',
+        parameters: _convertParameters({
+          'success': 'false',
+          'error': e.toString(),
+        }),
+      );
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to create product listing',
+      );
       rethrow;
     }
   }
 
-  static Future<void> updateProductListing(String listingId, ProductListing listing) async {
+  static Future<void> updateProductListing(
+    String listingId,
+    ProductListing listing,
+  ) async {
     try {
       await listings.doc(listingId).update(listing.toFirestore());
-      
+
       // Log listing update event
-      await logEvent('listing_updated', parameters: _convertParameters({
-        'listing_id': listingId,
-        'shipper_uid': listing.shipperUid,
-        'success': 'true',
-      }));
+      await logEvent(
+        'listing_updated',
+        parameters: _convertParameters({
+          'listing_id': listingId,
+          'shipper_uid': listing.shipperUid,
+          'success': 'true',
+        }),
+      );
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to update product listing');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to update product listing',
+      );
       rethrow;
     }
   }
@@ -1877,10 +2319,10 @@ class FirebaseService {
     try {
       // First, get the listing to find image and video URLs
       final listingDoc = await listings.doc(listingId).get();
-      
+
       if (listingDoc.exists) {
         final listingData = listingDoc.data() as Map<String, dynamic>?;
-        
+
         if (listingData != null) {
           // Delete images from Storage
           if (listingData['imageUrls'] != null) {
@@ -1891,50 +2333,71 @@ class FirebaseService {
                 await ref.delete();
               } catch (e) {
                 // Log error but don't fail the entire operation
-                await recordError(e, StackTrace.current, reason: 'Failed to delete listing image from storage');
+                await recordError(
+                  e,
+                  StackTrace.current,
+                  reason: 'Failed to delete listing image from storage',
+                );
               }
             }
           }
-          
+
           // Delete video from Storage
-          if (listingData['videoUrl'] != null && listingData['videoUrl'].toString().isNotEmpty) {
+          if (listingData['videoUrl'] != null &&
+              listingData['videoUrl'].toString().isNotEmpty) {
             try {
               final videoUrl = listingData['videoUrl'].toString();
               final ref = _storage.refFromURL(videoUrl);
               await ref.delete();
             } catch (e) {
               // Log error but don't fail the entire operation
-              await recordError(e, StackTrace.current, reason: 'Failed to delete listing video from storage');
+              await recordError(
+                e,
+                StackTrace.current,
+                reason: 'Failed to delete listing video from storage',
+              );
             }
           }
-          
+
           // Try to delete the entire listing folder from Storage
           final listingSnapshot = await listings.doc(listingId).get();
           if (listingSnapshot.exists) {
             final listing = ProductListing.fromFirestore(listingSnapshot);
             try {
-              final listingImagesRef = _storage.ref().child('shippers/${listing.shipperUid}/listings/$listingId/images');
+              final listingImagesRef = _storage.ref().child(
+                'shippers/${listing.shipperUid}/listings/$listingId/images',
+              );
               final listResult = await listingImagesRef.listAll();
-              
+
               // Delete all images in the folder
               for (final item in listResult.items) {
                 try {
                   await item.delete();
                 } catch (e) {
-                  await recordError(e, StackTrace.current, reason: 'Failed to delete individual listing image');
+                  await recordError(
+                    e,
+                    StackTrace.current,
+                    reason: 'Failed to delete individual listing image',
+                  );
                 }
               }
-              
+
               // Delete video folder
               try {
-                final listingVideoRef = _storage.ref().child('shippers/${listing.shipperUid}/listings/$listingId/video');
+                final listingVideoRef = _storage.ref().child(
+                  'shippers/${listing.shipperUid}/listings/$listingId/video',
+                );
                 final videoListResult = await listingVideoRef.listAll();
-                
+
                 for (final item in videoListResult.items) {
                   try {
                     await item.delete();
                   } catch (e) {
-                    await recordError(e, StackTrace.current, reason: 'Failed to delete listing video');
+                    await recordError(
+                      e,
+                      StackTrace.current,
+                      reason: 'Failed to delete listing video',
+                    );
                   }
                 }
               } catch (e) {
@@ -1942,22 +2405,33 @@ class FirebaseService {
               }
             } catch (e) {
               // Folder might not exist, that's okay
-              await recordError(e, StackTrace.current, reason: 'Failed to delete listing folder from storage');
+              await recordError(
+                e,
+                StackTrace.current,
+                reason: 'Failed to delete listing folder from storage',
+              );
             }
           }
         }
       }
-      
+
       // Delete the Firestore document
       await listings.doc(listingId).delete();
-      
+
       // Log listing deletion event
-      await logEvent('listing_deleted', parameters: _convertParameters({
-        'listing_id': listingId,
-        'success': 'true',
-      }));
+      await logEvent(
+        'listing_deleted',
+        parameters: _convertParameters({
+          'listing_id': listingId,
+          'success': 'true',
+        }),
+      );
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to delete product listing');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to delete product listing',
+      );
       rethrow;
     }
   }
@@ -1970,7 +2444,11 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get product listing');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get product listing',
+      );
       rethrow;
     }
   }
@@ -1984,39 +2462,45 @@ class FirebaseService {
   }) async {
     try {
       Query query = listings.where('isActive', isEqualTo: true);
-      
+
       if (shipperUid != null) {
         query = query.where('shipperUid', isEqualTo: shipperUid);
       }
-      
+
       if (condition != null) {
         query = query.where('condition', isEqualTo: condition);
       }
-      
+
       if (location != null) {
         query = query.where('location', isEqualTo: location);
       }
-      
+
       query = query.orderBy('createdAt', descending: true);
-      
+
       // For pagination, we need to use startAfter with the last document
       // For now, we'll use a simple approach with limit and offset
       if (offset > 0) {
         // Get documents to skip
         final skipQuery = query.limit(offset);
         final skipSnapshot = await skipQuery.get();
-        
+
         if (skipSnapshot.docs.isNotEmpty) {
           query = query.startAfterDocument(skipSnapshot.docs.last);
         }
       }
-      
+
       query = query.limit(limit);
-      
+
       final snapshot = await query.get();
-      return snapshot.docs.map((doc) => ProductListing.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ProductListing.fromFirestore(doc))
+          .toList();
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get product listings');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get product listings',
+      );
       rethrow;
     }
   }
@@ -2025,23 +2509,43 @@ class FirebaseService {
   static Future<List<String>> uploadProductImages(
     String shipperUid,
     String listingId,
-    List<File> imageFiles,
+    List<dynamic> images, // Can be List<File> or List<XFile>
   ) async {
     try {
       final List<String> imageUrls = [];
-      
-      for (int i = 0; i < imageFiles.length; i++) {
-        final fileName = 'image_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        final ref = _storage.ref().child('shippers/$shipperUid/listings/$listingId/images/$fileName');
-        final uploadTask = ref.putFile(imageFiles[i]);
-        final snapshot = await uploadTask;
-        final downloadUrl = await snapshot.ref.getDownloadURL();
-        imageUrls.add(downloadUrl);
+
+      for (int i = 0; i < images.length; i++) {
+        final image = images[i];
+        final fileName =
+            'image_${i + 1}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+        final ref = _storage.ref().child(
+          'shippers/$shipperUid/listings/$listingId/images/$fileName',
+        );
+
+        if (kIsWeb) {
+          final xfile = image as XFile;
+          final bytes = await xfile.readAsBytes();
+          final uploadTask = ref.putData(
+            bytes,
+            SettableMetadata(contentType: 'image/jpeg'),
+          );
+          final snapshot = await uploadTask;
+          imageUrls.add(await snapshot.ref.getDownloadURL());
+        } else {
+          final file = image is XFile ? File(image.path) : image as File;
+          final uploadTask = ref.putFile(file);
+          final snapshot = await uploadTask;
+          imageUrls.add(await snapshot.ref.getDownloadURL());
+        }
       }
-      
+
       return imageUrls;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload product images');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload product images',
+      );
       rethrow;
     }
   }
@@ -2050,17 +2554,35 @@ class FirebaseService {
   static Future<String?> uploadProductVideo(
     String shipperUid,
     String listingId,
-    File videoFile,
+    dynamic video, // Can be File or XFile
   ) async {
     try {
       final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
-      final ref = _storage.ref().child('shippers/$shipperUid/listings/$listingId/video/$fileName');
-      final uploadTask = ref.putFile(videoFile);
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-      return downloadUrl;
+      final ref = _storage.ref().child(
+        'shippers/$shipperUid/listings/$listingId/video/$fileName',
+      );
+
+      if (kIsWeb) {
+        final xfile = video as XFile;
+        final bytes = await xfile.readAsBytes();
+        final uploadTask = ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'video/mp4'),
+        );
+        final snapshot = await uploadTask;
+        return await snapshot.ref.getDownloadURL();
+      } else {
+        final file = video is XFile ? File(video.path) : video as File;
+        final uploadTask = ref.putFile(file);
+        final snapshot = await uploadTask;
+        return await snapshot.ref.getDownloadURL();
+      }
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload product video');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload product video',
+      );
       return null;
     }
   }
@@ -2075,13 +2597,20 @@ class FirebaseService {
           .doc(listing.id)
           .set(listing.toFirestore());
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to save listing');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save listing',
+      );
       rethrow;
     }
   }
 
   // Remove a saved listing for a user
-  static Future<void> removeSavedListing(String userId, String listingId) async {
+  static Future<void> removeSavedListing(
+    String userId,
+    String listingId,
+  ) async {
     try {
       await _firestore
           .collection('users')
@@ -2090,7 +2619,11 @@ class FirebaseService {
           .doc(listingId)
           .delete();
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to remove saved listing');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to remove saved listing',
+      );
       rethrow;
     }
   }
@@ -2106,7 +2639,11 @@ class FirebaseService {
           .get();
       return doc.exists;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to check saved status');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to check saved status',
+      );
       rethrow;
     }
   }
@@ -2119,9 +2656,15 @@ class FirebaseService {
           .doc(userId)
           .collection('savedListings')
           .get();
-      return snapshot.docs.map((doc) => ProductListing.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ProductListing.fromFirestore(doc))
+          .toList();
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get saved listings');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get saved listings',
+      );
       rethrow;
     }
   }
@@ -2136,18 +2679,22 @@ class FirebaseService {
   }) async {
     try {
       print('Creating/getting conversation between $senderId and $receiverId');
-      
+
       // Check if conversation already exists
       final existingConversation = await conversations
           .where('participants', arrayContains: senderId)
           .get();
 
-      print('Found ${existingConversation.docs.length} existing conversations for sender');
+      print(
+        'Found ${existingConversation.docs.length} existing conversations for sender',
+      );
 
       for (final doc in existingConversation.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final participants = List<String>.from(data['participants'] ?? []);
-        print('Checking conversation ${doc.id} with participants: $participants');
+        print(
+          'Checking conversation ${doc.id} with participants: $participants',
+        );
         if (participants.contains(receiverId)) {
           print('Found existing conversation: ${doc.id}');
           return doc.id;
@@ -2157,7 +2704,7 @@ class FirebaseService {
       // Create new conversation
       final conversationId = conversations.doc().id;
       print('Creating new conversation: $conversationId');
-      
+
       final conversation = ChatConversation(
         id: conversationId,
         participants: [senderId, receiverId],
@@ -2174,7 +2721,11 @@ class FirebaseService {
       return conversationId;
     } catch (e) {
       print('Error creating conversation: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to create conversation');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to create conversation',
+      );
       rethrow;
     }
   }
@@ -2190,7 +2741,7 @@ class FirebaseService {
       print('Sending message to conversation: $conversationId');
       print('Sender: $senderId, Receiver: $receiverId');
       print('Content: $content');
-      
+
       final messageId = messages.doc().id;
       final message = ChatMessage(
         id: messageId,
@@ -2213,15 +2764,15 @@ class FirebaseService {
         'lastMessage': message.toFirestore(),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       };
-      
+
       // Only update unreadCount if receiverId is valid (not empty)
       if (receiverId.isNotEmpty) {
         updateData['unreadCount.$receiverId'] = true;
       }
-      
+
       await conversations.doc(conversationId).update(updateData);
       print('Conversation updated with last message');
-      
+
       // Send notification for support messages
       final convDoc = await conversations.doc(conversationId).get();
       if (convDoc.exists) {
@@ -2233,30 +2784,34 @@ class FirebaseService {
             userId: receiverId,
             type: NotificationType.message,
             title: "New Support Message",
-            body: content.length > 50 ? '${content.substring(0, 50)}...' : content,
-            data: {
-              'conversationId': conversationId,
-              'senderId': senderId,
-            },
+            body: content.length > 50
+                ? '${content.substring(0, 50)}...'
+                : content,
+            data: {'conversationId': conversationId, 'senderId': senderId},
             relatedId: conversationId,
           );
         }
       }
     } catch (e) {
       print('Error sending message: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to send message');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to send message',
+      );
       rethrow;
     }
   }
-  
+
   // Support Chat functionality
-  static const String supportUserId = 'support_system'; // System support user ID
-  
+  static const String supportUserId =
+      'support_system'; // System support user ID
+
   /// Create or get support conversation for a user
   static Future<String> createOrGetSupportConversation(String userId) async {
     try {
       print('Creating/getting support conversation for user: $userId');
-      
+
       // Check if support conversation already exists
       final existingConversation = await conversations
           .where('participants', arrayContains: userId)
@@ -2264,14 +2819,16 @@ class FirebaseService {
           .get();
 
       if (existingConversation.docs.isNotEmpty) {
-        print('Found existing support conversation: ${existingConversation.docs.first.id}');
+        print(
+          'Found existing support conversation: ${existingConversation.docs.first.id}',
+        );
         return existingConversation.docs.first.id;
       }
 
       // Create new support conversation
       final conversationId = conversations.doc().id;
       print('Creating new support conversation: $conversationId');
-      
+
       final conversation = ChatConversation(
         id: conversationId,
         participants: [userId, supportUserId],
@@ -2282,17 +2839,21 @@ class FirebaseService {
 
       final conversationData = conversation.toFirestore();
       conversationData['supportTitle'] = 'Support Chat';
-      
+
       await conversations.doc(conversationId).set(conversationData);
       print('Support conversation created successfully');
       return conversationId;
     } catch (e) {
       print('Error creating support conversation: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to create support conversation');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to create support conversation',
+      );
       rethrow;
     }
   }
-  
+
   /// Send support message
   static Future<void> sendSupportMessage({
     required String conversationId,
@@ -2305,14 +2866,14 @@ class FirebaseService {
       if (!convDoc.exists) {
         throw Exception('Support conversation not found');
       }
-      
+
       final convData = convDoc.data() as Map<String, dynamic>;
       final participants = List<String>.from(convData['participants'] ?? []);
       final receiverId = participants.firstWhere(
         (id) => id != senderId,
         orElse: () => supportUserId,
       );
-      
+
       await sendMessage(
         conversationId: conversationId,
         senderId: senderId,
@@ -2320,11 +2881,15 @@ class FirebaseService {
         content: content,
       );
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to send support message');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to send support message',
+      );
       rethrow;
     }
   }
-  
+
   /// Get support conversation for a user
   static Future<ChatConversation?> getSupportConversation(String userId) async {
     try {
@@ -2333,19 +2898,25 @@ class FirebaseService {
           .where('isSupport', isEqualTo: true)
           .limit(1)
           .get();
-      
+
       if (snapshot.docs.isEmpty) {
         return null;
       }
-      
+
       return ChatConversation.fromFirestore(snapshot.docs.first);
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get support conversation');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get support conversation',
+      );
       return null;
     }
   }
 
-  static Future<List<ChatConversation>> getUserConversations(String userId) async {
+  static Future<List<ChatConversation>> getUserConversations(
+    String userId,
+  ) async {
     try {
       print('Getting conversations for user: $userId');
       final snapshot = await conversations
@@ -2354,41 +2925,51 @@ class FirebaseService {
           .get();
 
       print('Found ${snapshot.docs.length} conversation documents');
-      
+
       final conversationList = snapshot.docs.map((doc) {
         print('Processing conversation doc: ${doc.id}');
         print('Doc data: ${doc.data()}');
         return ChatConversation.fromFirestore(doc);
       }).toList();
-      
+
       print('Created ${conversationList.length} conversation objects');
       return conversationList;
     } catch (e) {
       print('Error getting conversations: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to get conversations');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get conversations',
+      );
       rethrow;
     }
   }
 
-  static Stream<List<ChatConversation>> getUserConversationsStream(String userId) {
+  static Stream<List<ChatConversation>> getUserConversationsStream(
+    String userId,
+  ) {
     print('Getting conversations stream for user: $userId');
     return conversations
         .where('participants', arrayContains: userId)
         .orderBy('updatedAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          print('Conversation snapshot received: ${snapshot.docs.length} conversations');
+          print(
+            'Conversation snapshot received: ${snapshot.docs.length} conversations',
+          );
           final conversationList = snapshot.docs.map((doc) {
             print('Processing conversation doc: ${doc.id}');
             return ChatConversation.fromFirestore(doc);
           }).toList();
-          
+
           print('Created ${conversationList.length} conversation objects');
           return conversationList;
         });
   }
 
-  static Stream<List<ChatMessage>> getConversationMessages(String conversationId) {
+  static Stream<List<ChatMessage>> getConversationMessages(
+    String conversationId,
+  ) {
     print('Getting messages for conversation: $conversationId');
     return messages
         .where('conversationId', isEqualTo: conversationId)
@@ -2399,41 +2980,50 @@ class FirebaseService {
             print('Processing message doc: ${doc.id}');
             return ChatMessage.fromFirestore(doc);
           }).toList();
-          
+
           // Sort messages by timestamp in ascending order (oldest first)
           messageList.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-          
+
           print('Created ${messageList.length} message objects');
           return messageList;
         });
   }
 
-  static Future<List<ChatMessage>> getConversationMessagesOnce(String conversationId) async {
+  static Future<List<ChatMessage>> getConversationMessagesOnce(
+    String conversationId,
+  ) async {
     try {
       print('Getting messages once for conversation: $conversationId');
       final snapshot = await messages
           .where('conversationId', isEqualTo: conversationId)
           .get();
-      
+
       print('Found ${snapshot.docs.length} messages in one-time query');
       final messageList = snapshot.docs.map((doc) {
         print('Processing message doc: ${doc.id}');
         return ChatMessage.fromFirestore(doc);
       }).toList();
-      
+
       // Sort messages by timestamp in ascending order (oldest first)
       messageList.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-      
+
       print('Created ${messageList.length} message objects');
       return messageList;
     } catch (e) {
       print('Error getting messages once: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to get messages once');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get messages once',
+      );
       rethrow;
     }
   }
 
-  static Future<void> markMessagesAsRead(String conversationId, String userId) async {
+  static Future<void> markMessagesAsRead(
+    String conversationId,
+    String userId,
+  ) async {
     try {
       // Mark all unread messages as read
       final unreadMessages = await messages
@@ -2453,7 +3043,11 @@ class FirebaseService {
         'unreadCount.$userId': false,
       });
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to mark messages as read');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to mark messages as read',
+      );
       rethrow;
     }
   }
@@ -2477,9 +3071,11 @@ class FirebaseService {
       if (loadId.isEmpty) {
         throw Exception('loadId cannot be empty');
       }
-      
-      print('createLoadConversation: loadId=$loadId, carrierUid=$carrierUid, shipperUid=$shipperUid');
-      
+
+      print(
+        'createLoadConversation: loadId=$loadId, carrierUid=$carrierUid, shipperUid=$shipperUid',
+      );
+
       // Check if conversation already exists for this load-carrier pair
       final existingConversations = await conversations
           .where('loadId', isEqualTo: loadId)
@@ -2489,7 +3085,9 @@ class FirebaseService {
       for (final doc in existingConversations.docs) {
         final data = doc.data() as Map<String, dynamic>;
         final participants = List<String>.from(data['participants'] ?? []);
-        print('Checking existing conversation ${doc.id}: participants=$participants');
+        print(
+          'Checking existing conversation ${doc.id}: participants=$participants',
+        );
         if (participants.contains(shipperUid)) {
           print('Found existing load conversation: ${doc.id}');
           return doc.id;
@@ -2500,7 +3098,7 @@ class FirebaseService {
       final conversationId = conversations.doc().id;
       final participantsList = [carrierUid, shipperUid];
       print('Creating new conversation with participants: $participantsList');
-      
+
       final conversation = ChatConversation(
         id: conversationId,
         participants: participantsList,
@@ -2512,25 +3110,33 @@ class FirebaseService {
       final firestoreData = conversation.toFirestore();
       print('Conversation firestore data: $firestoreData');
       print('Participants in firestore data: ${firestoreData['participants']}');
-      
+
       await conversations.doc(conversationId).set(firestoreData);
-      
+
       // Verify the conversation was saved correctly
       final savedDoc = await conversations.doc(conversationId).get();
       if (savedDoc.exists) {
         final savedData = savedDoc.data() as Map<String, dynamic>;
-        final savedParticipants = List<String>.from(savedData['participants'] ?? []);
+        final savedParticipants = List<String>.from(
+          savedData['participants'] ?? [],
+        );
         print('Verified saved conversation participants: $savedParticipants');
         if (savedParticipants.length != 2) {
-          print('WARNING: Conversation saved with ${savedParticipants.length} participants instead of 2!');
+          print(
+            'WARNING: Conversation saved with ${savedParticipants.length} participants instead of 2!',
+          );
         }
       }
-      
+
       print('Created new load conversation: $conversationId');
       return conversationId;
     } catch (e) {
       print('Error in createLoadConversation: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to create load conversation');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to create load conversation',
+      );
       rethrow;
     }
   }
@@ -2550,7 +3156,11 @@ class FirebaseService {
       if (snapshot.docs.isEmpty) return null;
       return snapshot.docs.first.id;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get conversation by loadId');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get conversation by loadId',
+      );
       return null;
     }
   }
@@ -2674,7 +3284,11 @@ class FirebaseService {
 
       print('Counter-offer sent successfully for offer: $offerId');
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to send counter-offer');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to send counter-offer',
+      );
       rethrow;
     }
   }
@@ -2694,156 +3308,166 @@ class FirebaseService {
       final carrierId = offerData['carrierId'] as String;
       final shipperId = offerData['shipperId'] as String;
 
-      return await _firestore.runTransaction<bool>((transaction) async {
-        // Get offer
-        final offerRef = offers.doc(offerId);
-        final offerDoc = await transaction.get(offerRef);
-        
-        if (!offerDoc.exists) {
-          throw Exception('Offer not found');
-        }
+      return await _firestore
+          .runTransaction<bool>((transaction) async {
+            // Get offer
+            final offerRef = offers.doc(offerId);
+            final offerDoc = await transaction.get(offerRef);
 
-        final offerData = offerDoc.data() as Map<String, dynamic>;
-        final status = offerData['status'] as String;
-        
-        if (status.contains('accepted') || status.contains('rejected')) {
-          throw Exception('Offer already processed');
-        }
+            if (!offerDoc.exists) {
+              throw Exception('Offer not found');
+            }
 
-        final carrierName = offerData['carrierName'] as String;
-        final conversationId = offerData['conversationId'] as String;
-        final acceptedAmount = offerData['counterOfferAmount'] as double? ?? 
-                               (offerData['offerAmount'] as num).toDouble();
+            final offerData = offerDoc.data() as Map<String, dynamic>;
+            final status = offerData['status'] as String;
 
-        // Find the load in shipper subcollection (using shipperId from offer)
-        final loadRef = _firestore
-            .collection('shippers')
-            .doc(shipperId)
-            .collection('loads')
-            .doc(loadId);
+            if (status.contains('accepted') || status.contains('rejected')) {
+              throw Exception('Offer already processed');
+            }
 
-        // Check if load exists and is still available
-        final loadDoc = await transaction.get(loadRef);
-        if (!loadDoc.exists) {
-          throw Exception('Load not found');
-        }
+            final carrierName = offerData['carrierName'] as String;
+            final conversationId = offerData['conversationId'] as String;
+            final acceptedAmount =
+                offerData['counterOfferAmount'] as double? ??
+                (offerData['offerAmount'] as num).toDouble();
 
-        final loadData = loadDoc.data() as Map<String, dynamic>;
-        if (loadData['status'] != 'active' && loadData['status'] != 'available') {
-          throw Exception('Load is no longer available');
-        }
+            // Find the load in shipper subcollection (using shipperId from offer)
+            final loadRef = _firestore
+                .collection('shippers')
+                .doc(shipperId)
+                .collection('loads')
+                .doc(loadId);
 
-        final now = DateTime.now();
+            // Check if load exists and is still available
+            final loadDoc = await transaction.get(loadRef);
+            if (!loadDoc.exists) {
+              throw Exception('Load not found');
+            }
 
-        // Update offer status
-        transaction.update(offerRef, {
-          'status': OfferStatus.accepted.toString().split('.').last,
-          'acceptedAt': Timestamp.fromDate(now),
-          'updatedAt': Timestamp.fromDate(now),
-        });
+            final loadData = loadDoc.data() as Map<String, dynamic>;
+            if (loadData['status'] != 'active' &&
+                loadData['status'] != 'available') {
+              throw Exception('Load is no longer available');
+            }
 
-        // Update load - book it
-        transaction.update(loadRef, {
-          'status': 'booked',
-          'bookedByCarrierId': carrierId,
-          'bookedAt': Timestamp.fromDate(now),
-          'updatedAt': Timestamp.fromDate(now),
-          'price': acceptedAmount, // Update price to accepted offer amount
-        });
+            final now = DateTime.now();
 
-        // Note: Closing other negotiations is handled outside transaction for efficiency
-        // We'll update them after transaction completes
+            // Update offer status
+            transaction.update(offerRef, {
+              'status': OfferStatus.accepted.toString().split('.').last,
+              'acceptedAt': Timestamp.fromDate(now),
+              'updatedAt': Timestamp.fromDate(now),
+            });
 
-        // Update accepted conversation
-        final convRef = conversations.doc(conversationId);
-        transaction.update(convRef, {
-          'isNegotiationActive': false,
-          'updatedAt': Timestamp.fromDate(now),
-        });
+            // Update load - book it
+            transaction.update(loadRef, {
+              'status': 'booked',
+              'bookedByCarrierId': carrierId,
+              'bookedAt': Timestamp.fromDate(now),
+              'updatedAt': Timestamp.fromDate(now),
+              'price': acceptedAmount, // Update price to accepted offer amount
+            });
 
-        // Send acceptance message
-        final messageId = messages.doc().id;
-        final message = ChatMessage(
-          id: messageId,
-          conversationId: conversationId,
-          senderId: shipperId,
-          receiverId: carrierId,
-          content: 'Offer accepted: \$${acceptedAmount.toStringAsFixed(2)}',
-          timestamp: now,
-          type: MessageType.offer,
-          offerId: offerId,
-        );
+            // Note: Closing other negotiations is handled outside transaction for efficiency
+            // We'll update them after transaction completes
 
-        transaction.set(messages.doc(messageId), message.toFirestore());
-        transaction.update(convRef, {
-          'lastMessage': message.toFirestore(),
-        });
+            // Update accepted conversation
+            final convRef = conversations.doc(conversationId);
+            transaction.update(convRef, {
+              'isNegotiationActive': false,
+              'updatedAt': Timestamp.fromDate(now),
+            });
 
-        // Create booking record
-        final bookingRef = bookings.doc();
-        transaction.set(bookingRef, {
-          'loadId': loadId,
-          'carrierId': carrierId,
-          'carrierName': carrierName,
-          'shipperId': shipperId,
-          'status': 'booked',
-          'bookedAt': Timestamp.fromDate(now),
-          'createdAt': Timestamp.fromDate(now),
-          'updatedAt': Timestamp.fromDate(now),
-        });
-
-        // Add to carrier's myBookings
-        final carrierBookingRef = carriers.doc(carrierId).collection('myBookings').doc(loadId);
-        transaction.set(carrierBookingRef, {
-          'loadId': loadId,
-          'status': 'booked',
-          'bookedAt': Timestamp.fromDate(now),
-          'createdAt': Timestamp.fromDate(now),
-        });
-
-        return true;
-      }).then((success) async {
-        if (success) {
-          // Close all other active negotiations for this load after transaction
-          await closeNegotiationsForLoad(loadId, carrierId);
-          
-          // Send notifications to both shipper and carrier
-          try {
-            await NotificationService.createNotification(
-              userId: shipperId,
-              type: NotificationType.orderStatus,
-              title: "Order Booked",
-              body: "A carrier has accepted your order! Please deposit payment to escrow to proceed.",
-              data: {
-                'loadId': loadId,
-                'oldStatus': 'available',
-                'newStatus': 'booked',
-                'requiresEscrowPayment': true,
-              },
-              relatedId: loadId,
+            // Send acceptance message
+            final messageId = messages.doc().id;
+            final message = ChatMessage(
+              id: messageId,
+              conversationId: conversationId,
+              senderId: shipperId,
+              receiverId: carrierId,
+              content: 'Offer accepted: \$${acceptedAmount.toStringAsFixed(2)}',
+              timestamp: now,
+              type: MessageType.offer,
+              offerId: offerId,
             );
-            
-            await NotificationService.createNotification(
-              userId: carrierId,
-              type: NotificationType.orderStatus,
-              title: "Load Booked Successfully",
-              body: "You have successfully booked this load!",
-              data: {
-                'loadId': loadId,
-                'oldStatus': 'available',
-                'newStatus': 'booked',
-              },
-              relatedId: loadId,
-            );
-          } catch (e) {
-            debugPrint('Error sending booking notifications: $e');
-            // Don't fail the booking if notification fails
-          }
-        }
-        return success;
-      });
+
+            transaction.set(messages.doc(messageId), message.toFirestore());
+            transaction.update(convRef, {'lastMessage': message.toFirestore()});
+
+            // Create booking record
+            final bookingRef = bookings.doc();
+            transaction.set(bookingRef, {
+              'loadId': loadId,
+              'carrierId': carrierId,
+              'carrierName': carrierName,
+              'shipperId': shipperId,
+              'status': 'booked',
+              'bookedAt': Timestamp.fromDate(now),
+              'createdAt': Timestamp.fromDate(now),
+              'updatedAt': Timestamp.fromDate(now),
+            });
+
+            // Add to carrier's myBookings
+            final carrierBookingRef = carriers
+                .doc(carrierId)
+                .collection('myBookings')
+                .doc(loadId);
+            transaction.set(carrierBookingRef, {
+              'loadId': loadId,
+              'status': 'booked',
+              'bookedAt': Timestamp.fromDate(now),
+              'createdAt': Timestamp.fromDate(now),
+            });
+
+            return true;
+          })
+          .then((success) async {
+            if (success) {
+              // Close all other active negotiations for this load after transaction
+              await closeNegotiationsForLoad(loadId, carrierId);
+
+              // Send notifications to both shipper and carrier
+              try {
+                await NotificationService.createNotification(
+                  userId: shipperId,
+                  type: NotificationType.orderStatus,
+                  title: "Order Booked",
+                  body:
+                      "A carrier has accepted your order! Please deposit payment to escrow to proceed.",
+                  data: {
+                    'loadId': loadId,
+                    'oldStatus': 'available',
+                    'newStatus': 'booked',
+                    'requiresEscrowPayment': true,
+                  },
+                  relatedId: loadId,
+                );
+
+                await NotificationService.createNotification(
+                  userId: carrierId,
+                  type: NotificationType.orderStatus,
+                  title: "Load Booked Successfully",
+                  body: "You have successfully booked this load!",
+                  data: {
+                    'loadId': loadId,
+                    'oldStatus': 'available',
+                    'newStatus': 'booked',
+                  },
+                  relatedId: loadId,
+                );
+              } catch (e) {
+                debugPrint('Error sending booking notifications: $e');
+                // Don't fail the booking if notification fails
+              }
+            }
+            return success;
+          });
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to accept offer');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to accept offer',
+      );
       return false;
     }
   }
@@ -2863,7 +3487,11 @@ class FirebaseService {
 
       print('Offer rejected: $offerId');
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to reject offer');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to reject offer',
+      );
       rethrow;
     }
   }
@@ -2873,15 +3501,22 @@ class FirebaseService {
     try {
       final snapshot = await offers
           .where('loadId', isEqualTo: loadId)
-          .where('status', whereIn: [
-            OfferStatus.pending.toString().split('.').last,
-            OfferStatus.counterOffered.toString().split('.').last,
-          ])
+          .where(
+            'status',
+            whereIn: [
+              OfferStatus.pending.toString().split('.').last,
+              OfferStatus.counterOffered.toString().split('.').last,
+            ],
+          )
           .get();
 
       return snapshot.docs.map((doc) => OfferModel.fromFirestore(doc)).toList();
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get active offers');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get active offers',
+      );
       return [];
     }
   }
@@ -2906,21 +3541,28 @@ class FirebaseService {
 
       final data = convDoc.data() as Map<String, dynamic>;
       final expiresAt = data['negotiationExpiresAt'] as Timestamp?;
-      
+
       if (expiresAt == null) return false;
       return DateTime.now().isAfter(expiresAt.toDate());
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to check negotiation timer');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to check negotiation timer',
+      );
       return true;
     }
   }
 
   /// Close all other negotiations when an offer is accepted (called internally)
-  static Future<void> closeNegotiationsForLoad(String loadId, String acceptedCarrierId) async {
+  static Future<void> closeNegotiationsForLoad(
+    String loadId,
+    String acceptedCarrierId,
+  ) async {
     try {
       // This is handled in acceptOffer transaction, but kept for explicit calls if needed
       final activeOffers = await getActiveOffersForLoad(loadId);
-      
+
       for (final offer in activeOffers) {
         if (offer.carrierId != acceptedCarrierId) {
           await offers.doc(offer.id).update({
@@ -2935,7 +3577,11 @@ class FirebaseService {
         }
       }
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to close negotiations');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to close negotiations',
+      );
     }
   }
 
@@ -2944,7 +3590,7 @@ class FirebaseService {
     try {
       print('Getting product listing by ID: $listingId');
       final doc = await listings.doc(listingId).get();
-      
+
       if (doc.exists && doc.data() != null) {
         final listing = ProductListing.fromFirestore(doc);
         print('Found listing: ${listing.title}');
@@ -2955,17 +3601,23 @@ class FirebaseService {
       }
     } catch (e) {
       print('Error getting product listing by ID: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to get product listing by ID');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get product listing by ID',
+      );
       return null;
     }
   }
 
   // Get shipper details by UID
-  static Future<Map<String, dynamic>?> getShipperDetails(String shipperUid) async {
+  static Future<Map<String, dynamic>?> getShipperDetails(
+    String shipperUid,
+  ) async {
     try {
       print('Getting shipper details for UID: $shipperUid');
       final doc = await _firestore.collection('shippers').doc(shipperUid).get();
-      
+
       if (doc.exists && doc.data() != null) {
         final data = doc.data()!;
         print('Found shipper: ${data['name'] ?? 'Unknown'}');
@@ -2976,7 +3628,11 @@ class FirebaseService {
       }
     } catch (e) {
       print('Error getting shipper details: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to get shipper details');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get shipper details',
+      );
       return null;
     }
   }
@@ -2984,20 +3640,20 @@ class FirebaseService {
   // ========== LOAD MANAGEMENT METHODS ==========
 
   /// Calculate match percentage between load and carrier preferences
-  /// 
+  ///
   /// MATCHING SCORING SYSTEM (Total: 100 points):
   /// - Equipment/Vehicle Type Match: 35 points (35%)
   /// - Location/Service Area Match: 30 points (30%)
   /// - Weight Capacity Match: 20 points (20%)
   /// - Distance Preference Match: 10 points (10%)
   /// - Preferred Load Type Match: 5 points (5%)
-  /// 
+  ///
   /// To adjust weights, modify the point values below and ensure they sum to 100.
-  /// 
+  ///
   /// [carrierLocation] - Optional carrier's current location address for distance calculation
   /// [apiKey] - Google API key for distance calculations
   static Future<double> calculateLoadMatchPercentage(
-    LoadModel load, 
+    LoadModel load,
     CarrierModel carrier, {
     String? carrierLocation,
     String? apiKey,
@@ -3011,32 +3667,36 @@ class FirebaseService {
     // Matches carrier's vehicle types against load's equipment needed
     // Example: "Dry Van" matches "Dry Van", "Refrigerated" matches "Reefer"
     // Made more lenient - partial matches also get points
-    // 
+    //
     // TO ADJUST: Change the 35.0 value below (currently 35% of total score)
-    if (carrier.vehicleTypes != null && carrier.vehicleTypes!.isNotEmpty && load.equipmentNeeded.isNotEmpty) {
+    if (carrier.vehicleTypes != null &&
+        carrier.vehicleTypes!.isNotEmpty &&
+        load.equipmentNeeded.isNotEmpty) {
       final equipmentLower = load.equipmentNeeded.toLowerCase();
       bool exactMatch = false;
       bool partialMatch = false;
-      
+
       for (final vehicleType in carrier.vehicleTypes!) {
         final vehicleTypeLower = vehicleType.toLowerCase();
-        
+
         // Check for exact or partial match
-        if (equipmentLower == vehicleTypeLower || 
-            equipmentLower.contains(vehicleTypeLower) || 
+        if (equipmentLower == vehicleTypeLower ||
+            equipmentLower.contains(vehicleTypeLower) ||
             vehicleTypeLower.contains(equipmentLower)) {
           exactMatch = true;
           break;
         }
-        
+
         // Check for partial word matches (e.g., "Dry Van" matches "Van")
         final equipmentWords = equipmentLower.split(RegExp(r'[\s\-_]+'));
         final vehicleWords = vehicleTypeLower.split(RegExp(r'[\s\-_]+'));
-        
+
         for (final equipmentWord in equipmentWords) {
           for (final vehicleWord in vehicleWords) {
-            if (equipmentWord.length >= 3 && vehicleWord.length >= 3 &&
-                (equipmentWord.contains(vehicleWord) || vehicleWord.contains(equipmentWord))) {
+            if (equipmentWord.length >= 3 &&
+                vehicleWord.length >= 3 &&
+                (equipmentWord.contains(vehicleWord) ||
+                    vehicleWord.contains(equipmentWord))) {
               partialMatch = true;
               break;
             }
@@ -3044,7 +3704,7 @@ class FirebaseService {
           if (partialMatch) break;
         }
       }
-      
+
       if (exactMatch) {
         totalScore += 35.0; // Full points for exact match
       } else if (partialMatch) {
@@ -3060,60 +3720,67 @@ class FirebaseService {
     // ============================================================================
     // Matches carrier's service areas against load's origin and destination
     // Uses simple string contains matching - no complex parsing
-    // 
+    //
     // Scoring:
     // - Origin OR destination matches any service area: 30 points (full score)
     // - Partial match (service area appears in address): 15 points (half score)
-    // 
+    //
     // TO ADJUST: Change the 30.0 and 15.0 values below
     if (carrier.serviceAreas != null && carrier.serviceAreas!.isNotEmpty) {
       final originLower = load.originAddress.toLowerCase();
       final destinationLower = load.destinationAddress.toLowerCase();
-      
+
       // Check if any service area matches origin or destination
       bool originMatch = false;
       bool destinationMatch = false;
       bool partialOriginMatch = false;
       bool partialDestinationMatch = false;
-      
+
       for (final area in carrier.serviceAreas!) {
         final areaLower = area.toLowerCase();
-        
+
         // Check for exact or partial match in origin
-        if (originLower.contains(areaLower) || areaLower.contains(originLower)) {
+        if (originLower.contains(areaLower) ||
+            areaLower.contains(originLower)) {
           // Check if it's a full match (service area format: "City, Province")
-          if (areaLower.contains(',') && originLower.contains(areaLower.split(',')[0].trim())) {
+          if (areaLower.contains(',') &&
+              originLower.contains(areaLower.split(',')[0].trim())) {
             originMatch = true;
           } else {
             partialOriginMatch = true;
           }
         }
-        
+
         // Check for exact or partial match in destination
-        if (destinationLower.contains(areaLower) || areaLower.contains(destinationLower)) {
+        if (destinationLower.contains(areaLower) ||
+            areaLower.contains(destinationLower)) {
           // Check if it's a full match
-          if (areaLower.contains(',') && destinationLower.contains(areaLower.split(',')[0].trim())) {
+          if (areaLower.contains(',') &&
+              destinationLower.contains(areaLower.split(',')[0].trim())) {
             destinationMatch = true;
           } else {
             partialDestinationMatch = true;
           }
         }
       }
-      
+
       // Award points - make it easier to get matches
       // Give points for ANY match, even partial
       if (originMatch || destinationMatch) {
-        totalScore += 30.0; // Full points if either origin or destination matches
+        totalScore +=
+            30.0; // Full points if either origin or destination matches
       } else if (partialOriginMatch || partialDestinationMatch) {
-        totalScore += 20.0; // More points for partial matches (increased from 15)
+        totalScore +=
+            20.0; // More points for partial matches (increased from 15)
       } else {
         // Even if no direct match, check if any service area city appears in addresses
         bool cityMatch = false;
         for (final area in carrier.serviceAreas!) {
           final areaLower = area.toLowerCase();
           final cityName = areaLower.split(',')[0].trim();
-          if (cityName.isNotEmpty && 
-              (originLower.contains(cityName) || destinationLower.contains(cityName))) {
+          if (cityName.isNotEmpty &&
+              (originLower.contains(cityName) ||
+                  destinationLower.contains(cityName))) {
             cityMatch = true;
             break;
           }
@@ -3129,30 +3796,32 @@ class FirebaseService {
     // ============================================================================
     // Checks if load weight is within carrier's max weight capacity
     // Special value 999999 means "No Limit" - accepts all weights
-    // 
+    //
     // Scoring: Full points if within capacity, bonus for lighter loads
-    // 
+    //
     // TO ADJUST: Change the 20.0 value below and the 0.3 bonus multiplier
-    if (carrier.carrierPreferences != null && 
+    if (carrier.carrierPreferences != null &&
         carrier.carrierPreferences!['maxWeight'] != null) {
       try {
         final maxWeightValue = carrier.carrierPreferences!['maxWeight'];
         double? maxWeight;
-        
+
         // Handle different data types from Firestore
         if (maxWeightValue is num) {
           maxWeight = maxWeightValue.toDouble();
         } else if (maxWeightValue is String) {
-          maxWeight = double.tryParse(maxWeightValue.replaceAll(RegExp(r'[^\d.]'), ''));
+          maxWeight = double.tryParse(
+            maxWeightValue.replaceAll(RegExp(r'[^\d.]'), ''),
+          );
         }
-        
+
         if (maxWeight != null && maxWeight > 0) {
           // 999999 = "No Limit" - accept all loads
           if (maxWeight >= 999999) {
             totalScore += 20.0; // Full points for unlimited capacity
           } else if (load.weight <= maxWeight) {
             // Calculate score with bonus for lighter loads
-        final weightRatio = load.weight / maxWeight;
+            final weightRatio = load.weight / maxWeight;
             // Bonus multiplier: 0.3 means lighter loads get up to 30% bonus
             totalScore += 20.0 * (1.0 - weightRatio * 0.3);
           }
@@ -3169,27 +3838,29 @@ class FirebaseService {
     // Checks if load's origin-to-destination distance is within carrier's max distance preference
     // NOTE: Distance Matrix API calls are commented out until API is activated
     // Special value 999999 means "Nationwide" - accepts all distances
-    // 
+    //
     // Scoring: Full points if within range, bonus for shorter distances
-    // 
+    //
     // TO ADJUST: Change the 10.0 value below and the 0.2 bonus multiplier
-    if (carrier.carrierPreferences != null && 
+    if (carrier.carrierPreferences != null &&
         carrier.carrierPreferences!['maxDistance'] != null) {
       try {
         final maxDistanceValue = carrier.carrierPreferences!['maxDistance'];
         double? maxDistance;
-        
+
         // Handle different data types from Firestore
         if (maxDistanceValue is num) {
           maxDistance = maxDistanceValue.toDouble();
         } else if (maxDistanceValue is String) {
           // Parse distance string like "50 miles" or "1,000 miles"
-          final match = RegExp(r'(\d{1,3}(?:,\d{3})*)').firstMatch(maxDistanceValue);
+          final match = RegExp(
+            r'(\d{1,3}(?:,\d{3})*)',
+          ).firstMatch(maxDistanceValue);
           if (match != null) {
             maxDistance = double.tryParse(match.group(1)!.replaceAll(',', ''));
           }
         }
-        
+
         if (maxDistance != null && maxDistance > 0) {
           // 999999 = "Nationwide" - accept all distances
           if (maxDistance >= 999999) {
@@ -3220,7 +3891,7 @@ class FirebaseService {
               }
             }
             */
-            
+
             // Check load's origin-to-destination distance (using stored distance field)
             // If load.distance is 0 or not set, skip distance matching (don't penalize)
             if (load.distance > 0 && load.distance <= maxDistance) {
@@ -3244,10 +3915,11 @@ class FirebaseService {
     // ============================================================================
     // Checks if load type matches carrier's preferred load types
     // Example: If carrier prefers "Electronics" and load is "Electronics", award points
-    // 
+    //
     // TO ADJUST: Change the 5.0 value below
     if (carrier.carrierPreferences != null) {
-      final preferredLoadTypesRaw = carrier.carrierPreferences!['preferredLoadTypes'];
+      final preferredLoadTypesRaw =
+          carrier.carrierPreferences!['preferredLoadTypes'];
       if (preferredLoadTypesRaw != null) {
         // Handle both List<String> and List<dynamic> from Firestore
         List<String> preferredLoadTypes;
@@ -3258,9 +3930,10 @@ class FirebaseService {
         } else {
           preferredLoadTypes = [];
         }
-        
+
         // Award points if load type is in preferred list
-        if (preferredLoadTypes.isNotEmpty && preferredLoadTypes.contains(load.loadType)) {
+        if (preferredLoadTypes.isNotEmpty &&
+            preferredLoadTypes.contains(load.loadType)) {
           totalScore += 5.0;
         }
       }
@@ -3273,11 +3946,13 @@ class FirebaseService {
     // Clamp ensures result is between 0 and 100
     // Show all loads with any match (even 5% match percentage)
     final finalScore = (totalScore / maxScore * 100).clamp(0.0, 100.0);
-    
+
     // Debug: Print final score breakdown
-    print('Total Score: $totalScore / $maxScore = ${finalScore.toStringAsFixed(1)}%');
+    print(
+      'Total Score: $totalScore / $maxScore = ${finalScore.toStringAsFixed(1)}%',
+    );
     print('====================');
-    
+
     return finalScore;
   }
 
@@ -3304,7 +3979,7 @@ class FirebaseService {
       // Fetch loads from each shipper using the same pattern as getShipperLoads
       for (final shipperDoc in shippersSnapshot.docs) {
         final shipperUid = shipperDoc.id;
-        
+
         // Use the same query pattern as getShipperLoads
         Query query = _firestore
             .collection('shippers')
@@ -3321,49 +3996,57 @@ class FirebaseService {
         query = query.orderBy('createdAt', descending: true);
 
         final snapshot = await query.get();
-        
+
         // Google API key for distance calculations (temporarily not used)
         // const String googleApiKey = AppConstants.googleApiKey;
-        
+
         // Get carrier's current location (use address if currentLocation is not available)
         // Temporarily not used until Distance Matrix API is activated
-        // final carrierLocation = carrier.currentLocation ?? 
-        //                        (carrier.address != null && carrier.address!.isNotEmpty 
-        //                         ? carrier.address! 
+        // final carrierLocation = carrier.currentLocation ??
+        //                        (carrier.address != null && carrier.address!.isNotEmpty
+        //                         ? carrier.address!
         //                         : null);
-        
+
         // Get shipper name from shipper document
         final shipperData = shipperDoc.data() as Map<String, dynamic>?;
-        final shipperName = shipperData?['displayName'] ?? 
-                           shipperData?['companyName'] ?? 
-                           shipperData?['shipperName'] ?? 
-                           shipperData?['name'] ?? 
-                           '';
-        
+        final shipperName =
+            shipperData?['displayName'] ??
+            shipperData?['companyName'] ??
+            shipperData?['shipperName'] ??
+            shipperData?['name'] ??
+            '';
+
         for (final doc in snapshot.docs) {
           try {
             // Pass shipperUid from parent document path
-            var load = LoadModel.fromFirestore(doc, parentShipperUid: shipperUid);
-            
+            var load = LoadModel.fromFirestore(
+              doc,
+              parentShipperUid: shipperUid,
+            );
+
             // If shipperName is missing from load, use the one from shipper document
             if (load.shipperName.isEmpty && shipperName.isNotEmpty) {
               load = load.copyWith(shipperName: shipperName);
             }
-            
+
             // Use async version without distance API calls (commented out)
             final matchPercentage = await calculateLoadMatchPercentage(
-              load, 
+              load,
               carrier,
               carrierLocation: null, // Temporarily disabled
               apiKey: null, // Temporarily disabled
             );
-            
+
             // Only log matches above 10% to reduce console spam
             if (matchPercentage >= 10.0) {
-              print('Load ${load.id}: ${matchPercentage.toStringAsFixed(1)}% match');
+              print(
+                'Load ${load.id}: ${matchPercentage.toStringAsFixed(1)}% match',
+              );
             }
-            
-            final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
+
+            final loadWithMatch = load.copyWith(
+              matchPercentage: matchPercentage,
+            );
             allLoads.add(loadWithMatch);
           } catch (e) {
             print('Error parsing load ${doc.id}: $e');
@@ -3377,7 +4060,9 @@ class FirebaseService {
         // Exclude loads that are booked by other carriers
         // Check for null, empty string, or different carrier ID
         final bookedById = load.bookedByCarrierId;
-        if (bookedById != null && bookedById.isNotEmpty && bookedById != carrierUid) {
+        if (bookedById != null &&
+            bookedById.isNotEmpty &&
+            bookedById != carrierUid) {
           return false; // Booked by another carrier - exclude
         }
         // Include if: null, empty string, or booked by this carrier
@@ -3385,23 +4070,26 @@ class FirebaseService {
       }).toList();
 
       // Sort by match percentage (highest first)
-      availableLoads.sort((a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0));
+      availableLoads.sort(
+        (a, b) => (b.matchPercentage ?? 0).compareTo(a.matchPercentage ?? 0),
+      );
 
       // Apply search filter client-side (same pattern as getShipperLoads)
       final filteredLoads = availableLoads.where((load) {
         if (searchQuery.isEmpty) return true;
         final searchLower = searchQuery.toLowerCase();
         return load.originAddress.toLowerCase().contains(searchLower) ||
-               load.destinationAddress.toLowerCase().contains(searchLower) ||
-               load.originCity.toLowerCase().contains(searchLower) ||
-               load.destinationCity.toLowerCase().contains(searchLower) ||
-               load.equipmentNeeded.toLowerCase().contains(searchLower) ||
-               load.loadType.toLowerCase().contains(searchLower) ||
-               load.description.toLowerCase().contains(searchLower);
+            load.destinationAddress.toLowerCase().contains(searchLower) ||
+            load.originCity.toLowerCase().contains(searchLower) ||
+            load.destinationCity.toLowerCase().contains(searchLower) ||
+            load.equipmentNeeded.toLowerCase().contains(searchLower) ||
+            load.loadType.toLowerCase().contains(searchLower) ||
+            load.description.toLowerCase().contains(searchLower);
       }).toList();
 
       // Apply pagination client-side
-      final startIndex = 0; // Simplified for now since we're aggregating from multiple collections
+      final startIndex =
+          0; // Simplified for now since we're aggregating from multiple collections
       final endIndex = (startIndex + limit).clamp(0, filteredLoads.length);
       final paginatedLoads = filteredLoads.sublist(startIndex, endIndex);
 
@@ -3412,15 +4100,19 @@ class FirebaseService {
         'totalCount': filteredLoads.length,
       };
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get available loads for carrier');
-      
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get available loads for carrier',
+      );
+
       // Re-throw network errors to be handled by the UI
-      if (e.toString().contains('network') || 
+      if (e.toString().contains('network') ||
           e.toString().contains('connection') ||
           e.toString().contains('timeout')) {
         rethrow;
       }
-      
+
       return {
         'loads': <LoadModel>[],
         'lastDocument': null,
@@ -3452,7 +4144,7 @@ class FirebaseService {
       // Fetch loads from each shipper using the same pattern as getShipperLoads
       for (final shipperDoc in shippersSnapshot.docs) {
         final shipperUid = shipperDoc.id;
-        
+
         // Get available loads (same pattern as getShipperLoads)
         Query availableQuery = _firestore
             .collection('shippers')
@@ -3474,53 +4166,63 @@ class FirebaseService {
         // Execute both queries
         final availableSnapshot = await availableQuery.get();
         final bookedSnapshot = await bookedQuery.get();
-        
+
         // Google API key for distance calculations (temporarily not used)
         // const String googleApiKey = AppConstants.googleApiKey;
-        
+
         // Get carrier's current location (temporarily not used)
-        // final carrierLocation = carrier.currentLocation ?? 
-        //                        (carrier.address != null && carrier.address!.isNotEmpty 
-        //                         ? carrier.address! 
+        // final carrierLocation = carrier.currentLocation ??
+        //                        (carrier.address != null && carrier.address!.isNotEmpty
+        //                         ? carrier.address!
         //                         : null);
-        
+
         // Get shipper name from shipper document
         final shipperData = shipperDoc.data() as Map<String, dynamic>?;
-        final shipperName = shipperData?['displayName'] ?? 
-                           shipperData?['companyName'] ?? 
-                           shipperData?['shipperName'] ?? 
-                           shipperData?['name'] ?? 
-                           '';
-        
+        final shipperName =
+            shipperData?['displayName'] ??
+            shipperData?['companyName'] ??
+            shipperData?['shipperName'] ??
+            shipperData?['name'] ??
+            '';
+
         // Process available loads (exclude those booked by other carriers)
         for (final doc in availableSnapshot.docs) {
           try {
             // Pass shipperUid from parent document path
-            var load = LoadModel.fromFirestore(doc, parentShipperUid: shipperUid);
-            
+            var load = LoadModel.fromFirestore(
+              doc,
+              parentShipperUid: shipperUid,
+            );
+
             // If shipperName is missing from load, use the one from shipper document
             if (load.shipperName.isEmpty && shipperName.isNotEmpty) {
               load = load.copyWith(shipperName: shipperName);
             }
-            
+
             // Only include if not booked by another carrier
             // Check for null, empty string, or same carrier ID
             final bookedById = load.bookedByCarrierId;
-            if (bookedById == null || bookedById.isEmpty || bookedById == carrierUid) {
+            if (bookedById == null ||
+                bookedById.isEmpty ||
+                bookedById == carrierUid) {
               // Use async version without distance API calls (commented out)
               final matchPercentage = await calculateLoadMatchPercentage(
-                load, 
+                load,
                 carrier,
                 carrierLocation: null, // Temporarily disabled
                 apiKey: null, // Temporarily disabled
               );
-              
+
               // Debug logging
               if (matchPercentage > 0) {
-                print('Load ${load.id} match: $matchPercentage% - Equipment: ${load.equipmentNeeded}');
+                print(
+                  'Load ${load.id} match: $matchPercentage% - Equipment: ${load.equipmentNeeded}',
+                );
               }
-              
-              final loadWithMatch = load.copyWith(matchPercentage: matchPercentage);
+
+              final loadWithMatch = load.copyWith(
+                matchPercentage: matchPercentage,
+              );
               allLoads.add(loadWithMatch);
             }
           } catch (e) {
@@ -3528,18 +4230,21 @@ class FirebaseService {
             continue;
           }
         }
-        
+
         // Process booked loads
         for (final doc in bookedSnapshot.docs) {
           try {
             // Pass shipperUid from parent document path
-            var load = LoadModel.fromFirestore(doc, parentShipperUid: shipperUid);
-            
+            var load = LoadModel.fromFirestore(
+              doc,
+              parentShipperUid: shipperUid,
+            );
+
             // If shipperName is missing from load, use the one from shipper document
             if (load.shipperName.isEmpty && shipperName.isNotEmpty) {
               load = load.copyWith(shipperName: shipperName);
             }
-            
+
             allLoads.add(load);
           } catch (e) {
             print('Error parsing booked load ${doc.id}: $e');
@@ -3556,16 +4261,17 @@ class FirebaseService {
         if (searchQuery.isEmpty) return true;
         final searchLower = searchQuery.toLowerCase();
         return load.originAddress.toLowerCase().contains(searchLower) ||
-               load.destinationAddress.toLowerCase().contains(searchLower) ||
-               load.originCity.toLowerCase().contains(searchLower) ||
-               load.destinationCity.toLowerCase().contains(searchLower) ||
-               load.equipmentNeeded.toLowerCase().contains(searchLower) ||
-               load.loadType.toLowerCase().contains(searchLower) ||
-               load.description.toLowerCase().contains(searchLower);
+            load.destinationAddress.toLowerCase().contains(searchLower) ||
+            load.originCity.toLowerCase().contains(searchLower) ||
+            load.destinationCity.toLowerCase().contains(searchLower) ||
+            load.equipmentNeeded.toLowerCase().contains(searchLower) ||
+            load.loadType.toLowerCase().contains(searchLower) ||
+            load.description.toLowerCase().contains(searchLower);
       }).toList();
 
       // Apply pagination client-side
-      final startIndex = 0; // Simplified for now since we're aggregating from multiple collections
+      final startIndex =
+          0; // Simplified for now since we're aggregating from multiple collections
       final endIndex = (startIndex + limit).clamp(0, filteredLoads.length);
       final paginatedLoads = filteredLoads.sublist(startIndex, endIndex);
 
@@ -3576,15 +4282,19 @@ class FirebaseService {
         'totalCount': filteredLoads.length,
       };
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get all loads for carrier');
-      
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get all loads for carrier',
+      );
+
       // Re-throw network errors to be handled by the UI
-      if (e.toString().contains('network') || 
+      if (e.toString().contains('network') ||
           e.toString().contains('connection') ||
           e.toString().contains('timeout')) {
         rethrow;
       }
-      
+
       return {
         'loads': <LoadModel>[],
         'lastDocument': null,
@@ -3609,7 +4319,7 @@ class FirebaseService {
       // Fetch booked loads from each shipper using the same pattern as getShipperLoads
       for (final shipperDoc in shippersSnapshot.docs) {
         final shipperUid = shipperDoc.id;
-        
+
         // Use the same query pattern as getShipperLoads
         Query query = _firestore
             .collection('shippers')
@@ -3626,25 +4336,29 @@ class FirebaseService {
         query = query.orderBy('createdAt', descending: true);
 
         final snapshot = await query.get();
-        
+
         // Get shipper name from shipper document
         final shipperData = shipperDoc.data() as Map<String, dynamic>?;
-        final shipperName = shipperData?['displayName'] ?? 
-                           shipperData?['companyName'] ?? 
-                           shipperData?['shipperName'] ?? 
-                           shipperData?['name'] ?? 
-                           '';
-        
+        final shipperName =
+            shipperData?['displayName'] ??
+            shipperData?['companyName'] ??
+            shipperData?['shipperName'] ??
+            shipperData?['name'] ??
+            '';
+
         for (final doc in snapshot.docs) {
           try {
             // Pass shipperUid from parent document path
-            var load = LoadModel.fromFirestore(doc, parentShipperUid: shipperUid);
-            
+            var load = LoadModel.fromFirestore(
+              doc,
+              parentShipperUid: shipperUid,
+            );
+
             // If shipperName is missing from load, use the one from shipper document
             if (load.shipperName.isEmpty && shipperName.isNotEmpty) {
               load = load.copyWith(shipperName: shipperName);
             }
-            
+
             allLoads.add(load);
           } catch (e) {
             print('Error parsing booked load ${doc.id}: $e');
@@ -3657,7 +4371,8 @@ class FirebaseService {
       allLoads.sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
       // Apply pagination client-side
-      final startIndex = 0; // Simplified for now since we're aggregating from multiple collections
+      final startIndex =
+          0; // Simplified for now since we're aggregating from multiple collections
       final endIndex = (startIndex + limit).clamp(0, allLoads.length);
       final paginatedLoads = allLoads.sublist(startIndex, endIndex);
 
@@ -3668,15 +4383,19 @@ class FirebaseService {
         'totalCount': allLoads.length,
       };
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get carrier booked loads');
-      
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get carrier booked loads',
+      );
+
       // Re-throw network errors to be handled by the UI
-      if (e.toString().contains('network') || 
+      if (e.toString().contains('network') ||
           e.toString().contains('connection') ||
           e.toString().contains('timeout')) {
         rethrow;
       }
-      
+
       return {
         'loads': <LoadModel>[],
         'lastDocument': null,
@@ -3686,47 +4405,54 @@ class FirebaseService {
     }
   }
 
-
   /// Debug method to check if there are any loads in the database
   static Future<void> debugCheckLoads() async {
     try {
       print('=== DEBUG: Checking for loads in database ===');
-      
+
       // Check main loads collection
       final mainLoadsSnapshot = await _firestore.collection('loads').get();
-      print('DEBUG: Main loads collection has ${mainLoadsSnapshot.docs.length} documents');
-      
+      print(
+        'DEBUG: Main loads collection has ${mainLoadsSnapshot.docs.length} documents',
+      );
+
       // Check shippers collection
       final shippersSnapshot = await _firestore.collection('shippers').get();
       print('DEBUG: Found ${shippersSnapshot.docs.length} shippers');
-      
+
       int totalLoads = 0;
       for (final shipperDoc in shippersSnapshot.docs) {
         final shipperUid = shipperDoc.id;
         print('DEBUG: Checking shipper $shipperUid...');
-        
+
         // Check if shipper document exists and has basic info
         final shipperData = shipperDoc.data();
         print('DEBUG: Shipper $shipperUid data: ${shipperData.keys.toList()}');
-        
+
         final loadsSnapshot = await _firestore
             .collection('shippers')
             .doc(shipperUid)
             .collection('loads')
             .get();
-        
-        print('DEBUG: Shipper $shipperUid has ${loadsSnapshot.docs.length} loads');
+
+        print(
+          'DEBUG: Shipper $shipperUid has ${loadsSnapshot.docs.length} loads',
+        );
         totalLoads += loadsSnapshot.docs.length;
-        
+
         // Print details of each load
         for (final loadDoc in loadsSnapshot.docs) {
           final data = loadDoc.data();
-          print('  - Load ${loadDoc.id}: status=${data['status']}, title=${data['title']}');
+          print(
+            '  - Load ${loadDoc.id}: status=${data['status']}, title=${data['title']}',
+          );
         }
-        
+
         // Also check if there are any documents in the loads subcollection at all
         if (loadsSnapshot.docs.isEmpty) {
-          print('DEBUG: No loads found for shipper $shipperUid - checking if subcollection exists...');
+          print(
+            'DEBUG: No loads found for shipper $shipperUid - checking if subcollection exists...',
+          );
           // Try to get a count query to see if there are any documents
           final countQuery = await _firestore
               .collection('shippers')
@@ -3734,10 +4460,12 @@ class FirebaseService {
               .collection('loads')
               .limit(1)
               .get();
-          print('DEBUG: Count query returned ${countQuery.docs.length} documents');
+          print(
+            'DEBUG: Count query returned ${countQuery.docs.length} documents',
+          );
         }
       }
-      
+
       print('DEBUG: Total loads across all shippers: $totalLoads');
       print('=== END DEBUG ===');
     } catch (e) {
@@ -3771,12 +4499,16 @@ class FirebaseService {
         'createdAt': Timestamp.fromDate(DateTime.now()),
         'updatedAt': Timestamp.fromDate(DateTime.now()),
       });
-      
+
       print('Report submitted successfully');
       return true;
     } catch (e) {
       print('Error submitting report: $e');
-      await recordError(e, StackTrace.current, reason: 'Failed to submit report');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to submit report',
+      );
       return false;
     }
   }
@@ -3786,16 +4518,20 @@ class FirebaseService {
     required String carrierUid,
   }) async {
     try {
-      print('DEBUG bookLoad: Starting to book load $loadId for carrier $carrierUid');
-      
+      print(
+        'DEBUG bookLoad: Starting to book load $loadId for carrier $carrierUid',
+      );
+
       // First, find the load outside of transaction to avoid timeout
       final shippersSnapshot = await _firestore.collection('shippers').get();
       DocumentReference? loadRef;
       Map<String, dynamic>? loadData;
       String? shipperUid;
 
-      print('DEBUG bookLoad: Searching through ${shippersSnapshot.docs.length} shippers');
-      
+      print(
+        'DEBUG bookLoad: Searching through ${shippersSnapshot.docs.length} shippers',
+      );
+
       // Search for the load in all shipper subcollections
       for (final shipperDoc in shippersSnapshot.docs) {
         final shipperId = shipperDoc.id;
@@ -3804,7 +4540,7 @@ class FirebaseService {
             .doc(shipperId)
             .collection('loads')
             .doc(loadId);
-        
+
         final loadDoc = await tempLoadRef.get();
         if (loadDoc.exists) {
           loadRef = tempLoadRef;
@@ -3822,7 +4558,9 @@ class FirebaseService {
 
       // Check if load is still available (active or available status)
       if (loadData['status'] != 'active' && loadData['status'] != 'available') {
-        print('DEBUG bookLoad: Load is no longer available, status: ${loadData['status']}');
+        print(
+          'DEBUG bookLoad: Load is no longer available, status: ${loadData['status']}',
+        );
         throw Exception('Load is no longer available');
       }
 
@@ -3834,99 +4572,109 @@ class FirebaseService {
       }
 
       final carrierData = carrierDoc.data() as Map<String, dynamic>;
-      final carrierName = carrierData['displayName'] ?? carrierData['companyName'] ?? 'Unknown Carrier';
+      final carrierName =
+          carrierData['displayName'] ??
+          carrierData['companyName'] ??
+          'Unknown Carrier';
       print('DEBUG bookLoad: Carrier found: $carrierName');
 
       // Now run the transaction with the found references
-      return await _firestore.runTransaction<bool>((transaction) async {
-        print('DEBUG bookLoad: Starting transaction');
-        
-        // Ensure loadRef is not null
-        if (loadRef == null) {
-          throw Exception('Load reference is null');
-        }
-        
-        // Re-check load status within transaction
-        final loadDoc = await transaction.get(loadRef);
-        if (!loadDoc.exists) {
-          throw Exception('Load no longer exists');
-        }
-        
-        final currentLoadData = loadDoc.data() as Map<String, dynamic>;
-        if (currentLoadData['status'] != 'active' && currentLoadData['status'] != 'available') {
-          throw Exception('Load is no longer available');
-        }
+      return await _firestore
+          .runTransaction<bool>((transaction) async {
+            print('DEBUG bookLoad: Starting transaction');
 
-        // Update load status in shipper subcollection
-        transaction.update(loadRef, {
-          'status': 'booked',
-          'bookedByCarrierId': carrierUid,
-          'bookedAt': Timestamp.now(),
-          'updatedAt': Timestamp.now(),
-        });
+            // Ensure loadRef is not null
+            if (loadRef == null) {
+              throw Exception('Load reference is null');
+            }
 
-        // Create booking record
-        final bookingRef = bookings.doc();
-        transaction.set(bookingRef, {
-          'loadId': loadId,
-          'carrierId': carrierUid,
-          'carrierName': carrierName,
-          'shipperId': shipperUid,
-          'shipperName': loadData?['shipperName'] ?? 'Unknown Shipper',
-          'status': 'booked',
-          'bookedAt': Timestamp.now(),
-          'createdAt': Timestamp.now(),
-          'updatedAt': Timestamp.now(),
-        });
+            // Re-check load status within transaction
+            final loadDoc = await transaction.get(loadRef);
+            if (!loadDoc.exists) {
+              throw Exception('Load no longer exists');
+            }
 
-        // Add to carrier's myBookings subcollection
-        final carrierBookingRef = carriers.doc(carrierUid).collection('myBookings').doc(loadId);
-        transaction.set(carrierBookingRef, {
-          'loadId': loadId,
-          'status': 'booked',
-          'bookedAt': Timestamp.now(),
-          'createdAt': Timestamp.now(),
-        });
+            final currentLoadData = loadDoc.data() as Map<String, dynamic>;
+            if (currentLoadData['status'] != 'active' &&
+                currentLoadData['status'] != 'available') {
+              throw Exception('Load is no longer available');
+            }
 
-        print('DEBUG bookLoad: Transaction completed successfully');
-        return true;
-      }).then((success) async {
-        if (success && shipperUid != null) {
-          // Send notifications to both shipper and carrier
-          try {
-            await NotificationService.createNotification(
-              userId: shipperUid,
-              type: NotificationType.orderStatus,
-              title: "Order Booked",
-              body: "A carrier has accepted your order! Please deposit payment to escrow to proceed.",
-              data: {
-                'loadId': loadId,
-                'oldStatus': 'available',
-                'newStatus': 'booked',
-                'requiresEscrowPayment': true,
-              },
-              relatedId: loadId,
-            );
-            
-            await NotificationService.createNotification(
-              userId: carrierUid,
-              type: NotificationType.orderStatus,
-              title: "Load Booked Successfully",
-              body: "You have successfully booked this load!",
-              data: {
-                'loadId': loadId,
-                'oldStatus': 'available',
-                'newStatus': 'booked',
-              },
-              relatedId: loadId,
-            );
-          } catch (e) {
-            debugPrint('Error sending booking notifications: $e');
-            // Don't fail the booking if notification fails
-          }
-        }
-        return success;
-      });
+            // Update load status in shipper subcollection
+            transaction.update(loadRef, {
+              'status': 'booked',
+              'bookedByCarrierId': carrierUid,
+              'bookedAt': Timestamp.now(),
+              'updatedAt': Timestamp.now(),
+            });
+
+            // Create booking record
+            final bookingRef = bookings.doc();
+            transaction.set(bookingRef, {
+              'loadId': loadId,
+              'carrierId': carrierUid,
+              'carrierName': carrierName,
+              'shipperId': shipperUid,
+              'shipperName': loadData?['shipperName'] ?? 'Unknown Shipper',
+              'status': 'booked',
+              'bookedAt': Timestamp.now(),
+              'createdAt': Timestamp.now(),
+              'updatedAt': Timestamp.now(),
+            });
+
+            // Add to carrier's myBookings subcollection
+            final carrierBookingRef = carriers
+                .doc(carrierUid)
+                .collection('myBookings')
+                .doc(loadId);
+            transaction.set(carrierBookingRef, {
+              'loadId': loadId,
+              'status': 'booked',
+              'bookedAt': Timestamp.now(),
+              'createdAt': Timestamp.now(),
+            });
+
+            print('DEBUG bookLoad: Transaction completed successfully');
+            return true;
+          })
+          .then((success) async {
+            if (success && shipperUid != null) {
+              // Send notifications to both shipper and carrier
+              try {
+                await NotificationService.createNotification(
+                  userId: shipperUid,
+                  type: NotificationType.orderStatus,
+                  title: "Order Booked",
+                  body:
+                      "A carrier has accepted your order! Please deposit payment to escrow to proceed.",
+                  data: {
+                    'loadId': loadId,
+                    'oldStatus': 'available',
+                    'newStatus': 'booked',
+                    'requiresEscrowPayment': true,
+                  },
+                  relatedId: loadId,
+                );
+
+                await NotificationService.createNotification(
+                  userId: carrierUid,
+                  type: NotificationType.orderStatus,
+                  title: "Load Booked Successfully",
+                  body: "You have successfully booked this load!",
+                  data: {
+                    'loadId': loadId,
+                    'oldStatus': 'available',
+                    'newStatus': 'booked',
+                  },
+                  relatedId: loadId,
+                );
+              } catch (e) {
+                debugPrint('Error sending booking notifications: $e');
+                // Don't fail the booking if notification fails
+              }
+            }
+            return success;
+          });
     } catch (e) {
       print('DEBUG bookLoad: Error occurred: $e');
       await recordError(e, StackTrace.current, reason: 'Failed to book load');
@@ -3956,7 +4704,7 @@ class FirebaseService {
             .doc(shipperId)
             .collection('loads')
             .doc(loadId);
-        
+
         final loadDoc = await tempLoadRef.get();
         if (loadDoc.exists) {
           loadRef = tempLoadRef;
@@ -3979,90 +4727,100 @@ class FirebaseService {
 
       // Store old status before update
       final oldStatus = loadData['status'] as String? ?? 'booked';
-      
+
       // Now run the transaction with the found reference
-      return await _firestore.runTransaction<bool>((transaction) async {
-        // Re-check load within transaction
-        final loadDoc = await transaction.get(loadRef!);
-        if (!loadDoc.exists) {
-          throw Exception('Load no longer exists');
-        }
-
-        // Update load status
-        final updateData = <String, dynamic>{
-          'status': status,
-          'updatedAt': Timestamp.now(),
-        };
-
-        if (status == 'completed') {
-          updateData['completedAt'] = Timestamp.now();
-        }
-
-        transaction.update(loadRef, updateData);
-
-        // Update booking record
-        final bookingQuery = bookings.where('loadId', isEqualTo: loadId);
-        final bookingSnapshot = await bookingQuery.get();
-        
-        for (final bookingDoc in bookingSnapshot.docs) {
-          transaction.update(bookingDoc.reference, {
-            'status': status,
-            'updatedAt': Timestamp.now(),
-          });
-        }
-
-        // Update carrier's myBookings subcollection
-        if (currentCarrierId != null) {
-          final carrierBookingRef = carriers.doc(currentCarrierId).collection('myBookings').doc(loadId);
-          transaction.update(carrierBookingRef, {
-            'status': status,
-            'updatedAt': Timestamp.now(),
-          });
-        }
-
-        return true;
-      }).then((success) async {
-        if (success && shipperUid != null && oldStatus != status) {
-          // Send notification to shipper about status change
-          try {
-            String title;
-            String body;
-            
-            if (status == 'in-transit' && oldStatus == 'booked') {
-              // Pickup completed - load is now in transit
-              title = "Pickup Completed";
-              body = "Your order has been picked up and is now in transit!";
-            } else if (status == 'completed' && oldStatus == 'in-transit') {
-              // Delivery completed
-              title = "Delivery Completed";
-              body = "Your order has been delivered successfully!";
-            } else {
-              // Generic status update
-              title = "Order Status Updated";
-              body = "Your order status has been updated to ${status.replaceAll('-', ' ')}.";
+      return await _firestore
+          .runTransaction<bool>((transaction) async {
+            // Re-check load within transaction
+            final loadDoc = await transaction.get(loadRef!);
+            if (!loadDoc.exists) {
+              throw Exception('Load no longer exists');
             }
-            
-            await NotificationService.createNotification(
-              userId: shipperUid,
-              type: NotificationType.orderStatus,
-              title: title,
-              body: body,
-              data: {
-                'loadId': loadId,
-                'oldStatus': oldStatus,
-                'newStatus': status,
-              },
-              relatedId: loadId,
-            );
-          } catch (e) {
-            debugPrint('Error sending status update notification: $e');
-            // Don't fail the status update if notification fails
-          }
-        }
-        return success;
-      });
+
+            // Update load status
+            final updateData = <String, dynamic>{
+              'status': status,
+              'updatedAt': Timestamp.now(),
+            };
+
+            if (status == 'completed') {
+              updateData['completedAt'] = Timestamp.now();
+            }
+
+            transaction.update(loadRef, updateData);
+
+            // Update booking record
+            final bookingQuery = bookings.where('loadId', isEqualTo: loadId);
+            final bookingSnapshot = await bookingQuery.get();
+
+            for (final bookingDoc in bookingSnapshot.docs) {
+              transaction.update(bookingDoc.reference, {
+                'status': status,
+                'updatedAt': Timestamp.now(),
+              });
+            }
+
+            // Update carrier's myBookings subcollection
+            if (currentCarrierId != null) {
+              final carrierBookingRef = carriers
+                  .doc(currentCarrierId)
+                  .collection('myBookings')
+                  .doc(loadId);
+              transaction.update(carrierBookingRef, {
+                'status': status,
+                'updatedAt': Timestamp.now(),
+              });
+            }
+
+            return true;
+          })
+          .then((success) async {
+            if (success && shipperUid != null && oldStatus != status) {
+              // Send notification to shipper about status change
+              try {
+                String title;
+                String body;
+
+                if (status == 'in-transit' && oldStatus == 'booked') {
+                  // Pickup completed - load is now in transit
+                  title = "Pickup Completed";
+                  body = "Your order has been picked up and is now in transit!";
+                } else if (status == 'completed' && oldStatus == 'in-transit') {
+                  // Delivery completed
+                  title = "Delivery Completed";
+                  body = "Your order has been delivered successfully!";
+                } else {
+                  // Generic status update
+                  title = "Order Status Updated";
+                  body =
+                      "Your order status has been updated to ${status.replaceAll('-', ' ')}.";
+                }
+
+                await NotificationService.createNotification(
+                  userId: shipperUid,
+                  type: NotificationType.orderStatus,
+                  title: title,
+                  body: body,
+                  data: {
+                    'loadId': loadId,
+                    'oldStatus': oldStatus,
+                    'newStatus': status,
+                  },
+                  relatedId: loadId,
+                );
+              } catch (e) {
+                debugPrint('Error sending status update notification: $e');
+                // Don't fail the status update if notification fails
+              }
+            }
+            return success;
+          });
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to update load status');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to update load status',
+      );
       // Re-throw to allow proper error handling in UI
       // The exception will be caught by the calling code
       rethrow;
@@ -4077,9 +4835,7 @@ class FirebaseService {
     Map<String, dynamic>? carrierPreferences,
   }) async {
     try {
-      final updateData = <String, dynamic>{
-        'updatedAt': Timestamp.now(),
-      };
+      final updateData = <String, dynamic>{'updatedAt': Timestamp.now()};
 
       if (vehicleTypes != null) {
         updateData['vehicleTypes'] = vehicleTypes;
@@ -4098,7 +4854,11 @@ class FirebaseService {
       print('Firebase: Successfully updated carrier preferences');
       return true;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to update carrier preferences');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to update carrier preferences',
+      );
       return false;
     }
   }
@@ -4134,7 +4894,7 @@ class FirebaseService {
             .collection('loads')
             .doc(loadId)
             .get();
-        
+
         if (loadDoc.exists) {
           await _firestore
               .collection('shippers')
@@ -4142,18 +4902,22 @@ class FirebaseService {
               .collection('loads')
               .doc(loadId)
               .update({
-            'escrowPaymentIntentId': paymentIntentId,
-            'escrowPaymentStatus': 'pending',
-            'escrowAmount': amountInCents / 100,
-            'updatedAt': Timestamp.now(),
-          });
+                'escrowPaymentIntentId': paymentIntentId,
+                'escrowPaymentStatus': 'pending',
+                'escrowAmount': amountInCents / 100,
+                'updatedAt': Timestamp.now(),
+              });
           break;
         }
       }
 
       return true;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to create escrow payment');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to create escrow payment',
+      );
       return false;
     }
   }
@@ -4173,12 +4937,13 @@ class FirebaseService {
 
       final doc = querySnapshot.docs.first;
       final data = doc.data();
-      return {
-        ...data,
-        'id': doc.id,
-      };
+      return {...data, 'id': doc.id};
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get escrow payment');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get escrow payment',
+      );
       return null;
     }
   }
@@ -4228,7 +4993,7 @@ class FirebaseService {
               .collection('loads')
               .doc(loadId)
               .get();
-          
+
           if (loadDoc.exists) {
             await _firestore
                 .collection('shippers')
@@ -4236,10 +5001,11 @@ class FirebaseService {
                 .collection('loads')
                 .doc(loadId)
                 .update({
-              'escrowPaymentStatus': status,
-              'updatedAt': Timestamp.now(),
-              if (releasedAt != null) 'escrowReleasedAt': Timestamp.fromDate(releasedAt),
-            });
+                  'escrowPaymentStatus': status,
+                  'updatedAt': Timestamp.now(),
+                  if (releasedAt != null)
+                    'escrowReleasedAt': Timestamp.fromDate(releasedAt),
+                });
             break;
           }
         }
@@ -4247,7 +5013,11 @@ class FirebaseService {
 
       return true;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to update escrow payment status');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to update escrow payment status',
+      );
       return false;
     }
   }
@@ -4274,22 +5044,26 @@ class FirebaseService {
       if (fileSize > 5 * 1024 * 1024) {
         throw Exception('Image file is too large. Maximum size is 5MB');
       }
-      
+
       final fileName = 'thumbnail_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = _storage.ref().child('academy/thumbnails/$fileName');
-      
+
       // Set metadata with content type
       final metadata = SettableMetadata(
         contentType: 'image/jpeg',
         cacheControl: 'public, max-age=31536000',
       );
-      
+
       final uploadTask = ref.putFile(imageFile, metadata);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload academy thumbnail');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload academy thumbnail',
+      );
       return null;
     }
   }
@@ -4302,22 +5076,26 @@ class FirebaseService {
       if (fileSize > 50 * 1024 * 1024) {
         throw Exception('Video file is too large. Maximum size is 50MB');
       }
-      
+
       final fileName = 'video_${DateTime.now().millisecondsSinceEpoch}.mp4';
       final ref = _storage.ref().child('academy/videos/$fileName');
-      
+
       // Set metadata with content type
       final metadata = SettableMetadata(
         contentType: 'video/mp4',
         cacheControl: 'public, max-age=31536000',
       );
-      
+
       final uploadTask = ref.putFile(videoFile, metadata);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload academy video');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload academy video',
+      );
       return null;
     }
   }
@@ -4330,11 +5108,13 @@ class FirebaseService {
       if (fileSize > 10 * 1024 * 1024) {
         throw Exception('Document file is too large. Maximum size is 10MB');
       }
-      
+
       final fileName = 'document_${DateTime.now().millisecondsSinceEpoch}';
       final extension = documentFile.path.split('.').last;
-      final ref = _storage.ref().child('academy/documents/$fileName.$extension');
-      
+      final ref = _storage.ref().child(
+        'academy/documents/$fileName.$extension',
+      );
+
       // Determine content type based on extension
       String contentType = 'application/octet-stream';
       switch (extension.toLowerCase()) {
@@ -4345,25 +5125,30 @@ class FirebaseService {
           contentType = 'application/msword';
           break;
         case 'docx':
-          contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+          contentType =
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
           break;
         case 'txt':
           contentType = 'text/plain';
           break;
       }
-      
+
       // Set metadata with content type
       final metadata = SettableMetadata(
         contentType: contentType,
         cacheControl: 'public, max-age=31536000',
       );
-      
+
       final uploadTask = ref.putFile(documentFile, metadata);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to upload academy document');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to upload academy document',
+      );
       return null;
     }
   }
@@ -4376,8 +5161,10 @@ class FirebaseService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => AcademyContent.fromFirestore(doc)).toList();
-    });
+          return snapshot.docs
+              .map((doc) => AcademyContent.fromFirestore(doc))
+              .toList();
+        });
   }
 
   /// Get all academy content (one-time fetch)
@@ -4388,9 +5175,15 @@ class FirebaseService {
           .orderBy('order')
           .orderBy('createdAt', descending: true)
           .get();
-      return snapshot.docs.map((doc) => AcademyContent.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => AcademyContent.fromFirestore(doc))
+          .toList();
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get academy content');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get academy content',
+      );
       return [];
     }
   }
@@ -4398,13 +5191,20 @@ class FirebaseService {
   /// Get academy content by ID
   static Future<AcademyContent?> getAcademyContentById(String contentId) async {
     try {
-      final doc = await _firestore.collection('academy_content').doc(contentId).get();
+      final doc = await _firestore
+          .collection('academy_content')
+          .doc(contentId)
+          .get();
       if (doc.exists) {
         return AcademyContent.fromFirestore(doc);
       }
       return null;
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get academy content by ID');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get academy content by ID',
+      );
       return null;
     }
   }
@@ -4414,17 +5214,24 @@ class FirebaseService {
     try {
       final data = content.toFirestore();
       data['updatedAt'] = Timestamp.now();
-      
+
       if (content.id.isEmpty || !await _academyContentExists(content.id)) {
         // Create new content
         data['createdAt'] = Timestamp.now();
         await _firestore.collection('academy_content').add(data);
       } else {
         // Update existing content
-        await _firestore.collection('academy_content').doc(content.id).update(data);
+        await _firestore
+            .collection('academy_content')
+            .doc(content.id)
+            .update(data);
       }
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to save academy content');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save academy content',
+      );
       rethrow;
     }
   }
@@ -4432,7 +5239,10 @@ class FirebaseService {
   /// Check if academy content exists
   static Future<bool> _academyContentExists(String contentId) async {
     try {
-      final doc = await _firestore.collection('academy_content').doc(contentId).get();
+      final doc = await _firestore
+          .collection('academy_content')
+          .doc(contentId)
+          .get();
       return doc.exists;
     } catch (e) {
       return false;
@@ -4476,7 +5286,11 @@ class FirebaseService {
       // Delete Firestore document
       await _firestore.collection('academy_content').doc(contentId).delete();
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to delete academy content');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to delete academy content',
+      );
       rethrow;
     }
   }
@@ -4490,13 +5304,14 @@ class FirebaseService {
           .get();
       return snapshot.docs.map((doc) {
         final data = doc.data();
-        return {
-          'id': doc.id,
-          ...data,
-        };
+        return {'id': doc.id, ...data};
       }).toList();
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to get academy playlists');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to get academy playlists',
+      );
       return [];
     }
   }
@@ -4518,10 +5333,17 @@ class FirebaseService {
         data['createdAt'] = Timestamp.now();
         await _firestore.collection('academy_playlists').add(data);
       } else {
-        await _firestore.collection('academy_playlists').doc(playlistId).update(data);
+        await _firestore
+            .collection('academy_playlists')
+            .doc(playlistId)
+            .update(data);
       }
     } catch (e) {
-      await recordError(e, StackTrace.current, reason: 'Failed to save academy playlist');
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to save academy playlist',
+      );
       rethrow;
     }
   }

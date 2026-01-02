@@ -20,7 +20,7 @@ Widget TopNavigationBar(BuildContext context) {
           : isSmallScreen
           ? 12
           : 16,
-      vertical: 12,
+      vertical: kIsWeb ? 25 : 12,
     ),
     decoration: BoxDecoration(
       color: Color(0xFF0A6837), // dark green background
@@ -36,19 +36,20 @@ Widget TopNavigationBar(BuildContext context) {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Flexible(
-                flex: isSmallScreen ? 2 : 3,
-                fit: FlexFit.loose,
-                child: SvgPicture.asset(
-                  'assets/remiles.svg',
-                  width: isVerySmallScreen
-                      ? 70
-                      : isSmallScreen
-                      ? 80
-                      : null,
-                  fit: BoxFit.contain,
+              if (!kIsWeb)
+                Flexible(
+                  flex: isSmallScreen ? 2 : 3,
+                  fit: FlexFit.loose,
+                  child: SvgPicture.asset(
+                    'assets/remiles.svg',
+                    width: isVerySmallScreen
+                        ? 70
+                        : isSmallScreen
+                        ? 80
+                        : null,
+                    fit: BoxFit.contain,
+                  ),
                 ),
-              ),
               const SizedBox(width: 4),
               Flexible(
                 flex: isSmallScreen ? 5 : 4,

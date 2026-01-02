@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'dart:io' as io;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../core/firebase_service.dart';
 import '../../../models/product_listing.dart';
 import '../../../providers/auth_provider.dart';
@@ -12,22 +13,19 @@ import '../../../core/constants/app_constants.dart';
 // Helper class to represent images (either existing URL or new file)
 class _ImageItem {
   final String? url;
-  final File? file;
+  final XFile? file;
   final bool isExisting;
-  
-  _ImageItem({
-    this.url,
-    this.file,
-    required this.isExisting,
-  }) : assert(
-    (url != null && file == null) || (url == null && file != null),
-    'Either url or file must be provided, but not both',
-  );
+
+  _ImageItem({this.url, this.file, required this.isExisting})
+    : assert(
+        (url != null && file == null) || (url == null && file != null),
+        'Either url or file must be provided, but not both',
+      );
 }
 
 class ShipperCreateListing extends StatefulWidget {
   final ProductListing? listingToEdit;
-  
+
   const ShipperCreateListing({super.key, this.listingToEdit});
 
   @override
@@ -47,9 +45,9 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
 
   // Image picker
   final ImagePicker _picker = ImagePicker();
-  List<File> _selectedImages = [];
-  File? _selectedVideo;
-  
+  List<XFile> _selectedImages = [];
+  XFile? _selectedVideo;
+
   // Existing image/video URLs (from listing being edited)
   List<String> _existingImageUrls = [];
   String? _existingVideoUrl;
@@ -105,278 +103,294 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Container(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black12,
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                // Header with close button
-                Row(
-                  children: [
-                    Text(
-                      _isEditing ? 'Edit Listing' : 'Create Listing',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: _handleClose,
-                      icon: const Icon(Icons.close, color: Colors.grey),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.grey.shade100,
-                        shape: const CircleBorder(),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                
-                // Images section
-                if (_existingImageUrls.isNotEmpty || _selectedImages.isNotEmpty)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Product Photos',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      _buildImagesGrid(),
-                      const SizedBox(height: 12),
-                    ],
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 10,
+                    spreadRadius: 2,
                   ),
-                
-                // Upload photo button
-                if (_existingImageUrls.length + _selectedImages.length < 10)
-                  OutlinedButton.icon(
-                    onPressed: _pickImages,
-                    icon: const Icon(Icons.add_photo_alternate),
-                    label: const Text('Add More Photos'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      side: BorderSide(color: Colors.green.shade700),
-                    ),
-                  ),
-                
-                const SizedBox(height: 16),
-                
-                // Video section
-                Row(
-                  children: [
-                    Expanded(
-                      child: _uploadCard(
-                        Icons.videocam, 
-                        "Product Video",
-                        onTap: _pickVideo,
-                        hasVideo: _selectedVideo != null || _existingVideoUrl != null,
-                      ),
-                    ),
-                    if (_existingVideoUrl != null || _selectedVideo != null) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildVideoPreview(),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 16),
-
-                // Name
-                _inputField(
-                  "Name of Product",
-                  controller: _titleController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Product name is required';
-                    }
-                    if (value.trim().length < 3) {
-                      return 'Product name must be at least 3 characters';
-                    }
-                    if (value.trim().length > 100) {
-                      return 'Product name must be less than 100 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Description
-                _inputField(
-                  "Product Description", 
-                  maxLines: 3,
-                  controller: _descriptionController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Product description is required';
-                    }
-                    if (value.trim().length < 10) {
-                      return 'Description must be at least 10 characters';
-                    }
-                    if (value.trim().length > 500) {
-                      return 'Description must be less than 500 characters';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-
-                // Price
-                TextFormField(
-                  controller: _priceController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                  ],
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Price is required';
-                    }
-                    final price = double.tryParse(value);
-                    if (price == null) {
-                      return 'Please enter a valid number';
-                    }
-                    if (price <= 0) {
-                      return 'Price must be greater than 0';
-                    }
-                    if (price > 1000000) {
-                      return 'Price must be less than \$1,000,000';
-                    }
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    hintText: "Price",
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 14, horizontal: 16),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Location
-                GooglePlacesAutocomplete(
-                  controller: _locationController,
-                  hintText: "Location",
-                  icon: Icons.location_on,
-                  apiKey: AppConstants.googleApiKey,
-                ),
-                const SizedBox(height: 16),
-
-                // Condition
-                const Text(
-                  "Condition",
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: conditions.map((condition) {
-                    final isSelected = selectedCondition == condition;
-                    return ChoiceChip(
-                      label: Text(condition),
-                      selected: isSelected,
-                      selectedColor: Colors.green.shade700,
-                      backgroundColor: Colors.white,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : Colors.black,
-                      ),
-                      onSelected: (_) {
-                        setState(() {
-                          selectedCondition = condition;
-                        });
-                      },
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 24),
-
-                // Action buttons row
-                Row(
-                  children: [
-                    // Cancel button
-                    Expanded(
-                      child: OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          side: BorderSide(color: Colors.grey.shade400),
-                        ),
-                        onPressed: _handleClose,
-                        child: const Text(
-                          "Cancel",
-                          style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    // Publish/Update button
-                    Expanded(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade700,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        onPressed: _isLoading ? null : _publishListing,
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                _isEditing ? "Update" : "Publish",
-                                style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
                 ],
+              ),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Header with close button
+                    Row(
+                      children: [
+                        Text(
+                          _isEditing ? 'Edit Listing' : 'Create Listing',
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: _handleClose,
+                          icon: const Icon(Icons.close, color: Colors.grey),
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.grey.shade100,
+                            shape: const CircleBorder(),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Images section
+                    if (_existingImageUrls.isNotEmpty ||
+                        _selectedImages.isNotEmpty)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Product Photos',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildImagesGrid(),
+                          const SizedBox(height: 12),
+                        ],
+                      ),
+
+                    // Upload photo button
+                    if (_existingImageUrls.length + _selectedImages.length < 10)
+                      OutlinedButton.icon(
+                        onPressed: _pickImages,
+                        icon: const Icon(Icons.add_photo_alternate),
+                        label: const Text('Add More Photos'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          side: BorderSide(color: Colors.green.shade700),
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Video section
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _uploadCard(
+                            Icons.videocam,
+                            "Product Video",
+                            onTap: _pickVideo,
+                            hasVideo:
+                                _selectedVideo != null ||
+                                _existingVideoUrl != null,
+                          ),
+                        ),
+                        if (_existingVideoUrl != null ||
+                            _selectedVideo != null) ...[
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildVideoPreview()),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Name
+                    _inputField(
+                      "Name of Product",
+                      controller: _titleController,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Product name is required';
+                        }
+                        if (value.trim().length < 3) {
+                          return 'Product name must be at least 3 characters';
+                        }
+                        if (value.trim().length > 100) {
+                          return 'Product name must be less than 100 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Description
+                    _inputField(
+                      "Product Description",
+                      maxLines: 3,
+                      controller: _descriptionController,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Product description is required';
+                        }
+                        if (value.trim().length < 10) {
+                          return 'Description must be at least 10 characters';
+                        }
+                        if (value.trim().length > 500) {
+                          return 'Description must be less than 500 characters';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Price
+                    TextFormField(
+                      controller: _priceController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d*'),
+                        ),
+                      ],
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Price is required';
+                        }
+                        final price = double.tryParse(value);
+                        if (price == null) {
+                          return 'Please enter a valid number';
+                        }
+                        if (price <= 0) {
+                          return 'Price must be greater than 0';
+                        }
+                        if (price > 1000000) {
+                          return 'Price must be less than \$1,000,000';
+                        }
+                        return null;
+                      },
+                      decoration: InputDecoration(
+                        hintText: "Price",
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 14,
+                          horizontal: 16,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Location
+                    GooglePlacesAutocomplete(
+                      controller: _locationController,
+                      hintText: "Location",
+                      icon: Icons.location_on,
+                      apiKey: AppConstants.googleApiKey,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Condition
+                    const Text(
+                      "Condition",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: conditions.map((condition) {
+                        final isSelected = selectedCondition == condition;
+                        return ChoiceChip(
+                          label: Text(condition),
+                          selected: isSelected,
+                          selectedColor: Colors.green.shade700,
+                          backgroundColor: Colors.white,
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : Colors.black,
+                          ),
+                          onSelected: (_) {
+                            setState(() {
+                              selectedCondition = condition;
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Action buttons row
+                    Row(
+                      children: [
+                        // Cancel button
+                        Expanded(
+                          child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              side: BorderSide(color: Colors.grey.shade400),
+                            ),
+                            onPressed: _handleClose,
+                            child: const Text(
+                              "Cancel",
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        // Publish/Update button
+                        Expanded(
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green.shade700,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: _isLoading ? null : _publishListing,
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    _isEditing ? "Update" : "Publish",
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
-      ),
     );
   }
 
   Widget _uploadCard(
-    IconData icon, 
+    IconData icon,
     String label, {
     VoidCallback? onTap,
     int count = 0,
@@ -389,23 +403,29 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: (count > 0 || hasVideo) ? Colors.green.shade700 : Colors.green.shade100, 
+            color: (count > 0 || hasVideo)
+                ? Colors.green.shade700
+                : Colors.green.shade100,
             width: 1.5,
           ),
         ),
         child: Column(
           children: [
             Icon(
-              icon, 
-              size: 36, 
-              color: (count > 0 || hasVideo) ? Colors.green.shade700 : Colors.black87,
+              icon,
+              size: 36,
+              color: (count > 0 || hasVideo)
+                  ? Colors.green.shade700
+                  : Colors.black87,
             ),
             const SizedBox(height: 8),
             Text(
-              label, 
+              label,
               style: TextStyle(
                 fontWeight: FontWeight.w500,
-                color: (count > 0 || hasVideo) ? Colors.green.shade700 : Colors.black87,
+                color: (count > 0 || hasVideo)
+                    ? Colors.green.shade700
+                    : Colors.black87,
               ),
             ),
             if (count > 0) ...[
@@ -438,7 +458,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
 
   Widget _inputField(
     String hint, {
-    int maxLines = 1, 
+    int maxLines = 1,
     TextInputType keyboard = TextInputType.text,
     TextEditingController? controller,
     String? Function(String?)? validator,
@@ -450,11 +470,11 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       maxLines: maxLines,
       decoration: InputDecoration(
         hintText: hint,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 14,
+          horizontal: 16,
         ),
-        contentPadding:
-        const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
       ),
     );
   }
@@ -472,16 +492,25 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
 
         // Validate image sizes
         for (final image in images) {
-          final file = File(image.path);
-          final fileSize = await file.length();
-          if (fileSize > 5 * 1024 * 1024) { // 5MB limit
-            _showErrorSnackBar('Image size must be less than 5MB');
-            return;
+          if (!kIsWeb) {
+            final file = io.File(image.path);
+            final fileSize = await file.length();
+            if (fileSize > 5 * 1024 * 1024) {
+              // 5MB limit
+              _showErrorSnackBar('Image size must be less than 5MB');
+              return;
+            }
+          } else {
+            final bytes = await image.readAsBytes();
+            if (bytes.length > 5 * 1024 * 1024) {
+              _showErrorSnackBar('Image size must be less than 5MB');
+              return;
+            }
           }
         }
 
         setState(() {
-          _selectedImages = images.map((image) => File(image.path)).toList();
+          _selectedImages = images;
         });
       }
     } catch (e) {
@@ -494,15 +523,24 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       final XFile? video = await _picker.pickVideo(source: ImageSource.gallery);
       if (video != null) {
         // Validate video size
-        final file = File(video.path);
-        final fileSize = await file.length();
-        if (fileSize > 50 * 1024 * 1024) { // 50MB limit
-          _showErrorSnackBar('Video size must be less than 50MB');
-          return;
+        if (!kIsWeb) {
+          final file = io.File(video.path);
+          final fileSize = await file.length();
+          if (fileSize > 50 * 1024 * 1024) {
+            // 50MB limit
+            _showErrorSnackBar('Video size must be less than 50MB');
+            return;
+          }
+        } else {
+          final bytes = await video.readAsBytes();
+          if (bytes.length > 50 * 1024 * 1024) {
+            _showErrorSnackBar('Video size must be less than 50MB');
+            return;
+          }
         }
 
         setState(() {
-          _selectedVideo = file;
+          _selectedVideo = video;
         });
       }
     } catch (e) {
@@ -517,7 +555,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       _showErrorSnackBar('Please select a location');
       return;
     }
-    
+
     // Validate form fields
     if (!_formKey.currentState!.validate()) {
       _showErrorSnackBar('Please fill in all required fields correctly');
@@ -556,20 +594,26 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user == null) {
-        _showErrorSnackBar('Please log in to ${_isEditing ? 'update' : 'create'} a listing');
+        _showErrorSnackBar(
+          'Please log in to ${_isEditing ? 'update' : 'create'} a listing',
+        );
         return;
       }
 
       // Use existing listing ID if editing, otherwise create new one
-      final listingId = _isEditing ? widget.listingToEdit!.id : DateTime.now().millisecondsSinceEpoch.toString();
-      
+      final listingId = _isEditing
+          ? widget.listingToEdit!.id
+          : DateTime.now().millisecondsSinceEpoch.toString();
+
       // If editing, find and delete removed images
       if (_isEditing && widget.listingToEdit != null) {
         final originalImageUrls = widget.listingToEdit!.imageUrls;
-        final removedImageUrls = originalImageUrls.where((url) => !_existingImageUrls.contains(url)).toList();
-        
+        final removedImageUrls = originalImageUrls
+            .where((url) => !_existingImageUrls.contains(url))
+            .toList();
+
         // Delete removed images from Storage
         if (removedImageUrls.isNotEmpty) {
           try {
@@ -580,7 +624,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
           }
         }
       }
-      
+
       // Upload new images if any selected
       List<String> imageUrls = List<String>.from(_existingImageUrls);
       if (_selectedImages.isNotEmpty) {
@@ -639,7 +683,9 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
         location: _locationController.text.trim(),
         imageUrls: imageUrls,
         videoUrl: videoUrl,
-        createdAt: _isEditing ? widget.listingToEdit!.createdAt : DateTime.now(),
+        createdAt: _isEditing
+            ? widget.listingToEdit!.createdAt
+            : DateTime.now(),
         updatedAt: DateTime.now(),
       );
 
@@ -651,14 +697,14 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
         await FirebaseService.createProductListing(listing);
         _showSuccessSnackBar('Listing published successfully!');
       }
-      
+
       // Close dialog
       Navigator.pop(context, true); // Return true to indicate success
-      
     } catch (e) {
       String errorMessage = 'Failed to publish listing';
       if (e.toString().contains('network')) {
-        errorMessage = 'Network error. Please check your connection and try again.';
+        errorMessage =
+            'Network error. Please check your connection and try again.';
       } else if (e.toString().contains('permission')) {
         errorMessage = 'Permission denied. Please try again.';
       } else if (e.toString().contains('storage')) {
@@ -674,36 +720,30 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
 
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
     );
   }
 
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-      ),
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
     );
   }
 
   // Build images grid widget
   Widget _buildImagesGrid() {
     final allImages = <_ImageItem>[];
-    
+
     // Add existing images
     for (var url in _existingImageUrls) {
       allImages.add(_ImageItem(url: url, isExisting: true));
     }
-    
+
     // Add new selected images
     for (var file in _selectedImages) {
       allImages.add(_ImageItem(file: file, isExisting: false));
     }
-    
+
     if (allImages.isEmpty) {
       return Container(
         height: 100,
@@ -719,7 +759,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
         ),
       );
     }
-    
+
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -736,7 +776,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       },
     );
   }
-  
+
   Widget _buildImageItem(_ImageItem item, int index) {
     return Stack(
       children: [
@@ -755,8 +795,15 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                     );
                   },
                 )
+              : kIsWeb
+              ? Image.network(
+                  item.file!.path,
+                  width: double.infinity,
+                  height: double.infinity,
+                  fit: BoxFit.cover,
+                )
               : Image.file(
-                  item.file!,
+                  io.File(item.file!.path),
                   width: double.infinity,
                   height: double.infinity,
                   fit: BoxFit.cover,
@@ -780,18 +827,14 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.close,
-                color: Colors.white,
-                size: 16,
-              ),
+              child: const Icon(Icons.close, color: Colors.white, size: 16),
             ),
           ),
         ),
       ],
     );
   }
-  
+
   // Remove image (either existing or new)
   void _removeImage(int gridIndex, bool isExisting) {
     setState(() {
@@ -810,22 +853,22 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
       }
     });
   }
-  
+
   Widget _buildVideoPreview() {
     String? videoPath;
     bool isExisting = false;
-    
+
     if (_selectedVideo != null) {
       videoPath = _selectedVideo!.path;
     } else if (_existingVideoUrl != null) {
       videoPath = _existingVideoUrl;
       isExisting = true;
     }
-    
+
     if (videoPath == null) {
       return const SizedBox.shrink();
     }
-    
+
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
@@ -868,11 +911,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
                   color: Colors.red,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
-                  Icons.close,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 16),
               ),
             ),
           ),
@@ -902,26 +941,25 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
     }
   }
 
-
   // Check if there are any unsaved changes
   bool _hasUnsavedChanges() {
     if (_isEditing && widget.listingToEdit != null) {
       final listing = widget.listingToEdit!;
       return _titleController.text.trim() != listing.title ||
-             _descriptionController.text.trim() != listing.description ||
-             _priceController.text.trim() != listing.price.toStringAsFixed(0) ||
-             _locationController.text.trim() != listing.location ||
-             selectedCondition != listing.condition ||
-             _selectedImages.isNotEmpty ||
-             (_selectedVideo != null && _existingVideoUrl != listing.videoUrl);
+          _descriptionController.text.trim() != listing.description ||
+          _priceController.text.trim() != listing.price.toStringAsFixed(0) ||
+          _locationController.text.trim() != listing.location ||
+          selectedCondition != listing.condition ||
+          _selectedImages.isNotEmpty ||
+          (_selectedVideo != null && _existingVideoUrl != listing.videoUrl);
     }
-    
+
     return _titleController.text.isNotEmpty ||
-           _descriptionController.text.isNotEmpty ||
-           _priceController.text.isNotEmpty ||
-           _locationController.text.isNotEmpty ||
-           _selectedImages.isNotEmpty ||
-           _selectedVideo != null;
+        _descriptionController.text.isNotEmpty ||
+        _priceController.text.isNotEmpty ||
+        _locationController.text.isNotEmpty ||
+        _selectedImages.isNotEmpty ||
+        _selectedVideo != null;
   }
 
   // Handle close button press
@@ -953,9 +991,7 @@ class _ShipperCreateListingState extends State<ShipperCreateListing> {
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.red,
-              ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Discard'),
             ),
           ],

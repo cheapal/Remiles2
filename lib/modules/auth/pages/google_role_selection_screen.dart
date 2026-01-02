@@ -10,7 +10,7 @@ import '../../shipper_onboarding/shipper_onboarding_wrapper.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_4_main_page.dart';
 import '../../shipper_dashboard/pages/shipper_dashboard_1.dart';
 import '../../carrier_dashboard/views/dashboard/pages/carrier_dashboard_1.dart';
-import '../../carrier_dashboard/views/dashboard/pages/main_page.dart';
+import '../../carrier_dashboard/views/dashboard/pages/carrier_dashboard_main_page.dart';
 
 /// Role selection screen specifically for Google Sign-In flow
 /// User is already authenticated via Google, we just need to create their account in Firestore
@@ -27,10 +27,10 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
 
   Future<void> _handleRoleSelection(BuildContext context, String role) async {
     HapticFeedback.selectionClick();
-    
+
     final authProvider = context.read<AuthProvider>();
     final appStateProvider = context.read<AppStateProvider>();
-    
+
     // Get Firebase user directly from Firebase Auth if not available in AuthProvider
     // This handles cases where AuthProvider state might have been cleared
     var firebaseUser = authProvider.firebaseUser;
@@ -45,7 +45,9 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
 
     if (firebaseUser == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Authentication error. Please try signing in again.')),
+        const SnackBar(
+          content: Text('Authentication error. Please try signing in again.'),
+        ),
       );
       return;
     }
@@ -76,12 +78,13 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
       if (success) {
         appStateProvider.showSuccess();
         await Future.delayed(const Duration(milliseconds: 500));
-        
+
         if (context.mounted) {
           await _navigateBasedOnRole(context, authProvider);
         }
       } else {
-        final errorMsg = authProvider.errorMessage ?? 'Failed to create account';
+        final errorMsg =
+            authProvider.errorMessage ?? 'Failed to create account';
         debugPrint('Error creating account: $errorMsg');
         appStateProvider.showError(errorMsg);
         // Show detailed error to user
@@ -108,10 +111,13 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) async {
+  Future<void> _navigateBasedOnRole(
+    BuildContext context,
+    AuthProvider authProvider,
+  ) async {
     final userRole = authProvider.currentUser?.role;
     print('Google Role Selection: Navigating based on role: $userRole');
-    
+
     if (userRole == UserRole.shipper) {
       final shipper = authProvider.shipperUser;
       if (shipper != null && !shipper.isOnboardingComplete) {
@@ -124,10 +130,15 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
         }
       } else if (shipper != null) {
         // Check if dashboard steps are completed
-        print('Google Role Selection: Checking if dashboard steps are completed...');
-        final isDashboardComplete = await FirebaseService.isShipperDashboardComplete(shipper.uid);
-        print('Google Role Selection: Dashboard complete: $isDashboardComplete');
-        
+        print(
+          'Google Role Selection: Checking if dashboard steps are completed...',
+        );
+        final isDashboardComplete =
+            await FirebaseService.isShipperDashboardComplete(shipper.uid);
+        print(
+          'Google Role Selection: Dashboard complete: $isDashboardComplete',
+        );
+
         if (!isDashboardComplete) {
           print('Google Role Selection: Navigating to Shipper Dashboard 1');
           if (context.mounted) {
@@ -137,10 +148,14 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
             );
           }
         } else {
-          print('Google Role Selection: Navigating to Shipper Dashboard Main Page');
+          print(
+            'Google Role Selection: Navigating to Shipper Dashboard Main Page',
+          );
           if (context.mounted) {
             Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+              MaterialPageRoute(
+                builder: (_) => const ShipperDashboardMainPage(),
+              ),
               (route) => false,
             );
           }
@@ -149,19 +164,26 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
     } else if (userRole == UserRole.carrier) {
       final carrier = authProvider.carrierUser;
       if (carrier != null && !carrier.isOnboardingComplete) {
-      print('Google Role Selection: Navigating to Carrier Onboarding Wrapper');
-      if (context.mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-          (route) => false,
+        print(
+          'Google Role Selection: Navigating to Carrier Onboarding Wrapper',
         );
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
+            (route) => false,
+          );
         }
       } else if (carrier != null) {
         // Check if dashboard steps are completed
-        print('Google Role Selection: Checking if carrier dashboard steps are completed...');
-        final isDashboardComplete = await FirebaseService.isCarrierDashboardComplete(carrier.uid);
-        print('Google Role Selection: Carrier dashboard complete: $isDashboardComplete');
-        
+        print(
+          'Google Role Selection: Checking if carrier dashboard steps are completed...',
+        );
+        final isDashboardComplete =
+            await FirebaseService.isCarrierDashboardComplete(carrier.uid);
+        print(
+          'Google Role Selection: Carrier dashboard complete: $isDashboardComplete',
+        );
+
         if (!isDashboardComplete) {
           print('Google Role Selection: Navigating to Carrier Dashboard 1');
           if (context.mounted) {
@@ -174,7 +196,9 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
           print('Google Role Selection: Navigating to Carrier Main Page');
           if (context.mounted) {
             Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const MainPage()),
+              MaterialPageRoute(
+                builder: (_) => const CarrierDashboardMainPage(),
+              ),
               (route) => false,
             );
           }
@@ -190,7 +214,9 @@ class GoogleRoleSelectionScreen extends StatelessWidget {
     final double h = size.height;
 
     // Maintain Figma proportions: use the smaller scale so nothing overflows
-    final double scale = (w / _designW < h / _designH) ? (w / _designW) : (h / _designH);
+    final double scale = (w / _designW < h / _designH)
+        ? (w / _designW)
+        : (h / _designH);
 
     // Panel (rectangle_6) — Figma width is 376dp, full height
     final double panelW = sx(_designW * 1.12, scale);
@@ -354,10 +380,7 @@ class _RoleCard extends StatelessWidget {
                       duration: const Duration(milliseconds: 100),
                       curve: Curves.easeOut,
                       onTap: onTap,
-                      child: Image.asset(
-                        imageUrl,
-                        fit: BoxFit.contain,
-                      ),
+                      child: Image.asset(imageUrl, fit: BoxFit.contain),
                     ),
                   ),
                 ),
@@ -447,11 +470,7 @@ class __PressableScaleState extends State<_PressableScale> {
       onPointerDown: (_) => _setPressed(true),
       onPointerUp: (_) => _setPressed(false),
       onPointerCancel: (_) => _setPressed(false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: content,
-      ),
+      child: GestureDetector(onTap: widget.onTap, child: content),
     );
   }
 }
-

@@ -90,7 +90,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Sarnia, ON',
     'Timmins, ON',
     'Kenora, ON',
-    
+
     // British Columbia
     'Vancouver, BC',
     'Victoria, BC',
@@ -112,7 +112,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Fort St. John, BC',
     'Cranbrook, BC',
     'Penticton, BC',
-    
+
     // Quebec
     'Montreal, QC',
     'Quebec City, QC',
@@ -134,7 +134,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Dollard-des-Ormeaux, QC',
     'Blainville, QC',
     'Châteauguay, QC',
-    
+
     // Alberta
     'Calgary, AB',
     'Edmonton, AB',
@@ -156,7 +156,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Canmore, AB',
     'Strathmore, AB',
     'High River, AB',
-    
+
     // Manitoba
     'Winnipeg, MB',
     'Brandon, MB',
@@ -168,7 +168,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Morden, MB',
     'Flin Flon, MB',
     'Dauphin, MB',
-    
+
     // Saskatchewan
     'Saskatoon, SK',
     'Regina, SK',
@@ -180,7 +180,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Estevan, SK',
     'Weyburn, SK',
     'Cranbrook, SK',
-    
+
     // Nova Scotia
     'Halifax, NS',
     'Sydney, NS',
@@ -192,7 +192,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Amherst, NS',
     'Bridgewater, NS',
     'Yarmouth, NS',
-    
+
     // New Brunswick
     'Moncton, NB',
     'Saint John, NB',
@@ -204,7 +204,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Miramichi, NB',
     'Campbellton, NB',
     'Oromocto, NB',
-    
+
     // Newfoundland and Labrador
     'St. John\'s, NL',
     'Mount Pearl, NL',
@@ -216,28 +216,28 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     'Labrador City, NL',
     'Stephenville, NL',
     'Clarenville, NL',
-    
+
     // Prince Edward Island
     'Charlottetown, PE',
     'Summerside, PE',
     'Stratford, PE',
     'Cornwall, PE',
     'Montague, PE',
-    
+
     // Northwest Territories
     'Yellowknife, NT',
     'Hay River, NT',
     'Inuvik, NT',
     'Fort Smith, NT',
     'Behchokò, NT',
-    
+
     // Yukon
     'Whitehorse, YT',
     'Dawson City, YT',
     'Watson Lake, YT',
     'Haines Junction, YT',
     'Carmacks, YT',
-    
+
     // Nunavut
     'Iqaluit, NU',
     'Rankin Inlet, NU',
@@ -282,171 +282,194 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     _loadPreferences();
   }
 
-
-
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final screenW = media.size.width;
+    final bool isWide = screenW >= 900;
+
     return Scaffold(
-          backgroundColor: Colors.white,
-          body: SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
-                  TopNavigationBar(context),
-                  Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    const SizedBox(height: 40),
-                    
-                    /// Title
-                    const Text(
-                      "My Preferences",
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+      backgroundColor: Colors.white,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            TopNavigationBar(context),
+            Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isWide ? 100.0 : 20.0,
+                  vertical: 20,
+                ),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 760),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
 
-                    /// Section: Vehicle Types
-                    const Text(
-                      "Vehicle Types",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildMultiSelectDropdown(
-                      "Select Vehicle Types",
-                      _selectedVehicleTypes,
-                      _vehicleTypes,
-                      (selected) {
-                        setState(() {
-                          _selectedVehicleTypes = selected;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 28),
-
-                    /// Section: Service Areas
-                    const Text(
-                      "Service Areas",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildMultiSelectDropdown(
-                      "Select Service Areas",
-                      _selectedServiceAreas,
-                      _serviceAreaOptions,
-                      (selected) {
-                        setState(() {
-                          _selectedServiceAreas = selected;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 28),
-
-                    /// Section: Load Preferences
-                    const Text(
-                      "Load Preferences",
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildMultiSelectDropdown(
-                      "Select Preferred Load Types",
-                      _selectedPreferredLoadTypes,
-                      _loadTypes,
-                      (selected) {
-                        print('Load types selection changed: $selected');
-                        setState(() {
-                          _selectedPreferredLoadTypes = selected;
-                        });
-                        print('Load types state updated: $_selectedPreferredLoadTypes');
-                      },
-                    ),
-                    const SizedBox(height: 20),
-
-                    /// Capacity & Distance
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildDropdownField(
-                            "Max Weight",
-                            _selectedMaxWeight,
-                            _maxWeightOptions,
-                            (value) {
-                              setState(() {
-                                _selectedMaxWeight = value;
-                              });
-                            },
-                          ),
+                      /// Title
+                      const Text(
+                        "My Preferences",
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Roboto',
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _buildDropdownField(
-                            "Max Distance",
-                            _selectedMaxDistance,
-                            _maxDistanceOptions,
-                            (value) {
-                              print('Max distance selection changed: $value');
-                              setState(() {
-                                _selectedMaxDistance = value;
-                              });
-                              print('Max distance state updated: $_selectedMaxDistance');
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 40),
+                      ),
+                      const SizedBox(height: 24),
 
-                    /// Save Button
-                    Center(
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _isSaving 
-                              ? const Color(0xFF2E5D3B).withOpacity(0.7)
-                              : const Color(0xFF2E5D3B),
-                          padding: const EdgeInsets.symmetric(
-                              vertical: 16, horizontal: 60),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
-                          ),
+                      /// Section: Vehicle Types
+                      const Text(
+                        "Vehicle Types",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
                         ),
-                        onPressed: _isSaving ? null : _savePreferences,
-                        child: _isSaving
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Text(
-                                "Save",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMultiSelectDropdown(
+                        "Select Vehicle Types",
+                        _selectedVehicleTypes,
+                        _vehicleTypes,
+                        (selected) {
+                          setState(() {
+                            _selectedVehicleTypes = selected;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 28),
+
+                      /// Section: Service Areas
+                      const Text(
+                        "Service Areas",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMultiSelectDropdown(
+                        "Select Service Areas",
+                        _selectedServiceAreas,
+                        _serviceAreaOptions,
+                        (selected) {
+                          setState(() {
+                            _selectedServiceAreas = selected;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 28),
+
+                      /// Section: Load Preferences
+                      const Text(
+                        "Load Preferences",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMultiSelectDropdown(
+                        "Select Preferred Load Types",
+                        _selectedPreferredLoadTypes,
+                        _loadTypes,
+                        (selected) {
+                          print('Load types selection changed: $selected');
+                          setState(() {
+                            _selectedPreferredLoadTypes = selected;
+                          });
+                          print(
+                            'Load types state updated: $_selectedPreferredLoadTypes',
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      /// Capacity & Distance
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDropdownField(
+                              "Max Weight",
+                              _selectedMaxWeight,
+                              _maxWeightOptions,
+                              (value) {
+                                setState(() {
+                                  _selectedMaxWeight = value;
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildDropdownField(
+                              "Max Distance",
+                              _selectedMaxDistance,
+                              _maxDistanceOptions,
+                              (value) {
+                                print('Max distance selection changed: $value');
+                                setState(() {
+                                  _selectedMaxDistance = value;
+                                });
+                                print(
+                                  'Max distance state updated: $_selectedMaxDistance',
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 40),
+
+                      /// Save Button
+                      Center(
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _isSaving
+                                  ? const Color(0xFF2E5D3B).withOpacity(0.7)
+                                  : const Color(0xFF2E5D3B),
+                              padding: const EdgeInsets.symmetric(vertical: 18),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
                               ),
+                              elevation: 4,
+                              shadowColor: const Color(
+                                0xFF2E5D3B,
+                              ).withOpacity(0.3),
+                            ),
+                            onPressed: _isSaving ? null : _savePreferences,
+                            child: _isSaving
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : const Text(
+                                    "Save Preferences",
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w800,
+                                      color: Colors.white,
+                                      fontFamily: 'Roboto',
+                                    ),
+                                  ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 40),
+                    ],
+                  ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -467,7 +490,14 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
         ),
         const SizedBox(height: 6),
         GestureDetector(
-          onTap: _isSaving ? null : () => _showMultiSelectDialog(label, selectedItems, options, onChanged),
+          onTap: _isSaving
+              ? null
+              : () => _showMultiSelectDialog(
+                  label,
+                  selectedItems,
+                  options,
+                  onChanged,
+                ),
           child: Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -479,21 +509,20 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
               children: [
                 Expanded(
                   child: Text(
-                    selectedItems.isEmpty 
+                    selectedItems.isEmpty
                         ? 'Select $label'
                         : selectedItems.length == 1
-                            ? selectedItems.first
-                            : '${selectedItems.length} items selected',
+                        ? selectedItems.first
+                        : '${selectedItems.length} items selected',
                     style: TextStyle(
-                      color: selectedItems.isEmpty ? Colors.grey.shade600 : Colors.black,
+                      color: selectedItems.isEmpty
+                          ? Colors.grey.shade600
+                          : Colors.black,
                       fontSize: 14,
                     ),
                   ),
                 ),
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: Colors.grey.shade600,
-                ),
+                Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
               ],
             ),
           ),
@@ -505,11 +534,16 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
             runSpacing: 4,
             children: selectedItems.map((item) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF2E5D3B).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF2E5D3B).withOpacity(0.3)),
+                  border: Border.all(
+                    color: const Color(0xFF2E5D3B).withOpacity(0.3),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -524,11 +558,15 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
                     ),
                     const SizedBox(width: 4),
                     GestureDetector(
-                      onTap: _isSaving ? null : () {
-                        List<String> newSelection = List.from(selectedItems);
-                        newSelection.remove(item);
-                        onChanged(newSelection);
-                      },
+                      onTap: _isSaving
+                          ? null
+                          : () {
+                              List<String> newSelection = List.from(
+                                selectedItems,
+                              );
+                              newSelection.remove(item);
+                              onChanged(newSelection);
+                            },
                       child: Icon(
                         Icons.close,
                         size: 16,
@@ -552,7 +590,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     Function(List<String>) onChanged,
   ) {
     List<String> tempSelected = List.from(selectedItems);
-    
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -568,12 +606,9 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
                   itemBuilder: (context, index) {
                     final option = options[index];
                     final isSelected = tempSelected.contains(option);
-                    
+
                     return CheckboxListTile(
-                      title: Text(
-                        option,
-                        style: const TextStyle(fontSize: 14),
-                      ),
+                      title: Text(option, style: const TextStyle(fontSize: 14)),
                       value: isSelected,
                       onChanged: (bool? value) {
                         setState(() {
@@ -595,7 +630,9 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
                 ),
                 TextButton(
                   onPressed: () {
-                    print('Multi-select dialog: Final selection: $tempSelected');
+                    print(
+                      'Multi-select dialog: Final selection: $tempSelected',
+                    );
                     onChanged(tempSelected);
                     Navigator.of(context).pop();
                   },
@@ -616,10 +653,11 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     Function(String?) onChanged,
   ) {
     // Ensure selectedValue is valid
-    final validSelectedValue = (selectedValue != null && options.contains(selectedValue)) 
-        ? selectedValue 
+    final validSelectedValue =
+        (selectedValue != null && options.contains(selectedValue))
+        ? selectedValue
         : null;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -640,10 +678,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
               value: validSelectedValue,
               hint: Text(
                 'Select $label',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
               ),
               isExpanded: true,
               items: options.map((String option) {
@@ -651,10 +686,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
                   value: option,
                   child: Text(
                     option,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.black,
-                    ),
+                    style: const TextStyle(fontSize: 14, color: Colors.black),
                   ),
                 );
               }).toList(),
@@ -667,7 +699,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
   }
 
   // ======== Methods ========
-  
+
   String _findClosestWeightOption(int weight) {
     try {
       // Parse all weight options to get their numeric values
@@ -684,13 +716,13 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
         }
         return 0;
       }).toList();
-      
+
       // Find the closest option
       if (weightValues.isEmpty) return _maxWeightOptions.first;
-      
+
       int closestIndex = 0;
       int minDifference = (weight - weightValues[0]).abs();
-      
+
       for (int i = 1; i < weightValues.length; i++) {
         final difference = (weight - weightValues[i]).abs();
         if (difference < minDifference) {
@@ -698,20 +730,21 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
           closestIndex = i;
         }
       }
-      
+
       return _maxWeightOptions[closestIndex];
     } catch (e) {
       print('Error in _findClosestWeightOption: $e');
       return _maxWeightOptions.first; // Return first option as fallback
     }
   }
-  
+
   // Convert distance string to numeric value for storage
   // "Nationwide" -> 999999.0, "50 miles" -> 50.0
   double? _parseDistanceToNumber(String? distanceString) {
     if (distanceString == null || distanceString.isEmpty) return null;
-    if (distanceString == 'Nationwide') return 999999.0; // 999999 represents unlimited/nationwide
-    
+    if (distanceString == 'Nationwide')
+      return 999999.0; // 999999 represents unlimited/nationwide
+
     try {
       // Extract number from strings like "50 miles", "1,000 miles"
       final match = RegExp(r'(\d{1,3}(?:,\d{3})*)').firstMatch(distanceString);
@@ -727,12 +760,12 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     }
     return null;
   }
-  
+
   // Convert numeric distance value back to display string
   // null or 999999 -> "Nationwide", 50.0 -> "50 miles"
   String? _formatDistanceFromNumber(dynamic distanceValue) {
     if (distanceValue == null) return 'Nationwide';
-    
+
     // If it's already a string, check if it's in our options
     if (distanceValue is String) {
       if (_maxDistanceOptions.contains(distanceValue)) {
@@ -743,34 +776,32 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
         return distanceValue;
       }
     }
-    
+
     // If it's a number, convert to string format
     if (distanceValue is num) {
       final distance = distanceValue.toDouble();
-      
+
       // Check if it's the "Nationwide" value (999999 or very large numbers)
       if (distance >= 999999) {
         return 'Nationwide';
       }
-      
+
       // Format with comma for thousands
-      final distanceString = '${distance.toStringAsFixed(0).replaceAllMapped(
-        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
-        (Match m) => '${m[1]},'
-      )} miles';
-      
+      final distanceString =
+          '${distance.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} miles';
+
       // Check if this distance exists in our options
       if (_maxDistanceOptions.contains(distanceString)) {
         return distanceString;
       }
-      
+
       // Find the closest match
       return _findClosestDistanceOption(distance.toInt());
     }
-    
+
     return null;
   }
-  
+
   String _findClosestDistanceOption(int distance) {
     try {
       // Parse all distance options to get their numeric values
@@ -787,13 +818,13 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
         }
         return 0;
       }).toList();
-      
+
       // Find the closest option
       if (distanceValues.isEmpty) return _maxDistanceOptions.first;
-      
+
       int closestIndex = 0;
       int minDifference = (distance - distanceValues[0]).abs();
-      
+
       for (int i = 1; i < distanceValues.length; i++) {
         final difference = (distance - distanceValues[i]).abs();
         if (difference < minDifference) {
@@ -801,39 +832,42 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
           closestIndex = i;
         }
       }
-      
+
       return _maxDistanceOptions[closestIndex];
     } catch (e) {
       print('Error in _findClosestDistanceOption: $e');
       return _maxDistanceOptions.first; // Return first option as fallback
     }
   }
-  
+
   Future<void> _loadPreferences() async {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         print('=== LOAD PREFERENCES DEBUG ===');
         print('Vehicle Types: ${carrier.vehicleTypes}');
         print('Service Areas: ${carrier.serviceAreas}');
         print('Carrier Preferences: ${carrier.carrierPreferences}');
         print('==============================');
-        
+
         setState(() {
           _selectedVehicleTypes = carrier.vehicleTypes ?? [];
           _selectedServiceAreas = carrier.serviceAreas ?? [];
-          _selectedPreferredLoadTypes = carrier.carrierPreferences?['preferredLoadTypes'] != null
-              ? List<String>.from(carrier.carrierPreferences!['preferredLoadTypes'])
+          _selectedPreferredLoadTypes =
+              carrier.carrierPreferences?['preferredLoadTypes'] != null
+              ? List<String>.from(
+                  carrier.carrierPreferences!['preferredLoadTypes'],
+                )
               : [];
-          
+
           // Convert maxWeight back to string format for display
           if (carrier.carrierPreferences?['maxWeight'] != null) {
             try {
               final weightValue = carrier.carrierPreferences!['maxWeight'];
               num? weight;
-              
+
               // Safely convert to number
               if (weightValue is num) {
                 weight = weightValue;
@@ -844,31 +878,31 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
                   weight = double.tryParse(cleaned);
                 }
               }
-              
+
               if (weight != null) {
                 print('Raw weight from DB: $weight');
-                
+
                 // Check if it's the "No Limit" value
                 if (weight >= 999999) {
                   _selectedMaxWeight = 'No Limit';
                   print('Weight is "No Limit"');
                 } else {
                   // Format with comma for thousands
-                  final weightString = '${weight.toStringAsFixed(0).replaceAllMapped(
-                    RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), 
-                    (Match m) => '${m[1]},'
-                  )} lbs';
-                  
+                  final weightString =
+                      '${weight.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} lbs';
+
                   print('Formatted weight string: $weightString');
                   print('Available options: $_maxWeightOptions');
-                  
+
                   // Check if this weight exists in our options
                   if (_maxWeightOptions.contains(weightString)) {
                     _selectedMaxWeight = weightString;
                     print('Exact match found: $weightString');
                   } else {
                     // Find the closest match from our options
-                    _selectedMaxWeight = _findClosestWeightOption(weight.toInt());
+                    _selectedMaxWeight = _findClosestWeightOption(
+                      weight.toInt(),
+                    );
                     print('Using closest match: $_selectedMaxWeight');
                   }
                 }
@@ -879,7 +913,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
               print('Error loading maxWeight: $e');
             }
           }
-          
+
           // Convert maxDistance back to string format for display
           if (carrier.carrierPreferences?['maxDistance'] != null) {
             try {
@@ -896,7 +930,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
           }
           print('Max Distance: $_selectedMaxDistance');
           print('Preferred Load Types: $_selectedPreferredLoadTypes');
-          
+
           print('=== UI STATE AFTER LOAD ===');
           print('UI Vehicle Types: $_selectedVehicleTypes');
           print('UI Service Areas: $_selectedServiceAreas');
@@ -913,7 +947,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
 
   Future<void> _savePreferences() async {
     if (_isSaving) return;
-    
+
     // Debug: Print current state before saving
     print('=== SAVE PREFERENCES DEBUG ===');
     print('Vehicle Types: $_selectedVehicleTypes');
@@ -922,18 +956,21 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
     print('Max Weight: $_selectedMaxWeight');
     print('Max Distance: $_selectedMaxDistance');
     print('==============================');
-    
+
     // Validate that at least some preferences are selected
     if (_selectedVehicleTypes.isEmpty && _selectedServiceAreas.isEmpty) {
-      _showAlertDialog(context, 'Please select at least one vehicle type and service area before saving.');
+      _showAlertDialog(
+        context,
+        'Please select at least one vehicle type and service area before saving.',
+      );
       return;
     }
-    
+
     setState(() => _isSaving = true);
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         // Parse maxWeight safely
         double? parsedMaxWeight;
@@ -944,11 +981,16 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
           } else {
             try {
               // Remove all non-digit and non-decimal characters
-              final cleanedWeight = _selectedMaxWeight!.replaceAll(RegExp(r'[^\d.]'), '');
+              final cleanedWeight = _selectedMaxWeight!.replaceAll(
+                RegExp(r'[^\d.]'),
+                '',
+              );
               if (cleanedWeight.isNotEmpty) {
                 parsedMaxWeight = double.tryParse(cleanedWeight);
                 if (parsedMaxWeight == null) {
-                  print('Warning: Failed to parse maxWeight: $_selectedMaxWeight');
+                  print(
+                    'Warning: Failed to parse maxWeight: $_selectedMaxWeight',
+                  );
                 }
               }
             } catch (e) {
@@ -956,7 +998,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
             }
           }
         }
-        
+
         // Parse maxDistance safely
         double? parsedMaxDistance;
         try {
@@ -964,7 +1006,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
         } catch (e) {
           print('Error parsing maxDistance: $_selectedMaxDistance, error: $e');
         }
-        
+
         // Prepare preferences data
         final preferencesData = {
           'preferredLoadTypes': _selectedPreferredLoadTypes,
@@ -972,7 +1014,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
           'maxDistance': parsedMaxDistance,
           'updatedAt': DateTime.now().toIso8601String(),
         };
-        
+
         print('Saving preferences: $preferencesData');
         print('Selected Preferred Load Types: $_selectedPreferredLoadTypes');
         print('Selected Max Distance: $_selectedMaxDistance');
@@ -986,16 +1028,18 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         // Refresh the carrier data in AuthProvider
         await authProvider.refreshUser();
-        
+
         // Reload preferences to ensure UI is updated
         await _loadPreferences();
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1004,7 +1048,7 @@ class _CarrierPreferencesPageState extends State<CarrierPreferencesPage> {
               duration: Duration(seconds: 3),
             ),
           );
-          
+
           // Navigate back
           Navigator.pop(context);
         }

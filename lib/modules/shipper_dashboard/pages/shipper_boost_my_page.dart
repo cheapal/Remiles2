@@ -10,6 +10,9 @@ import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
 import '../../../core/stripe_service.dart';
 
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 class ShipperBoostMyPage extends StatefulWidget {
   const ShipperBoostMyPage({super.key});
 
@@ -19,7 +22,8 @@ class ShipperBoostMyPage extends StatefulWidget {
 
 class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
   String selectedPlan = ""; // Plan user is clicking on to select
-  String activePlan = ""; // Plan user is actually subscribed to (from Firestore)
+  String activePlan =
+      ""; // Plan user is actually subscribed to (from Firestore)
   bool _isLoading = false;
   int _usedPosts = 0;
   int _postLimit = 10; // Default limit
@@ -36,11 +40,13 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     try {
       final authProvider = context.read<AuthProvider>();
       final shipper = authProvider.shipperUser;
-      
+
       if (shipper != null) {
         // Get shipper document directly to access subscriptionPlan field
-        final shipperDoc = await FirebaseService.shippers.doc(shipper.uid).get();
-        
+        final shipperDoc = await FirebaseService.shippers
+            .doc(shipper.uid)
+            .get();
+
         Map<String, dynamic>? currentData;
         if (shipperDoc.exists) {
           currentData = shipperDoc.data() as Map<String, dynamic>?;
@@ -55,7 +61,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   selectedPlan = planName;
                 }
               });
-              
+
               // Load renewal date for active plan
               if (currentData['renewalDate'] != null) {
                 try {
@@ -72,7 +78,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
               } else {
                 setState(() {
                   _renewalDate = null;
-              });
+                });
               }
             } else {
               // No plan subscribed, set to empty
@@ -81,38 +87,43 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                 _renewalDate = null;
               });
             }
-            
+
             // Load post limit from subscription
             final loadPostingsLimit = currentData['loadPostingsLimit'];
             if (loadPostingsLimit != null) {
               setState(() {
-                _postLimit = loadPostingsLimit is int ? loadPostingsLimit : int.tryParse(loadPostingsLimit.toString()) ?? 10;
+                _postLimit = loadPostingsLimit is int
+                    ? loadPostingsLimit
+                    : int.tryParse(loadPostingsLimit.toString()) ?? 10;
               });
             }
           }
         }
-        
+
         // Load posts used this period (reset on subscription/renewal/upgrade)
         // If not available, fall back to total count
         int usedPosts = 0;
         if (currentData != null && currentData['postsUsedThisPeriod'] != null) {
-          usedPosts = currentData['postsUsedThisPeriod'] is int 
-              ? currentData['postsUsedThisPeriod'] 
-              : int.tryParse(currentData['postsUsedThisPeriod'].toString()) ?? 0;
+          usedPosts = currentData['postsUsedThisPeriod'] is int
+              ? currentData['postsUsedThisPeriod']
+              : int.tryParse(currentData['postsUsedThisPeriod'].toString()) ??
+                    0;
         } else {
           // Fallback to total count if postsUsedThisPeriod not set
-        final loadStats = await FirebaseService.getShipperLoadStats(shipper.uid);
+          final loadStats = await FirebaseService.getShipperLoadStats(
+            shipper.uid,
+          );
           usedPosts = loadStats['total'] ?? 0;
         }
-        
+
         // Load subscription history
         final history = currentData?['subscriptionHistory'] as List<dynamic>?;
         final historyList = history != null
             ? List<Map<String, dynamic>>.from(
-                history.map((e) => e as Map<String, dynamic>)
+                history.map((e) => e as Map<String, dynamic>),
               )
             : <Map<String, dynamic>>[];
-        
+
         setState(() {
           _usedPosts = usedPosts;
           _subscriptionHistory = historyList;
@@ -125,7 +136,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
 
   Future<void> _savePlan() async {
     if (_isLoading) return;
-    
+
     // Check if a plan is selected
     if (selectedPlan.isEmpty) {
       if (mounted) {
@@ -201,7 +212,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           planName: selectedPlan,
           shipper: shipper,
         );
-        
+
         if (!paymentConfirmed) {
           setState(() => _isLoading = false);
           return; // Payment was canceled or failed
@@ -213,26 +224,28 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
       final subscriptionStartDate = now;
       // Monthly subscription - add 1 month for end date (handles year overflow)
       final subscriptionEndDate = DateTime(now.year, now.month + 1, now.day);
-      final renewalDate = subscriptionEndDate; // Renewal is same as end date for monthly
-      
+      final renewalDate =
+          subscriptionEndDate; // Renewal is same as end date for monthly
+
       // Add subscription dates
-      planData['subscriptionStartDate'] = subscriptionStartDate.toIso8601String();
+      planData['subscriptionStartDate'] = subscriptionStartDate
+          .toIso8601String();
       planData['subscriptionEndDate'] = subscriptionEndDate.toIso8601String();
       planData['renewalDate'] = renewalDate.toIso8601String();
       planData['subscriptionUpdatedAt'] = now.toIso8601String();
       planData['paymentStatus'] = 'paid';
       planData['paymentDate'] = now.toIso8601String();
-      
+
       // Reset posts counter for new subscription period
       planData['postsUsedThisPeriod'] = 0;
 
       // Get current subscription data to save to history
       final shipperDoc = await FirebaseService.shippers.doc(shipper.uid).get();
       final currentData = shipperDoc.data() as Map<String, dynamic>?;
-      
+
       // Prepare history entry from current subscription (if exists and different)
       Map<String, dynamic>? historyEntry;
-      if (currentData != null && 
+      if (currentData != null &&
           currentData['subscriptionPlan'] != null &&
           currentData['subscriptionPlan'] != selectedPlan) {
         // Only save to history if it's different from the new plan
@@ -243,7 +256,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           'boostCredits': currentData['boostCredits'] ?? 0,
           'subscriptionType': currentData['subscriptionType'] ?? 'monthly',
           'subscriptionStartDate': currentData['subscriptionStartDate'],
-          'subscriptionEndDate': DateTime.now().toIso8601String(), // When it ended
+          'subscriptionEndDate': DateTime.now()
+              .toIso8601String(), // When it ended
           'changedAt': DateTime.now().toIso8601String(),
           'reason': 'plan_change', // Reason for change
         };
@@ -251,24 +265,26 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
 
       // Update shipper document with new plan and add to history
       final updates = Map<String, dynamic>.from(planData);
-      
+
       if (historyEntry != null) {
         // Get existing history or initialize empty array
-        final existingHistory = currentData?['subscriptionHistory'] as List<dynamic>? ?? [];
-        
+        final existingHistory =
+            currentData?['subscriptionHistory'] as List<dynamic>? ?? [];
+
         // Add current subscription to history array (avoid duplicates)
         final updatedHistory = List<Map<String, dynamic>>.from(
-          existingHistory.map((e) => e as Map<String, dynamic>)
+          existingHistory.map((e) => e as Map<String, dynamic>),
         );
         updatedHistory.add(historyEntry);
-        
+
         // Store updated history
         updates['subscriptionHistory'] = updatedHistory;
-      } else if (currentData != null && currentData['subscriptionHistory'] == null) {
+      } else if (currentData != null &&
+          currentData['subscriptionHistory'] == null) {
         // Initialize empty history array if it doesn't exist
         updates['subscriptionHistory'] = [];
       }
-      
+
       await FirebaseService.updateShipper(shipper.uid, updates);
 
       // Update activePlan immediately after successful save
@@ -284,10 +300,10 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
             duration: const Duration(seconds: 2),
           ),
         );
-        
+
         // Reload plan data to update remaining posts
         await _loadCurrentPlan();
-        
+
         // Pop after a short delay
         Future.delayed(const Duration(milliseconds: 500), () {
           if (mounted) {
@@ -323,133 +339,153 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           Expanded(
             child: SingleChildScrollView(
               child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 40),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                Text(
-                  'Boost My Load',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Colors.black, // ✅ Black text
-                    fontWeight: FontWeight.bold,
-                  ),
+                    const SizedBox(height: 40),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Boost My Load',
+                          style: Theme.of(context).textTheme.headlineMedium
+                              ?.copyWith(
+                                color: Colors.black, // ✅ Black text
+                                fontWeight: FontWeight.bold,
+                              ),
+                        ),
+                        IconButton(
+                          onPressed: _showSubscriptionHistory,
+                          icon: const Icon(
+                            Icons.history,
+                            color: Color(0xFF195529),
+                            size: 28,
+                          ),
+                          tooltip: 'View Subscription History',
+                        ),
+                      ],
                     ),
-                    IconButton(
-                      onPressed: _showSubscriptionHistory,
-                      icon: const Icon(
-                        Icons.history,
-                        color: Color(0xFF195529),
-                        size: 28,
+                    const SizedBox(height: 20),
+
+                    _remainingPostsCard(),
+                    const SizedBox(height: 20),
+
+                    // Starter Bundle
+                    _planCard(
+                      title: "Starter Bundle",
+                      price: "\$99/month",
+                      details: ["10 load postings + 1 Boost"],
+                      renewal:
+                          activePlan == "Starter Bundle" && _renewalDate != null
+                          ? _formatRenewalDate(_renewalDate!)
+                          : null,
+                      selected: selectedPlan == "Starter Bundle",
+                      isActive: activePlan == "Starter Bundle",
+                      onTap: () {
+                        setState(() {
+                          selectedPlan = "Starter Bundle";
+                          _postLimit = 10;
+                        });
+                      },
+                      onCancel: activePlan == "Starter Bundle"
+                          ? _showCancelPlanDialog
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Pro Bundle
+                    _planCard(
+                      title: "Pro Bundle",
+                      price: "\$249/month",
+                      details: ["25 Load Postings + 5 Boost Credits"],
+                      tag: "Best Value",
+                      renewal:
+                          activePlan == "Pro Bundle" && _renewalDate != null
+                          ? _formatRenewalDate(_renewalDate!)
+                          : null,
+                      selected: selectedPlan == "Pro Bundle",
+                      isActive: activePlan == "Pro Bundle",
+                      onTap: () {
+                        setState(() {
+                          selectedPlan = "Pro Bundle";
+                          _postLimit = 25;
+                        });
+                      },
+                      onCancel: activePlan == "Pro Bundle"
+                          ? _showCancelPlanDialog
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Enterprise Bundle
+                    _planCard(
+                      title: "Enterprise Bundle",
+                      price: "\$449/month",
+                      details: ["Unlimited Load Postings + 10 Boost Credits"],
+                      renewal:
+                          activePlan == "Enterprise Bundle" &&
+                              _renewalDate != null
+                          ? _formatRenewalDate(_renewalDate!)
+                          : null,
+                      selected: selectedPlan == "Enterprise Bundle",
+                      isActive: activePlan == "Enterprise Bundle",
+                      onTap: () {
+                        setState(() {
+                          selectedPlan = "Enterprise Bundle";
+                          _postLimit = -1; // Unlimited
+                        });
+                      },
+                      onCancel: activePlan == "Enterprise Bundle"
+                          ? _showCancelPlanDialog
+                          : null,
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Upgrade Button
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor:
+                            (_isLoading ||
+                                (activePlan.isNotEmpty &&
+                                    selectedPlan == activePlan))
+                            ? Colors.grey
+                            : Colors.green,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                       ),
-                      tooltip: 'View Subscription History',
+                      onPressed:
+                          (_isLoading ||
+                              (activePlan.isNotEmpty &&
+                                  selectedPlan == activePlan))
+                          ? null
+                          : _savePlan,
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : Text(
+                              activePlan.isNotEmpty &&
+                                      selectedPlan == activePlan
+                                  ? "This is your active plan"
+                                  : "Upgrade My Plan",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 20),
-          
-                _remainingPostsCard(),
-                const SizedBox(height: 20),
-          
-                // Starter Bundle
-                _planCard(
-                  title: "Starter Bundle",
-                  price: "\$99/month",
-                  details: ["10 load postings + 1 Boost"],
-                  renewal: activePlan == "Starter Bundle" && _renewalDate != null
-                      ? _formatRenewalDate(_renewalDate!)
-                      : null,
-                  selected: selectedPlan == "Starter Bundle",
-                  isActive: activePlan == "Starter Bundle",
-                  onTap: () {
-                    setState(() {
-                      selectedPlan = "Starter Bundle";
-                      _postLimit = 10;
-                    });
-                  },
-                  onCancel: activePlan == "Starter Bundle" ? _showCancelPlanDialog : null,
-                ),
-                const SizedBox(height: 16),
-          
-                // Pro Bundle
-                _planCard(
-                  title: "Pro Bundle",
-                  price: "\$249/month",
-                  details: ["25 Load Postings + 5 Boost Credits"],
-                  tag: "Best Value",
-                  renewal: activePlan == "Pro Bundle" && _renewalDate != null
-                      ? _formatRenewalDate(_renewalDate!)
-                      : null,
-                  selected: selectedPlan == "Pro Bundle",
-                  isActive: activePlan == "Pro Bundle",
-                  onTap: () {
-                    setState(() {
-                      selectedPlan = "Pro Bundle";
-                      _postLimit = 25;
-                    });
-                  },
-                  onCancel: activePlan == "Pro Bundle" ? _showCancelPlanDialog : null,
-                ),
-                const SizedBox(height: 16),
-          
-                // Enterprise Bundle
-                _planCard(
-                  title: "Enterprise Bundle",
-                  price: "\$449/month",
-                  details: ["Unlimited Load Postings + 10 Boost Credits"],
-                  renewal: activePlan == "Enterprise Bundle" && _renewalDate != null
-                      ? _formatRenewalDate(_renewalDate!)
-                      : null,
-                  selected: selectedPlan == "Enterprise Bundle",
-                  isActive: activePlan == "Enterprise Bundle",
-                  onTap: () {
-                    setState(() {
-                      selectedPlan = "Enterprise Bundle";
-                      _postLimit = -1; // Unlimited
-                    });
-                  },
-                  onCancel: activePlan == "Enterprise Bundle" ? _showCancelPlanDialog : null,
-                ),
-                const SizedBox(height: 30),
-          
-                // Upgrade Button
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: (_isLoading || (activePlan.isNotEmpty && selectedPlan == activePlan))
-                        ? Colors.grey
-                        : Colors.green,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: (_isLoading || (activePlan.isNotEmpty && selectedPlan == activePlan))
-                      ? null
-                      : _savePlan,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : Text(
-                    activePlan.isNotEmpty && selectedPlan == activePlan
-                        ? "This is your active plan"
-                        : "Upgrade My Plan",
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
                 ),
               ),
             ),
@@ -462,37 +498,41 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
   Future<void> _showSubscriptionHistory() async {
     final authProvider = context.read<AuthProvider>();
     final shipper = authProvider.shipperUser;
-    
+
     // Reload fresh data from Firestore to ensure history is up to date
     Map<String, dynamic>? currentSubscription;
     List<Map<String, dynamic>> subscriptionHistory = [];
-    
+
     if (shipper != null) {
       try {
-        final shipperDoc = await FirebaseService.shippers.doc(shipper.uid).get();
+        final shipperDoc = await FirebaseService.shippers
+            .doc(shipper.uid)
+            .get();
         if (shipperDoc.exists) {
           final data = shipperDoc.data() as Map<String, dynamic>?;
           if (data != null) {
             // Get current active subscription
             if (data['subscriptionPlan'] != null) {
-            currentSubscription = {
-              'subscriptionPlan': data['subscriptionPlan'],
-                'subscriptionPrice': data['subscriptionPrice'] ?? _getPlanPrice(activePlan),
-              'loadPostingsLimit': data['loadPostingsLimit'] ?? _postLimit,
-                'boostCredits': data['boostCredits'] ?? _getPlanBoostCredits(activePlan),
-              'subscriptionType': data['subscriptionType'] ?? 'monthly',
-              'subscriptionStartDate': data['subscriptionStartDate'],
+              currentSubscription = {
+                'subscriptionPlan': data['subscriptionPlan'],
+                'subscriptionPrice':
+                    data['subscriptionPrice'] ?? _getPlanPrice(activePlan),
+                'loadPostingsLimit': data['loadPostingsLimit'] ?? _postLimit,
+                'boostCredits':
+                    data['boostCredits'] ?? _getPlanBoostCredits(activePlan),
+                'subscriptionType': data['subscriptionType'] ?? 'monthly',
+                'subscriptionStartDate': data['subscriptionStartDate'],
                 'subscriptionEndDate': data['subscriptionEndDate'],
                 'renewalDate': data['renewalDate'],
-              'status': 'active',
-            };
+                'status': 'active',
+              };
             }
-            
+
             // Get fresh subscription history from Firestore
             final history = data['subscriptionHistory'] as List<dynamic>?;
             if (history != null) {
               subscriptionHistory = List<Map<String, dynamic>>.from(
-                history.map((e) => e as Map<String, dynamic>)
+                history.map((e) => e as Map<String, dynamic>),
               );
             }
           }
@@ -501,14 +541,14 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
         debugPrint('Error loading subscription history: $e');
       }
     }
-    
+
     // Combine current with history (newest first)
     final allSubscriptions = <Map<String, dynamic>>[];
     if (currentSubscription != null) {
       allSubscriptions.add(currentSubscription);
     }
     allSubscriptions.addAll(subscriptionHistory.reversed);
-    
+
     // Navigate to full screen
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -523,10 +563,10 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
   Widget _remainingPostsCard() {
     // Calculate remaining posts
     final remaining = _postLimit == -1 ? -1 : (_postLimit - _usedPosts);
-    final displayText = _postLimit == -1 
-        ? "$_usedPosts/Unlimited" 
+    final displayText = _postLimit == -1
+        ? "$_usedPosts/Unlimited"
         : "$_usedPosts/$_postLimit";
-    
+
     return Container(
       height: 110, // Fixed height to prevent UI shifts
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -579,7 +619,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     String? renewal,
     String? tag,
     bool selected = false,
-    bool isActive = false, // True only if this is the actual active subscription
+    bool isActive =
+        false, // True only if this is the actual active subscription
     required VoidCallback onTap,
     VoidCallback? onCancel, // Cancel subscription callback
   }) {
@@ -591,14 +632,22 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isActive 
-              ? const Color(0xFF195529).withOpacity(0.08) // Primary color tint for active plan
+          color: isActive
+              ? const Color(0xFF195529).withOpacity(
+                  0.08,
+                ) // Primary color tint for active plan
               : Colors.grey.shade200, // ✅ Light card for inactive plans
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive 
-                ? const Color(0xFF195529) // Primary color border for active plan
-                : (selected ? Colors.green.withOpacity(0.6) : Colors.grey.withOpacity(0.3)), // Border for selected (clicked) plan
+            color: isActive
+                ? const Color(
+                    0xFF195529,
+                  ) // Primary color border for active plan
+                : (selected
+                      ? Colors.green.withOpacity(0.6)
+                      : Colors.grey.withOpacity(
+                          0.3,
+                        )), // Border for selected (clicked) plan
             width: 2, // Fixed width to prevent resizing
           ),
         ),
@@ -610,9 +659,13 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                 Row(
                   children: [
                     Expanded(
-                      child: Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, color: Colors.black)),
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
                     ),
                     // Active Plan Chip - ONLY show for actually active plan
                     AnimatedSwitcher(
@@ -620,7 +673,10 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                       child: isActive
                           ? Container(
                               key: const ValueKey('active-chip'),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFF195529),
                                 borderRadius: BorderRadius.circular(12),
@@ -643,20 +699,26 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(price,
-                    style:
-                    const TextStyle(color: Colors.black87, fontSize: 14)),
+                Text(
+                  price,
+                  style: const TextStyle(color: Colors.black87, fontSize: 14),
+                ),
                 const SizedBox(height: 6),
                 ...details
-                    .map((e) => Text(
-                  e,
-                  style: const TextStyle(color: Colors.black54),
-                ))
+                    .map(
+                      (e) => Text(
+                        e,
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    )
                     .toList(),
                 if (renewal != null) ...[
                   const SizedBox(height: 12),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF195529).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(8),
@@ -697,7 +759,10 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
-                          side: BorderSide(color: Colors.red.withOpacity(0.5), width: 1),
+                          side: BorderSide(
+                            color: Colors.red.withOpacity(0.5),
+                            width: 1,
+                          ),
                         ),
                       ),
                       child: const Row(
@@ -726,15 +791,21 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                 top: 0,
                 right: 0,
                 child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.green,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(tag,
-                      style: const TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    tag,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
           ],
@@ -772,8 +843,18 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
   /// Format renewal date for display (e.g., "Sept 30, 2025")
   String _formatRenewalDate(DateTime date) {
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sept',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
@@ -787,7 +868,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     try {
       // Show payment processing dialog
       if (!mounted) return false;
-      
+
       // Show payment method selection dialog
       final paymentMethod = await _showPaymentMethodDialog();
       if (paymentMethod == null) {
@@ -796,7 +877,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
 
       // Convert amount to cents for Stripe
       final amountInCents = amount * 100;
-      
+
       // Prepare payment metadata
       final metadata = {
         'shipper_id': shipper.uid,
@@ -806,12 +887,38 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
         'subscription_type': 'monthly',
       };
 
-      // Process payment using Stripe Payment Sheet
-      final paymentSuccess = await StripeService.processPayment(
-        amountInCents: amountInCents,
-        currency: 'usd',
-        metadata: metadata,
-      );
+      // Process payment
+      bool paymentSuccess = false;
+
+      if (kIsWeb) {
+        // Web Payment Flow
+        final clientSecret = await StripeService.createPaymentIntent(
+          amountInCents: amountInCents,
+          currency: 'cad',
+          metadata: metadata,
+        );
+
+        if (!mounted) return false;
+
+        final result = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => WebPurchaseDialog(
+            clientSecret: clientSecret,
+            amount: amount,
+            planName: planName,
+          ),
+        );
+
+        paymentSuccess = result ?? false;
+      } else {
+        // Native Payment Flow
+        paymentSuccess = await StripeService.processPayment(
+          amountInCents: amountInCents,
+          currency: 'cad',
+          metadata: metadata,
+        );
+      }
 
       if (paymentSuccess) {
         // Log analytics event for successful subscription upgrade
@@ -823,11 +930,15 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
             'shipper_id': shipper.uid,
           }),
         );
-        
+
         if (mounted) {
           // Get subscription dates from planData (calculated in _savePlan)
           final now = DateTime.now();
-          final subscriptionEndDate = DateTime(now.year, now.month + 1, now.day);
+          final subscriptionEndDate = DateTime(
+            now.year,
+            now.month + 1,
+            now.day,
+          );
           await _showPaymentSuccessDialog(
             planName: planName,
             amount: amount,
@@ -847,10 +958,12 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
         stackTrace,
         reason: 'Payment processing failed in shipper_boost_my_page',
       );
-      await FirebaseService.log('Payment Failed - Plan: $planName, Amount: \$$amount');
+      await FirebaseService.log(
+        'Payment Failed - Plan: $planName, Amount: \$$amount',
+      );
       await FirebaseService.setCustomKey('payment_plan', planName);
       await FirebaseService.setCustomKey('payment_amount', amount);
-      
+
       // Log analytics event for subscription upgrade failure
       final errorMessage = StripeService.getErrorMessage(e);
       await FirebaseService.logEvent(
@@ -859,10 +972,12 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           'plan_name': planName,
           'amount': amount,
           'shipper_id': shipper.uid,
-          'error_message': errorMessage.length > 100 ? errorMessage.substring(0, 100) : errorMessage,
+          'error_message': errorMessage.length > 100
+              ? errorMessage.substring(0, 100)
+              : errorMessage,
         }),
       );
-      
+
       if (mounted) {
         // Calculate renewal date for failure dialog
         final now = DateTime.now();
@@ -890,7 +1005,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
   Future<void> _showCancelPlanDialog() async {
     final authProvider = context.read<AuthProvider>();
     final shipper = authProvider.shipperUser;
-    
+
     if (shipper == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -904,7 +1019,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     // Get current subscription details
     final shipperDoc = await FirebaseService.shippers.doc(shipper.uid).get();
     final currentData = shipperDoc.data() as Map<String, dynamic>?;
-    final currentPlan = currentData?['subscriptionPlan'] as String? ?? selectedPlan;
+    final currentPlan =
+        currentData?['subscriptionPlan'] as String? ?? selectedPlan;
     final endDateStr = currentData?['subscriptionEndDate'] as String?;
     DateTime? endDate;
     if (endDateStr != null) {
@@ -918,8 +1034,18 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     // Format date for display
     String formatDate(DateTime date) {
       const months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sept',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       return '${months[date.month - 1]} ${date.day}, ${date.year}';
     }
@@ -975,7 +1101,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Title
                 const Text(
                   'Cancel Subscription',
@@ -987,7 +1113,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Subscription details card
                 Container(
                   width: double.infinity,
@@ -1026,7 +1152,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Warning message container
                 Container(
                   width: double.infinity,
@@ -1079,7 +1205,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Action buttons
                 Column(
                   children: [
@@ -1205,11 +1331,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
   }) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: iconColor ?? const Color(0xFFE53935),
-        ),
+        Icon(icon, size: 20, color: iconColor ?? const Color(0xFFE53935)),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -1252,7 +1374,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
           'boostCredits': currentData['boostCredits'] ?? 0,
           'subscriptionType': currentData['subscriptionType'] ?? 'monthly',
           'subscriptionStartDate': currentData['subscriptionStartDate'],
-          'subscriptionEndDate': DateTime.now().toIso8601String(), // Cancellation date
+          'subscriptionEndDate': DateTime.now()
+              .toIso8601String(), // Cancellation date
           'changedAt': DateTime.now().toIso8601String(),
           'reason': 'cancelled', // Reason for cancellation
         };
@@ -1274,17 +1397,19 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
 
       if (historyEntry != null) {
         // Get existing history or initialize empty array
-        final existingHistory = currentData?['subscriptionHistory'] as List<dynamic>? ?? [];
-        
+        final existingHistory =
+            currentData?['subscriptionHistory'] as List<dynamic>? ?? [];
+
         // Add canceled subscription to history
         final updatedHistory = List<Map<String, dynamic>>.from(
-          existingHistory.map((e) => e as Map<String, dynamic>)
+          existingHistory.map((e) => e as Map<String, dynamic>),
         );
         updatedHistory.add(historyEntry);
-        
+
         // Store updated history
         updates['subscriptionHistory'] = updatedHistory;
-      } else if (currentData != null && currentData['subscriptionHistory'] == null) {
+      } else if (currentData != null &&
+          currentData['subscriptionHistory'] == null) {
         // Initialize empty history array if it doesn't exist
         updates['subscriptionHistory'] = [];
       }
@@ -1313,7 +1438,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
             duration: Duration(seconds: 3),
           ),
         );
-        
+
         // Reload plan data
         await _loadCurrentPlan();
       }
@@ -1346,6 +1471,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     String formatDate(DateTime date) {
       return '${date.month}/${date.day}/${date.year}';
     }
+
     return showDialog(
       context: context,
       barrierDismissible: false,
@@ -1390,14 +1516,10 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.check,
-                    color: Colors.white,
-                    size: 50,
-                  ),
+                  child: const Icon(Icons.check, color: Colors.white, size: 50),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Success title
                 const Text(
                   'Payment Successful!',
@@ -1409,7 +1531,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Payment details card
                 Container(
                   width: double.infinity,
@@ -1476,7 +1598,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Success message
                 Text(
                   'Your subscription has been upgraded successfully. You can now enjoy all the premium features!',
@@ -1489,7 +1611,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Done button
                 Container(
                   width: double.infinity,
@@ -1550,6 +1672,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
     String formatDate(DateTime date) {
       return '${date.month}/${date.day}/${date.year}';
     }
+
     return showDialog(
       context: context,
       barrierDismissible: false,
@@ -1594,14 +1717,10 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 50,
-                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 50),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Failure title
                 const Text(
                   'Payment Failed',
@@ -1613,7 +1732,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
-                
+
                 // Payment details card
                 Container(
                   width: double.infinity,
@@ -1661,7 +1780,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Error message container
                 Container(
                   width: double.infinity,
@@ -1685,8 +1804,8 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          errorMessage.length > 150 
-                              ? '${errorMessage.substring(0, 150)}...' 
+                          errorMessage.length > 150
+                              ? '${errorMessage.substring(0, 150)}...'
                               : errorMessage,
                           style: const TextStyle(
                             fontSize: 13,
@@ -1700,7 +1819,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Helpful message
                 Text(
                   'Please check your payment method and try again. If the problem persists, contact support.',
@@ -1713,7 +1832,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
-                
+
                 // Retry and Cancel buttons
                 Row(
                   children: [
@@ -1827,11 +1946,7 @@ class _ShipperBoostMyPageState extends State<ShipperBoostMyPage> {
   }) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 20,
-          color: iconColor ?? const Color(0xFF195529),
-        ),
+        Icon(icon, size: 20, color: iconColor ?? const Color(0xFF195529)),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -1892,7 +2007,11 @@ class SubscriptionHistoryScreen extends StatelessWidget {
               children: [
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                  icon: const Icon(
+                    Icons.arrow_back,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                   tooltip: 'Back',
                 ),
                 const SizedBox(width: 12),
@@ -1923,7 +2042,11 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.history, size: 64, color: Colors.grey.shade400),
+                        Icon(
+                          Icons.history,
+                          size: 64,
+                          color: Colors.grey.shade400,
+                        ),
                         const SizedBox(height: 16),
                         Text(
                           'No subscription history available',
@@ -1937,9 +2060,7 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                     ),
                   )
                 : Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade50,
-                    ),
+                    decoration: BoxDecoration(color: Colors.grey.shade50),
                     child: ListView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: subscriptions.length,
@@ -1948,7 +2069,12 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                         final isActive = subscription['status'] == 'active';
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildHistoryItem(context, subscription, isActive, shipper),
+                          child: _buildHistoryItem(
+                            context,
+                            subscription,
+                            isActive,
+                            shipper,
+                          ),
                         );
                       },
                     ),
@@ -1974,9 +2100,9 @@ class SubscriptionHistoryScreen extends StatelessWidget {
     final changedAt = subscription['changedAt'] ?? startDate;
     final status = isActive ? 'Active' : 'Ended';
     final subscriptionType = subscription['subscriptionType'] ?? 'monthly';
-    
+
     final receiptText = _formatReceipt(subscription, shipper);
-    
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2001,7 +2127,7 @@ class SubscriptionHistoryScreen extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: isActive 
+                colors: isActive
                     ? [Colors.green.shade50, Colors.green.shade100]
                     : [Colors.grey.shade50, Colors.grey.shade100],
                 begin: Alignment.topLeft,
@@ -2023,7 +2149,9 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                         children: [
                           Icon(
                             isActive ? Icons.check_circle : Icons.history,
-                            color: isActive ? Colors.green.shade700 : Colors.grey.shade600,
+                            color: isActive
+                                ? Colors.green.shade700
+                                : Colors.grey.shade600,
                             size: 24,
                           ),
                           const SizedBox(width: 8),
@@ -2033,7 +2161,9 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 22,
                                 fontWeight: FontWeight.bold,
-                                color: isActive ? Colors.green.shade900 : Colors.grey.shade800,
+                                color: isActive
+                                    ? Colors.green.shade900
+                                    : Colors.grey.shade800,
                               ),
                             ),
                           ),
@@ -2041,16 +2171,23 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          color: isActive ? Colors.green.shade700 : Colors.grey.shade600,
+                          color: isActive
+                              ? Colors.green.shade700
+                              : Colors.grey.shade600,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              isActive ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                              isActive
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_unchecked,
                               color: Colors.white,
                               size: 16,
                             ),
@@ -2092,19 +2229,29 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                         color: Colors.blue,
                         onPressed: () => _copyReceipt(context, receiptText),
                       ),
-                      Container(width: 1, height: 40, color: Colors.grey.shade300),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.grey.shade300,
+                      ),
                       _buildActionButton(
                         icon: Icons.print,
                         label: 'Print',
                         color: Colors.green,
-                        onPressed: () => _printReceipt(context, receiptText, plan, shipper),
+                        onPressed: () =>
+                            _printReceipt(context, receiptText, plan, shipper),
                       ),
-                      Container(width: 1, height: 40, color: Colors.grey.shade300),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.grey.shade300,
+                      ),
                       _buildActionButton(
                         icon: Icons.share,
                         label: 'Share',
                         color: Colors.orange,
-                        onPressed: () => _shareReceipt(context, receiptText, plan),
+                        onPressed: () =>
+                            _shareReceipt(context, receiptText, plan),
                       ),
                     ],
                   ),
@@ -2176,7 +2323,10 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.blue.shade700,
                               borderRadius: BorderRadius.circular(8),
@@ -2232,7 +2382,11 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.calendar_today, size: 18, color: Colors.grey.shade700),
+                          Icon(
+                            Icons.calendar_today,
+                            size: 18,
+                            color: Colors.grey.shade700,
+                          ),
                           const SizedBox(width: 8),
                           Text(
                             'Subscription Timeline',
@@ -2246,17 +2400,37 @@ class SubscriptionHistoryScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       if (startDate != null)
-                        _buildDateRow('Start Date', _formatDate(startDate), Icons.play_circle, Colors.green),
+                        _buildDateRow(
+                          'Start Date',
+                          _formatDate(startDate),
+                          Icons.play_circle,
+                          Colors.green,
+                        ),
                       if (endDate != null) ...[
                         const SizedBox(height: 8),
-                        _buildDateRow('End Date', _formatDate(endDate), Icons.stop_circle, Colors.red),
+                        _buildDateRow(
+                          'End Date',
+                          _formatDate(endDate),
+                          Icons.stop_circle,
+                          Colors.red,
+                        ),
                       ],
                       if (changedAt != null && !isActive) ...[
                         const SizedBox(height: 8),
-                        _buildDateRow('Changed At', _formatDate(changedAt), Icons.swap_horiz, Colors.orange),
+                        _buildDateRow(
+                          'Changed At',
+                          _formatDate(changedAt),
+                          Icons.swap_horiz,
+                          Colors.orange,
+                        ),
                       ],
                       const SizedBox(height: 8),
-                      _buildDateRow('Print Date', _formatDate(DateTime.now().toIso8601String()), Icons.print, Colors.blue),
+                      _buildDateRow(
+                        'Print Date',
+                        _formatDate(DateTime.now().toIso8601String()),
+                        Icons.print,
+                        Colors.blue,
+                      ),
                     ],
                   ),
                 ),
@@ -2301,7 +2475,12 @@ class SubscriptionHistoryScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildFeatureRow(IconData icon, String label, String value, Color color) {
+  Widget _buildFeatureRow(
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Row(
       children: [
         Container(
@@ -2316,10 +2495,7 @@ class SubscriptionHistoryScreen extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade700,
-            ),
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
           ),
         ),
         Text(
@@ -2342,10 +2518,7 @@ class SubscriptionHistoryScreen extends StatelessWidget {
         Expanded(
           child: Text(
             label,
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
         ),
         Text(
@@ -2369,7 +2542,7 @@ class SubscriptionHistoryScreen extends StatelessWidget {
     final endDate = subscription['subscriptionEndDate'];
     final changedAt = subscription['changedAt'] ?? startDate;
     final status = subscription['status'] == 'active' ? 'Active' : 'Ended';
-    
+
     final buffer = StringBuffer();
     buffer.writeln('═══════════════════════════════════');
     buffer.writeln('        SUBSCRIPTION RECEIPT');
@@ -2397,12 +2570,14 @@ class SubscriptionHistoryScreen extends StatelessWidget {
       buffer.writeln('Changed At: ${_formatDate(changedAt)}');
     }
     buffer.writeln('');
-    buffer.writeln('Print Date: ${_formatDate(DateTime.now().toIso8601String())}');
+    buffer.writeln(
+      'Print Date: ${_formatDate(DateTime.now().toIso8601String())}',
+    );
     buffer.writeln('');
     buffer.writeln('═══════════════════════════════════');
     buffer.writeln('Thank you for using Remiles!');
     buffer.writeln('═══════════════════════════════════');
-    
+
     return buffer.toString();
   }
 
@@ -2427,11 +2602,17 @@ class SubscriptionHistoryScreen extends StatelessWidget {
     );
   }
 
-  Future<void> _printReceipt(BuildContext context, String receiptText, String planName, dynamic shipper) async {
+  Future<void> _printReceipt(
+    BuildContext context,
+    String receiptText,
+    String planName,
+    dynamic shipper,
+  ) async {
     try {
       // Show print dialog
       await Printing.layoutPdf(
-        onLayout: (format) async => await _generateReceiptPDF(receiptText, planName, shipper),
+        onLayout: (format) async =>
+            await _generateReceiptPDF(receiptText, planName, shipper),
       );
     } catch (e) {
       if (context.mounted) {
@@ -2446,10 +2627,14 @@ class SubscriptionHistoryScreen extends StatelessWidget {
     }
   }
 
-  Future<Uint8List> _generateReceiptPDF(String receiptText, String planName, dynamic shipper) async {
+  Future<Uint8List> _generateReceiptPDF(
+    String receiptText,
+    String planName,
+    dynamic shipper,
+  ) async {
     final pdf = pw.Document();
     final lines = receiptText.split('\n');
-    
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
@@ -2461,52 +2646,50 @@ class SubscriptionHistoryScreen extends StatelessWidget {
               if (line.trim().isEmpty) {
                 return pw.SizedBox(height: 8);
               }
-              
+
               // Style headers and separators
               pw.TextStyle textStyle = pw.TextStyle(
                 fontSize: 12,
                 color: PdfColors.black,
               );
-              
+
               if (line.contains('════') || line.contains('───')) {
-                textStyle = pw.TextStyle(
-                  fontSize: 10,
-                  color: PdfColors.grey,
-                );
-              } else if (line.contains('SUBSCRIPTION RECEIPT') || 
-                         line.contains('Subscription Details:')) {
+                textStyle = pw.TextStyle(fontSize: 10, color: PdfColors.grey);
+              } else if (line.contains('SUBSCRIPTION RECEIPT') ||
+                  line.contains('Subscription Details:')) {
                 textStyle = pw.TextStyle(
                   fontSize: 16,
                   fontWeight: pw.FontWeight.bold,
                   color: PdfColors.black,
                 );
-              } else if (line.contains('Plan:') || 
-                         line.contains('Status:') || 
-                         line.contains('Price:')) {
+              } else if (line.contains('Plan:') ||
+                  line.contains('Status:') ||
+                  line.contains('Price:')) {
                 textStyle = pw.TextStyle(
                   fontSize: 14,
                   fontWeight: pw.FontWeight.bold,
                   color: PdfColors.black,
                 );
               }
-              
+
               return pw.Padding(
                 padding: const pw.EdgeInsets.only(bottom: 4),
-                child: pw.Text(
-                  line,
-                  style: textStyle,
-                ),
+                child: pw.Text(line, style: textStyle),
               );
             }).toList(),
           );
         },
       ),
     );
-    
+
     return pdf.save();
   }
 
-  Future<void> _shareReceipt(BuildContext context, String receiptText, String planName) async {
+  Future<void> _shareReceipt(
+    BuildContext context,
+    String receiptText,
+    String planName,
+  ) async {
     try {
       await Share.share(
         receiptText,
@@ -2523,5 +2706,101 @@ class SubscriptionHistoryScreen extends StatelessWidget {
         );
       }
     }
+  }
+}
+
+class WebPurchaseDialog extends StatefulWidget {
+  final String clientSecret;
+  final int amount;
+  final String planName;
+
+  const WebPurchaseDialog({
+    super.key,
+    required this.clientSecret,
+    required this.amount,
+    required this.planName,
+  });
+
+  @override
+  State<WebPurchaseDialog> createState() => _WebPurchaseDialogState();
+}
+
+class _WebPurchaseDialogState extends State<WebPurchaseDialog> {
+  bool _isComplete = false;
+  bool _isLoading = false;
+
+  Future<void> _handlePay() async {
+    setState(() => _isLoading = true);
+    try {
+      await StripeService.confirmWebPayment(widget.clientSecret);
+      if (mounted) {
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Payment failed: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Pay \$${widget.amount}'),
+      content: SizedBox(
+        width: 500,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Purchasing: ${widget.planName}'),
+            const SizedBox(height: 20),
+            const Text('Enter your card details securely via Stripe.'),
+            const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: CardField(
+                onCardChanged: (details) {
+                  setState(() {
+                    _isComplete = details?.complete ?? false;
+                  });
+                },
+                style: const TextStyle(fontSize: 16, color: Colors.black),
+                decoration: const InputDecoration(border: InputBorder.none),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (_isComplete && !_isLoading) ? _handlePay : null,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Pay Now'),
+        ),
+      ],
+    );
   }
 }

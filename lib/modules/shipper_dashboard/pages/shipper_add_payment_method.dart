@@ -1,14 +1,18 @@
 import 'package:remiles/core/stripe_service.dart';
 import 'package:remiles/core/payment_logo_service.dart';
+import 'package:remiles/core/theme/colors.dart';
 import 'package:remiles/providers/payment_methods_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ShipperAddPaymentMethod extends StatefulWidget {
   const ShipperAddPaymentMethod({super.key});
 
   @override
-  State<ShipperAddPaymentMethod> createState() => _ShipperAddPaymentMethodState();
+  State<ShipperAddPaymentMethod> createState() =>
+      _ShipperAddPaymentMethodState();
 }
 
 class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
@@ -24,6 +28,14 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
   }
 
   Future<void> _addPaymentMethod() async {
+    if (kIsWeb) {
+      await showDialog(
+        context: context,
+        builder: (context) => const WebPaymentDialog(),
+      );
+      return;
+    }
+
     setState(() => _isAdding = true);
     try {
       final provider = context.read<PaymentMethodsProvider>();
@@ -40,7 +52,9 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add payment method: ${StripeService.getErrorMessage(e)}'),
+            content: Text(
+              'Failed to add payment method: ${StripeService.getErrorMessage(e)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -68,7 +82,9 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to set default: ${StripeService.getErrorMessage(e)}'),
+            content: Text(
+              'Failed to set default: ${StripeService.getErrorMessage(e)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -76,13 +92,19 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
     }
   }
 
-  Future<void> _deletePaymentMethod(String paymentMethodId, bool isDefault, List<Map<String, dynamic>> paymentMethods) async {
+  Future<void> _deletePaymentMethod(
+    String paymentMethodId,
+    bool isDefault,
+    List<Map<String, dynamic>> paymentMethods,
+  ) async {
     // Prevent deleting the only payment method
     if (paymentMethods.length == 1) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Cannot delete the only payment method. Please add another one first.'),
+            content: Text(
+              'Cannot delete the only payment method. Please add another one first.',
+            ),
             backgroundColor: Colors.orange,
           ),
         );
@@ -96,7 +118,9 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Delete Default Payment Method'),
-          content: const Text('This is your default payment method. Another payment method will be set as default. Continue?'),
+          content: const Text(
+            'This is your default payment method. Another payment method will be set as default. Continue?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -117,7 +141,9 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Delete Payment Method'),
-          content: const Text('Are you sure you want to delete this payment method?'),
+          content: const Text(
+            'Are you sure you want to delete this payment method?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -149,7 +175,9 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to delete: ${StripeService.getErrorMessage(e)}'),
+            content: Text(
+              'Failed to delete: ${StripeService.getErrorMessage(e)}',
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -166,21 +194,24 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: backgroundColor,
       body: SafeArea(
         child: Consumer<PaymentMethodsProvider>(
           builder: (context, provider, child) {
             final paymentMethods = provider.paymentMethods;
-            final isLoading = provider.isLoading && paymentMethods.isEmpty; // Only show loading if no cached data
+            final isLoading =
+                provider.isLoading &&
+                paymentMethods.isEmpty; // Only show loading if no cached data
 
             return SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Section
-                const Header(),
-                const SizedBox(height: 32),
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header Section
+                    const Header(),
+                    const SizedBox(height: 32),
 
                     // Loading state (only if no cached data)
                     if (isLoading)
@@ -209,7 +240,7 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
                                   fontWeight: FontWeight.w600,
                                   color: Colors.grey.shade600,
                                 ),
-                ),
+                              ),
                               const SizedBox(height: 8),
                               Text(
                                 'Add a payment method to get started',
@@ -240,22 +271,27 @@ class _ShipperAddPaymentMethodState extends State<ShipperAddPaymentMethod> {
                             cardLastFour: last4,
                             expiryDate: _formatExpiryDate(expMonth, expYear),
                             isDefault: isDefault,
-                            onSetDefault: () => _setDefaultPaymentMethod(paymentMethodId),
-                            onDelete: () => _deletePaymentMethod(paymentMethodId, isDefault, paymentMethods),
+                            onSetDefault: () =>
+                                _setDefaultPaymentMethod(paymentMethodId),
+                            onDelete: () => _deletePaymentMethod(
+                              paymentMethodId,
+                              isDefault,
+                              paymentMethods,
+                            ),
                           ),
                         );
                       }),
 
-                const SizedBox(height: 32),
+                    const SizedBox(height: 32),
 
-                // Add Payment Method Button
+                    // Add Payment Method Button
                     AddPaymentMethodButton(
                       onPressed: _isAdding ? null : _addPaymentMethod,
                       isLoading: _isAdding,
                     ),
-              ],
-            ),
-          ),
+                  ],
+                ),
+              ),
             );
           },
         ),
@@ -269,34 +305,30 @@ class Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return   Row(
+    return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-                        Row(
-                          children: [
-                            IconButton(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back, color: Colors.black, size: 28),
-                              tooltip: 'Back',
-                            ),
-                            const SizedBox(width: 8),
-        const Text(
-                              "Payment Methods",
-          style: TextStyle(
-                                fontSize: 26,
-            fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: Colors.green.shade100,
-                          child: const Icon(Icons.person, color: Colors.green, size: 28),
+        Row(
+          children: [
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, color: Colors.black, size: 28),
+              tooltip: 'Back',
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "Payment Methods",
+              style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        CircleAvatar(
+          radius: 22,
+          backgroundColor: Colors.green.shade100,
+          child: const Icon(Icons.person, color: Colors.green, size: 28),
         ),
       ],
     );
-                  
   }
 }
 
@@ -330,26 +362,26 @@ class PaymentCard extends StatelessWidget {
           children: [
             Expanded(
               child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
                     'Card',
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black87,
+                    style: TextStyle(
+                      fontSize: 26,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-                Text(
-                  '****$cardLastFour',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                    height: 1.5,
+                  Text(
+                    '****$cardLastFour',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                      height: 1.5,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             ),
             const SizedBox(width: 12),
             cardLogo,
@@ -360,18 +392,12 @@ class PaymentCard extends StatelessWidget {
         // Expiry Date
         const Text(
           'Expiry Date',
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey,
-          ),
+          style: TextStyle(fontSize: 14, color: Colors.grey),
         ),
         const SizedBox(height: 4),
         Text(
           expiryDate,
-          style: const TextStyle(
-            fontSize: 16,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontSize: 16, color: Colors.black87),
         ),
         const SizedBox(height: 20),
 
@@ -391,14 +417,14 @@ class PaymentCard extends StatelessWidget {
                       Flexible(
                         child: Text(
                           'Set as Default',
-              style: TextStyle(fontSize: 16, color: Colors.black54),
+                          style: TextStyle(fontSize: 16, color: Colors.black54),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                 ),
-            ),
+              ),
             if (!isDefault && onSetDefault != null) const SizedBox(width: 12),
             // Status Tag
             Text(
@@ -418,17 +444,17 @@ class PaymentCard extends StatelessWidget {
             onTap: onDelete,
             child: Row(
               mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.close, color: Colors.red, size: 20),
-            const SizedBox(width: 8),
+              children: [
+                const Icon(Icons.close, color: Colors.red, size: 20),
+                const SizedBox(width: 8),
                 Flexible(
                   child: Text(
-              'Remove Payment Method',
+                    'Remove Payment Method',
                     style: const TextStyle(fontSize: 16, color: Colors.black54),
                     overflow: TextOverflow.ellipsis,
                   ),
-            ),
-          ],
+                ),
+              ],
             ),
           ),
       ],
@@ -450,7 +476,11 @@ class CardBrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return PaymentLogoService().getLogoWidget(brand, width: width, height: height);
+    return PaymentLogoService().getLogoWidget(
+      brand,
+      width: width,
+      height: height,
+    );
   }
 }
 
@@ -493,6 +523,97 @@ class AddPaymentMethodButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class WebPaymentDialog extends StatefulWidget {
+  const WebPaymentDialog({super.key});
+
+  @override
+  State<WebPaymentDialog> createState() => _WebPaymentDialogState();
+}
+
+class _WebPaymentDialogState extends State<WebPaymentDialog> {
+  bool _isComplete = false;
+  bool _isLoading = false;
+
+  Future<void> _handleSave() async {
+    setState(() => _isLoading = true);
+    try {
+      final provider = context.read<PaymentMethodsProvider>();
+      await provider.addPaymentMethodWeb();
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Payment method added successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add payment method: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Card'),
+      content: SizedBox(
+        width: 500,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Enter your card details securely via Stripe.'),
+            const SizedBox(height: 20),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: CardField(
+                onCardChanged: (details) {
+                  setState(() {
+                    _isComplete = details?.complete ?? false;
+                  });
+                },
+                style: const TextStyle(fontSize: 16, color: Colors.black),
+                decoration: const InputDecoration(border: InputBorder.none),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: (_isComplete && !_isLoading) ? _handleSave : null,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Text('Save Card'),
+        ),
+      ],
     );
   }
 }

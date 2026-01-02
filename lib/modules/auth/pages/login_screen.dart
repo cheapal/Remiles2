@@ -12,7 +12,7 @@ import '../../shipper_dashboard/pages/shipper_dashboard_1.dart';
 import '../../carrier_onboarding/carrier_onboarding_wrapper.dart';
 import '../../shipper_onboarding/shipper_onboarding_wrapper.dart';
 import '../../carrier_dashboard/views/dashboard/pages/carrier_dashboard_1.dart';
-import '../../carrier_dashboard/views/dashboard/pages/main_page.dart';
+import '../../carrier_dashboard/views/dashboard/pages/carrier_dashboard_main_page.dart';
 import 'forgot_password_screen.dart';
 import 'google_role_selection_screen.dart';
 
@@ -26,12 +26,12 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   bool rememberMe = false;
   bool _obscurePassword = true;
-  
+
   // Form controllers
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  
+
   // Track validation errors to display them without layout shift
   String? _emailError;
   String? _passwordError;
@@ -72,16 +72,18 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailError = null;
       _passwordError = null;
     });
-    
+
     if (!_formKey.currentState!.validate()) {
       // Update error states after validation
       setState(() {
         if (_emailController.text.isEmpty) {
           _emailError = 'Please enter your email';
-        } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(_emailController.text)) {
+        } else if (!RegExp(
+          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+        ).hasMatch(_emailController.text)) {
           _emailError = 'Please enter a valid email';
         }
-        
+
         if (_passwordController.text.isEmpty) {
           _passwordError = 'Please enter your password';
         } else if (_passwordController.text.length < 6) {
@@ -119,12 +121,12 @@ class _LoginScreenState extends State<LoginScreen> {
           duration: Duration(seconds: 2),
         ),
       );
-      
+
       print('Login successful, navigating based on user role');
-      
+
       // Add a small delay to ensure user data is fully loaded
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Direct navigation as fallback if AuthWrapper doesn't trigger
       if (context.mounted) {
         await _navigateBasedOnRole(context, authProvider);
@@ -156,19 +158,20 @@ class _LoginScreenState extends State<LoginScreen> {
           duration: Duration(seconds: 2),
         ),
       );
-      
+
       print('Google Sign-In successful, navigating based on user role');
-      
+
       // Add a small delay to ensure user data is fully loaded
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Direct navigation as fallback if AuthWrapper doesn't trigger
       if (context.mounted) {
         await _navigateBasedOnRole(context, authProvider);
       }
     } else {
       // Check if this is a new user who needs to select a role
-      if (authProvider.firebaseUser != null && authProvider.currentUser == null) {
+      if (authProvider.firebaseUser != null &&
+          authProvider.currentUser == null) {
         // New user - navigate to role selection
         print('Google Sign-In: New user, navigating to role selection');
         if (context.mounted) {
@@ -181,7 +184,8 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         // Actual error occurred
         print('Google Sign-In failed: ${authProvider.errorMessage}');
-        if (authProvider.errorMessage != null && authProvider.errorMessage!.isNotEmpty) {
+        if (authProvider.errorMessage != null &&
+            authProvider.errorMessage!.isNotEmpty) {
           appStateProvider.showError(authProvider.errorMessage!);
         }
       }
@@ -190,10 +194,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // Navigate based on user role
-  Future<void> _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) async {
+  Future<void> _navigateBasedOnRole(
+    BuildContext context,
+    AuthProvider authProvider,
+  ) async {
     final userRole = authProvider.currentUser?.role;
     print('Login: Navigating based on role: $userRole');
-    
+
     if (userRole == UserRole.shipper) {
       final shipper = authProvider.shipperUser;
       if (shipper != null && shipper.isOnboardingComplete == false) {
@@ -207,9 +214,10 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (shipper != null) {
         // Check if dashboard steps are completed
         print('Login: Checking if dashboard steps are completed...');
-        final isDashboardComplete = await FirebaseService.isShipperDashboardComplete(shipper.uid);
+        final isDashboardComplete =
+            await FirebaseService.isShipperDashboardComplete(shipper.uid);
         print('Login: Dashboard complete: $isDashboardComplete');
-        
+
         if (!isDashboardComplete) {
           print('Login: Navigating to Shipper Dashboard 1');
           if (context.mounted) {
@@ -222,7 +230,9 @@ class _LoginScreenState extends State<LoginScreen> {
           print('Login: Navigating to Shipper Dashboard Main Page');
           if (context.mounted) {
             Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const ShipperDashboardMainPage()),
+              MaterialPageRoute(
+                builder: (_) => const ShipperDashboardMainPage(),
+              ),
               (route) => false,
             );
           }
@@ -239,19 +249,20 @@ class _LoginScreenState extends State<LoginScreen> {
     } else if (userRole == UserRole.carrier) {
       final carrier = authProvider.carrierUser;
       if (carrier != null && carrier.isOnboardingComplete == false) {
-      print('Login: Navigating to Carrier Onboarding Wrapper');
-      if (context.mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
-          (route) => false,
-        );
+        print('Login: Navigating to Carrier Onboarding Wrapper');
+        if (context.mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const CarrierOnboardingWrapper()),
+            (route) => false,
+          );
         }
       } else if (carrier != null) {
         // Check if dashboard steps are completed
         print('Login: Checking if carrier dashboard steps are completed...');
-        final isDashboardComplete = await FirebaseService.isCarrierDashboardComplete(carrier.uid);
+        final isDashboardComplete =
+            await FirebaseService.isCarrierDashboardComplete(carrier.uid);
         print('Login: Carrier dashboard complete: $isDashboardComplete');
-        
+
         if (!isDashboardComplete) {
           print('Login: Navigating to Carrier Dashboard 1');
           if (context.mounted) {
@@ -264,7 +275,9 @@ class _LoginScreenState extends State<LoginScreen> {
           print('Login: Navigating to Carrier Main Page');
           if (context.mounted) {
             Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (_) => const MainPage()),
+              MaterialPageRoute(
+                builder: (_) => const CarrierDashboardMainPage(),
+              ),
               (route) => false,
             );
           }
@@ -328,19 +341,17 @@ class _LoginScreenState extends State<LoginScreen> {
                           children: [
                             // Leather Image from joiningoption.dart
                             if (!kIsWeb) ...[
-                           SizedBox(
-                              width: double.infinity,
-                              height: 250 * scale, // Adjust height as needed
-                              child: Image.asset(
-                                'assets/leather.png',
-                                fit: BoxFit.contain,
-                                alignment: Alignment.topCenter,
+                              SizedBox(
+                                width: double.infinity,
+                                height: 250 * scale, // Adjust height as needed
+                                child: Image.asset(
+                                  'assets/leather.png',
+                                  fit: BoxFit.contain,
+                                  alignment: Alignment.topCenter,
+                                ),
                               ),
-                            ),
                             ],
-                          if(kIsWeb) ...[
-                            SizedBox(height: 200),
-                            ],
+                            if (kIsWeb) ...[SizedBox(height: 200)],
                             // Remiles Logo
                             SizedBox(height: 1 * scale),
                             SizedBox(
@@ -360,10 +371,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Container(
                                   width: 314 * scale,
                                   height: 49 * scale,
-                                  margin: EdgeInsets.symmetric(horizontal: (456 - 314) / 2 * scale),
+                                  margin: EdgeInsets.symmetric(
+                                    horizontal: (456 - 314) / 2 * scale,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFFFFFFF),
-                                    borderRadius: BorderRadius.circular(24.5 * scale),
+                                    borderRadius: BorderRadius.circular(
+                                      24.5 * scale,
+                                    ),
                                     boxShadow: const [
                                       BoxShadow(
                                         color: Color(0x40000000),
@@ -373,7 +388,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ],
                                   ),
                                   child: Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 24.5 * scale),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 24.5 * scale,
+                                    ),
                                     child: TextFormField(
                                       controller: _emailController,
                                       keyboardType: TextInputType.emailAddress,
@@ -382,7 +399,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                         String? error;
                                         if (value == null || value.isEmpty) {
                                           error = 'Please enter your email';
-                                        } else if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                        } else if (!RegExp(
+                                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                        ).hasMatch(value)) {
                                           error = 'Please enter a valid email';
                                         }
                                         // Update error state
@@ -408,7 +427,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                           fontSize: 16 * scale,
                                           color: const Color(0x40000000),
                                         ),
-                                        errorStyle: const TextStyle(height: 0, fontSize: 0),
+                                        errorStyle: const TextStyle(
+                                          height: 0,
+                                          fontSize: 0,
+                                        ),
                                       ),
                                       style: TextStyle(
                                         fontSize: 16 * scale,
@@ -424,7 +446,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: _emailError != null
                                       ? Padding(
                                           padding: EdgeInsets.only(
-                                            left: (456 - 314) / 2 * scale + 24.5 * scale,
+                                            left:
+                                                (456 - 314) / 2 * scale +
+                                                24.5 * scale,
                                             top: 4 * scale,
                                           ),
                                           child: Text(
@@ -448,10 +472,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Container(
                                   width: 314 * scale,
                                   height: 49 * scale,
-                                  margin: EdgeInsets.symmetric(horizontal: (456 - 314) / 2 * scale),
+                                  margin: EdgeInsets.symmetric(
+                                    horizontal: (456 - 314) / 2 * scale,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFFFFFFFF),
-                                    borderRadius: BorderRadius.circular(24.5 * scale),
+                                    borderRadius: BorderRadius.circular(
+                                      24.5 * scale,
+                                    ),
                                     boxShadow: const [
                                       BoxShadow(
                                         color: Color(0x40000000),
@@ -461,7 +489,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ],
                                   ),
                                   child: Padding(
-                                    padding: EdgeInsets.symmetric(horizontal: 24.5 * scale),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 24.5 * scale,
+                                    ),
                                     child: TextFormField(
                                       controller: _passwordController,
                                       obscureText: _obscurePassword,
@@ -471,7 +501,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                         if (value == null || value.isEmpty) {
                                           error = 'Please enter your password';
                                         } else if (value.length < 6) {
-                                          error = 'Password must be at least 6 characters';
+                                          error =
+                                              'Password must be at least 6 characters';
                                         }
                                         // Update error state
                                         if (mounted) {
@@ -496,16 +527,22 @@ class _LoginScreenState extends State<LoginScreen> {
                                           fontSize: 16 * scale,
                                           color: const Color(0x40000000),
                                         ),
-                                        errorStyle: const TextStyle(height: 0, fontSize: 0),
+                                        errorStyle: const TextStyle(
+                                          height: 0,
+                                          fontSize: 0,
+                                        ),
                                         suffixIcon: IconButton(
                                           icon: Icon(
-                                            _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                            _obscurePassword
+                                                ? Icons.visibility_off
+                                                : Icons.visibility,
                                             color: Colors.grey,
                                             size: 24 * scale,
                                           ),
                                           onPressed: () {
                                             setState(() {
-                                              _obscurePassword = !_obscurePassword;
+                                              _obscurePassword =
+                                                  !_obscurePassword;
                                             });
                                           },
                                         ),
@@ -524,7 +561,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   child: _passwordError != null
                                       ? Padding(
                                           padding: EdgeInsets.only(
-                                            left: (456 - 314) / 2 * scale + 24.5 * scale,
+                                            left:
+                                                (456 - 314) / 2 * scale +
+                                                24.5 * scale,
                                             top: 4 * scale,
                                           ),
                                           child: Text(
@@ -545,7 +584,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(
                               width: 314 * scale,
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
@@ -556,8 +596,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                           });
                                           // If unchecked, clear saved email
                                           if (!rememberMe) {
-                                            final authProvider = context.read<AuthProvider>();
-                                            await authProvider.clearRememberedEmail();
+                                            final authProvider = context
+                                                .read<AuthProvider>();
+                                            await authProvider
+                                                .clearRememberedEmail();
                                           }
                                         },
                                         child: Container(
@@ -565,7 +607,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                           height: 21 * scale,
                                           decoration: BoxDecoration(
                                             color: const Color(0xFFF8F8F8),
-                                            borderRadius: BorderRadius.circular(5 * scale),
+                                            borderRadius: BorderRadius.circular(
+                                              5 * scale,
+                                            ),
                                             boxShadow: const [
                                               BoxShadow(
                                                 color: Color(0x40000000),
@@ -576,10 +620,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ),
                                           child: rememberMe
                                               ? Icon(
-                                            Icons.check,
-                                            size: 16 * scale,
-                                            color: Colors.black,
-                                          )
+                                                  Icons.check,
+                                                  size: 16 * scale,
+                                                  color: Colors.black,
+                                                )
                                               : null,
                                         ),
                                       ),
@@ -597,15 +641,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                     onTap: () {
                                       Navigator.of(context).push(
                                         MaterialPageRoute(
-                                          builder: (_) => const ForgotPasswordScreen(),
+                                          builder: (_) =>
+                                              const ForgotPasswordScreen(),
                                         ),
                                       );
                                     },
                                     child: Text(
-                                    "Forgot Password?",
-                                    style: TextStyle(
-                                      fontSize: 11 * scale,
-                                      color: const Color(0x40000000),
+                                      "Forgot Password?",
+                                      style: TextStyle(
+                                        fontSize: 11 * scale,
+                                        color: const Color(0x40000000),
                                       ),
                                     ),
                                   ),
@@ -618,12 +663,18 @@ class _LoginScreenState extends State<LoginScreen> {
                             if (authProvider.errorMessage != null)
                               Container(
                                 width: 314 * scale,
-                                margin: EdgeInsets.symmetric(horizontal: (456 - 314) / 2 * scale),
+                                margin: EdgeInsets.symmetric(
+                                  horizontal: (456 - 314) / 2 * scale,
+                                ),
                                 padding: EdgeInsets.all(12 * scale),
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
-                                  borderRadius: BorderRadius.circular(8 * scale),
-                                  border: Border.all(color: Colors.red.shade200),
+                                  borderRadius: BorderRadius.circular(
+                                    8 * scale,
+                                  ),
+                                  border: Border.all(
+                                    color: Colors.red.shade200,
+                                  ),
                                 ),
                                 child: Text(
                                   authProvider.errorMessage!,
@@ -634,7 +685,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   textAlign: TextAlign.center,
                                 ),
                               ),
-                            if (authProvider.errorMessage != null) SizedBox(height: 10 * scale),
+                            if (authProvider.errorMessage != null)
+                              SizedBox(height: 10 * scale),
 
                             // Login Button
                             GestureDetector(
@@ -644,10 +696,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 height: 59 * scale,
                                 decoration: BoxDecoration(
                                   image: const DecorationImage(
-                                    image: AssetImage('assets/login_button.png'),
+                                    image: AssetImage(
+                                      'assets/login_button.png',
+                                    ),
                                     fit: BoxFit.fill,
                                   ),
-                                  borderRadius: BorderRadius.circular(24.5 * scale),
+                                  borderRadius: BorderRadius.circular(
+                                    24.5 * scale,
+                                  ),
                                 ),
                                 child: Align(
                                   alignment: Alignment(0, -0.2),
@@ -657,7 +713,10 @@ class _LoginScreenState extends State<LoginScreen> {
                                           height: 20 * scale,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
                                           ),
                                         )
                                       : Text(
@@ -668,7 +727,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                             fontWeight: FontWeight.bold,
                                             shadows: [
                                               Shadow(
-                                                color: Colors.black.withOpacity(0.3),
+                                                color: Colors.black.withOpacity(
+                                                  0.3,
+                                                ),
                                                 offset: const Offset(0, 2),
                                                 blurRadius: 4,
                                               ),
@@ -695,8 +756,14 @@ class _LoginScreenState extends State<LoginScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 ElevatedButton.icon(
-                                  onPressed: authProvider.isLoading ? null : _handleGoogleSignIn,
-                                  icon: Image.asset('assets/google.png', width: 24 * scale, height: 24 * scale),
+                                  onPressed: authProvider.isLoading
+                                      ? null
+                                      : _handleGoogleSignIn,
+                                  icon: Image.asset(
+                                    'assets/google.png',
+                                    width: 24 * scale,
+                                    height: 24 * scale,
+                                  ),
                                   label: Text(
                                     "Sign In with Google",
                                     style: TextStyle(
@@ -707,16 +774,25 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20 * scale),
+                                      borderRadius: BorderRadius.circular(
+                                        20 * scale,
+                                      ),
                                     ),
-                                    padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 10 * scale),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10 * scale,
+                                      vertical: 10 * scale,
+                                    ),
                                     elevation: 4,
                                   ),
                                 ),
                                 SizedBox(width: 10 * scale),
                                 ElevatedButton.icon(
                                   onPressed: () {},
-                                  icon: Image.asset('assets/apple.png', width: 24 * scale, height: 24 * scale),
+                                  icon: Image.asset(
+                                    'assets/apple.png',
+                                    width: 24 * scale,
+                                    height: 24 * scale,
+                                  ),
                                   label: Text(
                                     "Sign In with Apple",
                                     style: TextStyle(
@@ -727,9 +803,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20 * scale),
+                                      borderRadius: BorderRadius.circular(
+                                        20 * scale,
+                                      ),
                                     ),
-                                    padding: EdgeInsets.symmetric(horizontal: 10 * scale, vertical: 10 * scale),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 10 * scale,
+                                      vertical: 10 * scale,
+                                    ),
                                     elevation: 4,
                                   ),
                                 ),

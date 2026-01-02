@@ -1,3 +1,4 @@
+import 'package:remiles/core/theme/colors.dart';
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/app_settings_page.dart';
 import 'package:remiles/modules/shipper_dashboard/pages/profile_document_management.dart';
@@ -20,7 +21,6 @@ import '../../../core/firebase_service.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 
 class ShipperProfile extends StatefulWidget {
   const ShipperProfile({super.key});
@@ -45,7 +45,7 @@ class _ShipperProfileState extends State<ShipperProfile>
   Future<void> _loadShipperStats() async {
     final authProvider = context.read<AuthProvider>();
     final shipper = authProvider.shipperUser;
-    
+
     if (shipper != null) {
       try {
         final stats = await FirebaseService.getShipperLoadStats(shipper.uid);
@@ -127,9 +127,11 @@ class _ShipperProfileState extends State<ShipperProfile>
       }
     } catch (e) {
       final appStateProvider = context.read<AppStateProvider>();
-      appStateProvider.showError('Failed to update profile picture. Please try again.');
+      appStateProvider.showError(
+        'Failed to update profile picture. Please try again.',
+      );
       print('Error updating profile picture: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -177,20 +179,14 @@ class _ShipperProfileState extends State<ShipperProfile>
             ),
             content: const Text(
               'Are you sure you want to delete your profile picture?',
-              style: TextStyle(
-                fontSize: 16,
-                color: Color(0xFF666666),
-              ),
+              style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
                 child: const Text(
                   'Cancel',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF666666),
-                  ),
+                  style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
                 ),
               ),
               TextButton(
@@ -248,9 +244,11 @@ class _ShipperProfileState extends State<ShipperProfile>
       }
     } catch (e) {
       final appStateProvider = context.read<AppStateProvider>();
-      appStateProvider.showError('Failed to delete profile picture. Please try again.');
+      appStateProvider.showError(
+        'Failed to delete profile picture. Please try again.',
+      );
       print('Error deleting profile picture: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -276,16 +274,14 @@ class _ShipperProfileState extends State<ShipperProfile>
     final shipper = authProvider.shipperUser;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
+      backgroundColor: backgroundColor, //const Color(0xFFF5F7FA),
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark,
         child: CustomScrollView(
           slivers: [
             // Top Navigation
-            SliverToBoxAdapter(
-              child: TopNavigationBar(context),
-            ),
-            
+            SliverToBoxAdapter(child: TopNavigationBar(context)),
+
             // Profile Header with Gradient
             SliverToBoxAdapter(
               child: Container(
@@ -334,7 +330,9 @@ class _ShipperProfileState extends State<ShipperProfile>
                             ),
                           ),
                           GestureDetector(
-                            onTap: _isUploadingImage ? null : _changeProfilePicture,
+                            onTap: _isUploadingImage
+                                ? null
+                                : _changeProfilePicture,
                             child: Container(
                               width: 130,
                               height: 130,
@@ -358,21 +356,26 @@ class _ShipperProfileState extends State<ShipperProfile>
                                             width: 130,
                                             height: 130,
                                             fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              return Container(
-                                                width: 130,
-                                                height: 130,
-                                                decoration: const BoxDecoration(
-                                                  shape: BoxShape.circle,
-                                                  color: Color(0xFFF5F7FA),
-                                                ),
-                                                child: const Icon(
-                                                  Icons.person,
-                                                  size: 80,
-                                                  color: Color(0xFF43975A),
-                                                ),
-                                              );
-                                            },
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                                  return Container(
+                                                    width: 130,
+                                                    height: 130,
+                                                    decoration:
+                                                        const BoxDecoration(
+                                                          shape:
+                                                              BoxShape.circle,
+                                                          color: Color(
+                                                            0xFFF5F7FA,
+                                                          ),
+                                                        ),
+                                                    child: const Icon(
+                                                      Icons.person,
+                                                      size: 80,
+                                                      color: Color(0xFF43975A),
+                                                    ),
+                                                  );
+                                                },
                                           )
                                         : Container(
                                             width: 130,
@@ -402,7 +405,10 @@ class _ShipperProfileState extends State<ShipperProfile>
                                           height: 30,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 3,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
                                           ),
                                         ),
                                       ),
@@ -422,10 +428,14 @@ class _ShipperProfileState extends State<ShipperProfile>
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
                                                 color: const Color(0xFF43975A),
-                                                border: Border.all(color: Colors.white, width: 3),
+                                                border: Border.all(
+                                                  color: Colors.white,
+                                                  width: 3,
+                                                ),
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: Colors.black.withOpacity(0.2),
+                                                    color: Colors.black
+                                                        .withOpacity(0.2),
                                                     blurRadius: 8,
                                                     offset: const Offset(0, 2),
                                                   ),
@@ -438,7 +448,11 @@ class _ShipperProfileState extends State<ShipperProfile>
                                               ),
                                             ),
                                           ),
-                                          if (shipper?.profileImageUrl != null && shipper!.profileImageUrl!.isNotEmpty) ...[
+                                          if (shipper?.profileImageUrl !=
+                                                  null &&
+                                              shipper!
+                                                  .profileImageUrl!
+                                                  .isNotEmpty) ...[
                                             const SizedBox(width: 8),
                                             GestureDetector(
                                               onTap: _deleteProfilePicture,
@@ -448,12 +462,19 @@ class _ShipperProfileState extends State<ShipperProfile>
                                                 decoration: BoxDecoration(
                                                   shape: BoxShape.circle,
                                                   color: Colors.red,
-                                                  border: Border.all(color: Colors.white, width: 3),
+                                                  border: Border.all(
+                                                    color: Colors.white,
+                                                    width: 3,
+                                                  ),
                                                   boxShadow: [
                                                     BoxShadow(
-                                                      color: Colors.black.withOpacity(0.2),
+                                                      color: Colors.black
+                                                          .withOpacity(0.2),
                                                       blurRadius: 8,
-                                                      offset: const Offset(0, 2),
+                                                      offset: const Offset(
+                                                        0,
+                                                        2,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
@@ -504,7 +525,9 @@ class _ShipperProfileState extends State<ShipperProfile>
                             ),
                             const SizedBox(width: 12),
                             _buildVerifiedChip(
-                              isVerified: (shipper.isVerified || shipper.isPhoneVerified),
+                              isVerified:
+                                  (shipper.isVerified ||
+                                  shipper.isPhoneVerified),
                             ),
                             const SizedBox(width: 12),
                             _buildStatChip(
@@ -587,7 +610,8 @@ class _ShipperProfileState extends State<ShipperProfile>
                       await Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const ShipperAccountDetailsPage(),
+                          builder: (context) =>
+                              const ShipperAccountDetailsPage(),
                         ),
                       );
                       _loadShipperStats();
@@ -616,7 +640,8 @@ class _ShipperProfileState extends State<ShipperProfile>
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const ShipperDashboardMyPreferencePage(),
+                          builder: (context) =>
+                              const ShipperDashboardMyPreferencePage(),
                         ),
                       );
                     },
@@ -630,7 +655,8 @@ class _ShipperProfileState extends State<ShipperProfile>
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const ProfileDocumentManagment(),
+                          builder: (context) =>
+                              const ProfileDocumentManagment(),
                         ),
                       );
                     },
@@ -680,23 +706,23 @@ class _ShipperProfileState extends State<ShipperProfile>
                     },
                   ),
                   const SizedBox(height: 12),
-                   // App Settings - only visible in debug mode
-                if (kDebugMode) ...[
-                  const SizedBox(height: 12),
-                  _buildModernProfileOption(
-                    'App Settings',
-                    Icons.admin_panel_settings_rounded,
-                    'Developer settings',
-                    () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AppSettingsPage(),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+                  // App Settings - only visible in debug mode
+                  if (kDebugMode) ...[
+                    const SizedBox(height: 12),
+                    _buildModernProfileOption(
+                      'App Settings',
+                      Icons.admin_panel_settings_rounded,
+                      'Developer settings',
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AppSettingsPage(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                   _buildModernProfileOption(
                     'Help & Legal',
                     Icons.help_outline_rounded,
@@ -718,10 +744,7 @@ class _ShipperProfileState extends State<ShipperProfile>
                     height: 56,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [
-                          Colors.red.shade400,
-                          Colors.red.shade600,
-                        ],
+                        colors: [Colors.red.shade400, Colors.red.shade600],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
@@ -741,7 +764,11 @@ class _ShipperProfileState extends State<ShipperProfile>
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.logout_rounded, color: Colors.white, size: 22),
+                              Icon(
+                                Icons.logout_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
                               SizedBox(width: 12),
                               Text(
                                 'Log Out',
@@ -780,10 +807,7 @@ class _ShipperProfileState extends State<ShipperProfile>
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.2),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.3),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -839,11 +863,7 @@ class _ShipperProfileState extends State<ShipperProfile>
                   : Colors.grey.shade400,
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.check_rounded,
-              color: Colors.white,
-              size: 12,
-            ),
+            child: Icon(Icons.check_rounded, color: Colors.white, size: 12),
           ),
           const SizedBox(width: 6),
           Text(
@@ -938,10 +958,7 @@ class _ShipperProfileState extends State<ShipperProfile>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.grey.shade200,
-              width: 1,
-            ),
+            border: Border.all(color: Colors.grey.shade200, width: 1),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
@@ -958,11 +975,7 @@ class _ShipperProfileState extends State<ShipperProfile>
                   color: const Color(0xFF43975A).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  color: const Color(0xFF43975A),
-                  size: 24,
-                ),
+                child: Icon(icon, color: const Color(0xFF43975A), size: 24),
               ),
               const SizedBox(width: 16),
               Expanded(
@@ -1018,20 +1031,14 @@ class _ShipperProfileState extends State<ShipperProfile>
           ),
           content: const Text(
             'Are you sure you want to log out?',
-            style: TextStyle(
-              fontSize: 16,
-              color: Color(0xFF666666),
-            ),
+            style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
                 'Cancel',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
               ),
             ),
             TextButton(
@@ -1063,15 +1070,15 @@ class _ShipperProfileState extends State<ShipperProfile>
 
     try {
       appStateProvider.showLoadingWithMessage('Logging out...');
-      
+
       // Clear payment-related providers before logout
       paymentMethodsProvider.clear();
       carrierPaymentsProvider.clear();
-      
+
       await authProvider.signOut();
-      
+
       appStateProvider.showSuccess();
-      
+
       // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1080,9 +1087,9 @@ class _ShipperProfileState extends State<ShipperProfile>
           duration: Duration(seconds: 2),
         ),
       );
-      
+
       print('Shipper logout successful, navigating to AuthWrapper');
-      
+
       // Navigate directly to AuthWrapper which will handle the welcome screen
       if (context.mounted) {
         Navigator.of(context).pushAndRemoveUntil(

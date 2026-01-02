@@ -11,7 +11,8 @@ import 'carrier_onboarding_wrapper.dart';
 
 class CarrierSignUpScreen extends StatefulWidget {
   final VoidCallback? onOnboardingComplete;
-  const CarrierSignUpScreen({Key? key, this.onOnboardingComplete}) : super(key: key);
+  const CarrierSignUpScreen({Key? key, this.onOnboardingComplete})
+    : super(key: key);
 
   @override
   State<CarrierSignUpScreen> createState() => _CarrierSignUpScreenState();
@@ -22,12 +23,12 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
-  
+
   // Country selection state
   String _selectedCountryKey = 'canada'; // Use unique key instead of code
   String _selectedCountryCode = '+1';
   String _selectedCountryFlag = 'assets/canada_flag.png';
-  
+
   // Form controllers
   final _companyNameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -38,7 +39,12 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
 
   // Country data with unique keys
   final List<Map<String, String>> _countries = [
-    {'key': 'canada', 'code': '+1', 'flag': 'assets/canada_flag.png', 'name': 'Canada'},
+    {
+      'key': 'canada',
+      'code': '+1',
+      'flag': 'assets/canada_flag.png',
+      'name': 'Canada',
+    },
     // {'key': 'usa', 'code': '+1', 'flag': 'assets/flag.png', 'name': 'United States'},
     // {'key': 'uk', 'code': '+44', 'flag': 'assets/flag.png', 'name': 'United Kingdom'},
     // {'key': 'france', 'code': '+33', 'flag': 'assets/flag.png', 'name': 'France'},
@@ -46,7 +52,12 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     // {'key': 'japan', 'code': '+81', 'flag': 'assets/flag.png', 'name': 'Japan'},
     // {'key': 'china', 'code': '+86', 'flag': 'assets/flag.png', 'name': 'China'},
     // {'key': 'india', 'code': '+91', 'flag': 'assets/flag.png', 'name': 'India'},
-    {'key': 'pakistan', 'code': '+92', 'flag': 'assets/flag.png', 'name': 'Pakistan'},
+    {
+      'key': 'pakistan',
+      'code': '+92',
+      'flag': 'assets/flag.png',
+      'name': 'Pakistan',
+    },
     // {'key': 'australia', 'code': '+61', 'flag': 'assets/flag.png', 'name': 'Australia'},
     // {'key': 'brazil', 'code': '+55', 'flag': 'assets/flag.png', 'name': 'Brazil'},
   ];
@@ -66,7 +77,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please agree to the terms and conditions')),
+        const SnackBar(
+          content: Text('Please agree to the terms and conditions'),
+        ),
       );
       return;
     }
@@ -95,27 +108,31 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
             duration: Duration(seconds: 2),
           ),
         );
-        
+
         print('Carrier signup successful, navigating based on user role');
-        
+
         // Add a small delay to ensure user data is fully loaded
         await Future.delayed(const Duration(milliseconds: 500));
-        
+
         // Call onboarding completion callback if provided
         widget.onOnboardingComplete?.call();
-        
+
         // Direct navigation as fallback if AuthWrapper doesn't trigger
         if (context.mounted) {
           _navigateBasedOnRole(context, authProvider);
         }
       } else {
         print('Carrier signup failed: ${authProvider.errorMessage}');
-        appStateProvider.showError(authProvider.errorMessage ?? 'Signup failed');
+        appStateProvider.showError(
+          authProvider.errorMessage ?? 'Signup failed',
+        );
       }
     } catch (e) {
       // Stop loading and show error for any unexpected errors
       print('Carrier signup error: $e');
-      appStateProvider.showError('An unexpected error occurred. Please try again.');
+      appStateProvider.showError(
+        'An unexpected error occurred. Please try again.',
+      );
     }
   }
 
@@ -123,7 +140,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
   void _navigateBasedOnRole(BuildContext context, AuthProvider authProvider) {
     final userRole = authProvider.currentUser?.role;
     print('Carrier Signup: Navigating based on role: $userRole');
-    
+
     if (userRole == UserRole.shipper) {
       print('Carrier Signup: Navigating to Shipper Dashboard');
       Navigator.of(context).pushAndRemoveUntil(
@@ -139,10 +156,12 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     } else {
       print('Carrier Signup: Role not determined, navigating to AuthWrapper');
       // If role is not determined, navigate to AuthWrapper
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const AuthWrapper()),
-        (route) => false,
-      );
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const AuthWrapper()),
+          (route) => false,
+        );
+      }
     }
   }
 
@@ -164,7 +183,11 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     }
   }
 
-  Widget _buildWebDesktopLayout(BuildContext context, double screenWidth, double screenHeight) {
+  Widget _buildWebDesktopLayout(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+  ) {
     return Scaffold(
       body: Row(
         children: [
@@ -227,7 +250,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: const Color(0xFF1C6B4A).withOpacity(0.5),
+                                  color: const Color(
+                                    0xFF1C6B4A,
+                                  ).withOpacity(0.5),
                                   blurRadius: 20,
                                   offset: const Offset(0, 10),
                                 ),
@@ -264,7 +289,10 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                           ),
                           const SizedBox(height: 40),
                           // Feature highlights
-                          _buildFeatureItem('✓', 'Secure and reliable platform'),
+                          _buildFeatureItem(
+                            '✓',
+                            'Secure and reliable platform',
+                          ),
                           const SizedBox(height: 15),
                           _buildFeatureItem('✓', 'Easy onboarding process'),
                           const SizedBox(height: 15),
@@ -347,7 +375,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter email address';
                               }
-                              if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                              if (!RegExp(
+                                r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                              ).hasMatch(value)) {
                                 return 'Please enter a valid email';
                               }
                               return null;
@@ -405,14 +435,57 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                             },
                             onSuffixIconPressed: () {
                               setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword;
                               });
                             },
                           ),
                           const SizedBox(height: 25),
-                          // Terms and conditions
                           _buildWebTermsCheckbox(),
-                          const SizedBox(height: 30),
+                          const SizedBox(height: 25),
+                          // Error message display
+                          Consumer2<AuthProvider, AppStateProvider>(
+                            builder:
+                                (
+                                  context,
+                                  authProvider,
+                                  appStateProvider,
+                                  child,
+                                ) {
+                                  final error =
+                                      authProvider.errorMessage ??
+                                      appStateProvider.errorMessage;
+                                  if (error != null) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 20,
+                                      ),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.shade50,
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.red.shade200,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          error,
+                                          style: TextStyle(
+                                            color: Colors.red.shade700,
+                                            fontSize: 14,
+                                          ),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return const SizedBox.shrink();
+                                },
+                          ),
+                          const SizedBox(height: 10),
                           // Sign up button
                           _buildWebSignUpButton(),
                         ],
@@ -428,17 +501,18 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     );
   }
 
-  Widget _buildWebTabletLayout(BuildContext context, double screenWidth, double screenHeight) {
+  Widget _buildWebTabletLayout(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+  ) {
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFF4B744F),
-              Color(0xFFFEFEF6),
-            ],
+            colors: [Color(0xFF4B744F), Color(0xFFFEFEF6)],
             stops: [0.3, 0.3],
           ),
         ),
@@ -536,7 +610,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                             if (value == null || value.isEmpty) {
                               return 'Please enter email address';
                             }
-                            if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                            if (!RegExp(
+                              r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                            ).hasMatch(value)) {
                               return 'Please enter a valid email';
                             }
                             return null;
@@ -594,13 +670,48 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                           },
                           onSuffixIconPressed: () {
                             setState(() {
-                              _obscureConfirmPassword = !_obscureConfirmPassword;
+                              _obscureConfirmPassword =
+                                  !_obscureConfirmPassword;
                             });
                           },
                         ),
                         const SizedBox(height: 25),
                         _buildWebTermsCheckbox(),
-                        const SizedBox(height: 30),
+                        const SizedBox(height: 25),
+                        // Error message display
+                        Consumer2<AuthProvider, AppStateProvider>(
+                          builder:
+                              (context, authProvider, appStateProvider, child) {
+                                final error =
+                                    authProvider.errorMessage ??
+                                    appStateProvider.errorMessage;
+                                if (error != null) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 20),
+                                    child: Container(
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: Colors.red.shade200,
+                                        ),
+                                      ),
+                                      child: Text(
+                                        error,
+                                        style: TextStyle(
+                                          color: Colors.red.shade700,
+                                          fontSize: 14,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return const SizedBox.shrink();
+                              },
+                        ),
+                        const SizedBox(height: 10),
                         _buildWebSignUpButton(),
                       ],
                     ),
@@ -614,7 +725,11 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     );
   }
 
-  Widget _buildMobileLayout(BuildContext context, double screenWidth, double screenHeight) {
+  Widget _buildMobileLayout(
+    BuildContext context,
+    double screenWidth,
+    double screenHeight,
+  ) {
     const double designW = 456.0;
     const double designH = 952.0;
     final double scale = (screenWidth / designW < screenHeight / designH)
@@ -689,7 +804,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                                 if (value == null || value.isEmpty) {
                                   return 'Please enter email address';
                                 }
-                                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+                                if (!RegExp(
+                                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                ).hasMatch(value)) {
                                   return 'Please enter a valid email';
                                 }
                                 return null;
@@ -750,7 +867,8 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                               },
                               onSuffixIconPressed: () {
                                 setState(() {
-                                  _obscureConfirmPassword = !_obscureConfirmPassword;
+                                  _obscureConfirmPassword =
+                                      !_obscureConfirmPassword;
                                 });
                               },
                             ),
@@ -775,16 +893,19 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                               width: 20 * scale,
                               height: 20 * scale,
                               margin: EdgeInsets.only(
-                                  right: 8 * scale, top: 2 * scale),
+                                right: 8 * scale,
+                                top: 2 * scale,
+                              ),
                               decoration: BoxDecoration(
                                 color: _agreeToTerms
                                     ? const Color(0xFF4B744F)
                                     : Colors.white,
-                                borderRadius:
-                                BorderRadius.circular(4 * scale),
+                                borderRadius: BorderRadius.circular(4 * scale),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFF1C6B4A).withOpacity(0.95),
+                                    color: const Color(
+                                      0xFF1C6B4A,
+                                    ).withOpacity(0.95),
                                     blurRadius: 4,
                                     offset: const Offset(0, 4),
                                   ),
@@ -792,10 +913,10 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                               ),
                               child: _agreeToTerms
                                   ? Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 14 * scale,
-                              )
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 14 * scale,
+                                    )
                                   : null,
                             ),
                           ),
@@ -867,7 +988,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                                   height: 20 * scale,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
                                   ),
                                 )
                               : Text(
@@ -878,7 +1001,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                                     fontWeight: FontWeight.bold,
                                     shadows: [
                                       Shadow(
-                                        color: const Color(0xFF1C6B4A).withOpacity(0.95),
+                                        color: const Color(
+                                          0xFF1C6B4A,
+                                        ).withOpacity(0.95),
                                         offset: Offset(0, 2),
                                         blurRadius: 4,
                                       ),
@@ -892,9 +1017,12 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                 ),
               ),
               // Error message display
-              Consumer<AuthProvider>(
-                builder: (context, authProvider, child) {
-                  if (authProvider.errorMessage != null) {
+              Consumer2<AuthProvider, AppStateProvider>(
+                builder: (context, authProvider, appStateProvider, child) {
+                  final error =
+                      authProvider.errorMessage ??
+                      appStateProvider.errorMessage;
+                  if (error != null) {
                     return Positioned(
                       bottom: 250 * scale,
                       left: 20 * scale,
@@ -907,7 +1035,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                           border: Border.all(color: Colors.red.shade200),
                         ),
                         child: Text(
-                          authProvider.errorMessage!,
+                          error,
                           style: TextStyle(
                             color: Colors.red.shade700,
                             fontSize: 14 * scale,
@@ -938,7 +1066,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     String? Function(String?)? validator,
   }) {
     return Container(
-      height: 56,
+      constraints: const BoxConstraints(minHeight: 56),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -978,10 +1106,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                     color: Color(0xFF9CA3AF),
                   ),
                 ),
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF111827),
-                ),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF111827)),
               ),
             ),
             if (onSuffixIconPressed != null)
@@ -1005,7 +1130,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
     String? Function(String?)? validator,
   }) {
     return Container(
-      height: 56,
+      constraints: const BoxConstraints(minHeight: 56),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -1032,9 +1157,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                 keyboardType: TextInputType.phone,
                 autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: validator,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   hintText: hintText,
                   border: InputBorder.none,
@@ -1043,10 +1166,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                     color: Color(0xFF9CA3AF),
                   ),
                 ),
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF111827),
-                ),
+                style: const TextStyle(fontSize: 16, color: Color(0xFF111827)),
               ),
             ),
           ],
@@ -1088,7 +1208,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
               });
             }
           },
-          items: _countries.map<DropdownMenuItem<String>>((Map<String, String> country) {
+          items: _countries.map<DropdownMenuItem<String>>((
+            Map<String, String> country,
+          ) {
             return DropdownMenuItem<String>(
               value: country['key'],
               child: Row(
@@ -1188,26 +1310,31 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
               color: _agreeToTerms ? const Color(0xFF4B744F) : Colors.white,
               borderRadius: BorderRadius.circular(4),
               border: Border.all(
-                color: _agreeToTerms ? const Color(0xFF4B744F) : const Color(0xFFD1D5DB),
+                color: _agreeToTerms
+                    ? const Color(0xFF4B744F)
+                    : const Color(0xFFD1D5DB),
                 width: 2,
               ),
             ),
             child: _agreeToTerms
-                ? const Icon(
-              Icons.check,
-              color: Colors.white,
-              size: 14,
-            )
+                ? const Icon(Icons.check, color: Colors.white, size: 14)
                 : null,
           ),
         ),
-        const Expanded(
-          child: Text(
-            'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
-            style: TextStyle(
-              fontSize: 14,
-              color: Color(0xFF6B7280),
-              height: 1.4,
+        Expanded(
+          child: GestureDetector(
+            onTap: () {
+              setState(() {
+                _agreeToTerms = !_agreeToTerms;
+              });
+            },
+            child: const Text(
+              'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF6B7280),
+                height: 1.4,
+              ),
             ),
           ),
         ),
@@ -1242,10 +1369,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                   )
                 : const Text(
                     'Create Account',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
           ),
         );
@@ -1265,13 +1389,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
           ),
         ),
         const SizedBox(width: 12),
-        Text(
-          text,
-          style: const TextStyle(
-            fontSize: 16,
-            color: Colors.white,
-          ),
-        ),
+        Text(text, style: const TextStyle(fontSize: 16, color: Colors.white)),
       ],
     );
   }
@@ -1352,7 +1470,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
 
   // Helper method for the phone number field with flag and country code
   Widget _buildPhoneInputField({
-    required double scale, 
+    required double scale,
     required String hintText,
     TextEditingController? controller,
     String? Function(String?)? validator,
@@ -1384,9 +1502,7 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
                 keyboardType: TextInputType.phone,
                 autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: validator,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly
-                ],
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   hintText: hintText,
                   border: InputBorder.none,
@@ -1441,7 +1557,9 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
               });
             }
           },
-          items: _countries.map<DropdownMenuItem<String>>((Map<String, String> country) {
+          items: _countries.map<DropdownMenuItem<String>>((
+            Map<String, String> country,
+          ) {
             return DropdownMenuItem<String>(
               value: country['key'],
               child: Row(

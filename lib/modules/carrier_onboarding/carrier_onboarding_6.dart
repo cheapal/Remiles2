@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,7 +12,8 @@ class CarrierOnboarding6Screen extends StatefulWidget {
   const CarrierOnboarding6Screen({super.key, this.onOnboardingComplete});
 
   @override
-  State<CarrierOnboarding6Screen> createState() => _CarrierOnboarding6ScreenState();
+  State<CarrierOnboarding6Screen> createState() =>
+      _CarrierOnboarding6ScreenState();
 }
 
 class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
@@ -31,9 +33,11 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
-        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(
+          carrier.uid,
+        );
         if (onboardingData != null) {
           final response = onboardingData.getResponse('onboarding_6_income');
           if (response != null && response['incomeAmount'] != null) {
@@ -57,10 +61,7 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
     );
   }
@@ -91,17 +92,17 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
     setState(() {
       _isSaving = true;
     });
-    
+
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         final response = {
           'incomeAmount': _incomeController.text.trim(),
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveCarrierOnboardingResponse(
           carrier.uid,
           'onboarding_6_income',
@@ -109,10 +110,12 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         print('Onboarding 6 response saved: ${_incomeController.text.trim()}');
       }
     } catch (e) {
@@ -133,6 +136,36 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
     }
   }
 
+  Future<void> _handleNext() async {
+    // Validate that user has entered an amount (including 0)
+    final incomeText = _incomeController.text.trim();
+    if (incomeText.isEmpty) {
+      _showAlertDialog(context, 'Please enter an income amount to proceed.');
+      return;
+    }
+
+    // Validate that it's a valid number
+    final incomeValue = int.tryParse(incomeText);
+    if (incomeValue == null) {
+      _showAlertDialog(context, 'Please enter a valid number.');
+      return;
+    }
+
+    // Save the response before proceeding
+    await _saveOnboardingResponse();
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        _createFadePageRoute(
+          CarrierOnboarding7Screen(
+            onOnboardingComplete: widget.onOnboardingComplete,
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -148,10 +181,7 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
               SizedBox(height: 20),
               Text(
                 'Loading...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
               ),
             ],
           ),
@@ -173,7 +203,8 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
     final double endWidth = 322.5 * scale;
 
     return Scaffold(
-      resizeToAvoidBottomInset: false, // Prevents screen from resizing when keyboard opens
+      resizeToAvoidBottomInset:
+          false, // Prevents screen from resizing when keyboard opens
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark,
         child: SafeArea(
@@ -252,6 +283,7 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
                     child: Column(
                       children: [
                         SizedBox(height: 188 * scale),
+
                         Text(
                           'How much income do you estimate you \nlose per week from running empty?',
                           textAlign: TextAlign.left,
@@ -281,7 +313,9 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
                               ],
                             ),
                             child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 20 * scale),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 20 * scale,
+                              ),
                               child: Row(
                                 children: [
                                   // Bigger Dollar sign with space
@@ -314,7 +348,9 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
 
                                       decoration: InputDecoration(
                                         isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(vertical: 1 * scale),
+                                        contentPadding: EdgeInsets.symmetric(
+                                          vertical: 1 * scale,
+                                        ),
                                         border: InputBorder.none,
                                         hintText: 'Enter amount (e.g., 0)',
                                         hintStyle: TextStyle(
@@ -339,86 +375,104 @@ class _CarrierOnboarding6ScreenState extends State<CarrierOnboarding6Screen> {
               // Next button
               Positioned(
                 top: 626 * scale,
-                left: 287 * scale,
-                child: GestureDetector(
-                  onTap: _isSaving ? null : () async {
-                    // Validate that user has entered an amount (including 0)
-                    final incomeText = _incomeController.text.trim();
-                    if (incomeText.isEmpty) {
-                      _showAlertDialog(context, 'Please enter an income amount to proceed.');
-                      return;
-                    }
-                    
-                    // Validate that it's a valid number
-                    final incomeValue = int.tryParse(incomeText);
-                    if (incomeValue == null) {
-                      _showAlertDialog(context, 'Please enter a valid number.');
-                      return;
-                    }
-                    
-                    // Save the response before proceeding
-                    await _saveOnboardingResponse();
-                    
-                    if (mounted) {
-                      Navigator.push(
-                        context,
-                        _createFadePageRoute(CarrierOnboarding7Screen(
-                          onOnboardingComplete: widget.onOnboardingComplete,
-                        )),
-                      );
-                    }
-                  },
-                  child: Container(
-                    width: 110 * scale,
-                    height: 55 * scale,
-                    decoration: const BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage('assets/signup_button.png'),
-                        fit: BoxFit.fill,
-                      ),
-                      borderRadius: BorderRadius.all(Radius.circular(24.5)),
-                    ),
-                    child: Align(
-                      alignment: const Alignment(0, -0.2),
-                      child: _isSaving
-                          ? SizedBox(
-                              width: 20 * scale,
-                              height: 20 * scale,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                left: kIsWeb ? 0 : 287 * scale,
+                right: kIsWeb ? 0 : null,
+                child: kIsWeb
+                    ? Center(
+                        child: SizedBox(
+                          width: 200 * scale,
+                          height: 55 * scale,
+                          child: ElevatedButton(
+                            onPressed: _isSaving ? null : _handleNext,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4B744F),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  27.5 * scale,
+                                ),
                               ),
-                            )
-                          : Text(
-                              "Next",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18 * scale,
-                                fontWeight: FontWeight.bold,
-                                shadows: const [
-                                  Shadow(
-                                    color: Color.fromRGBO(0, 0, 0, 0.3),
-                                    offset: Offset(0, 2),
-                                    blurRadius: 4,
-                                  ),
-                                ],
-                              ),
+                              elevation: 4,
                             ),
-                    ),
-                  ),
-                ),
+                            child: _isSaving
+                                ? SizedBox(
+                                    width: 20 * scale,
+                                    height: 20 * scale,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    "Next",
+                                    style: TextStyle(
+                                      fontSize: 18 * scale,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: _isSaving ? null : _handleNext,
+                        child: Container(
+                          width: 110 * scale,
+                          height: 55 * scale,
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/signup_button.png'),
+                              fit: BoxFit.fill,
+                            ),
+                            borderRadius: BorderRadius.all(
+                              Radius.circular(24.5),
+                            ),
+                          ),
+                          child: Align(
+                            alignment: const Alignment(0, -0.2),
+                            child: _isSaving
+                                ? SizedBox(
+                                    width: 20 * scale,
+                                    height: 20 * scale,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    "Next",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18 * scale,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Color.fromRGBO(0, 0, 0, 0.3),
+                                          offset: Offset(0, 2),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
               ),
 
               // Bottom image positioned to touch the bottom and side edges
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Image.asset(
-                  'assets/leather_up.png',
-                  fit: BoxFit.cover,
+              if (!kIsWeb)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Image.asset(
+                    'assets/leather_up.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
             ],
           ),
         ),

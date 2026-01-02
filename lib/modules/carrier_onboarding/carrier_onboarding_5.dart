@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +13,8 @@ class CarrierOnboarding5Screen extends StatefulWidget {
   const CarrierOnboarding5Screen({super.key, this.onOnboardingComplete});
 
   @override
-  State<CarrierOnboarding5Screen> createState() => _CarrierOnboarding5ScreenState();
+  State<CarrierOnboarding5Screen> createState() =>
+      _CarrierOnboarding5ScreenState();
 }
 
 class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
@@ -32,11 +34,15 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
-        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(
+          carrier.uid,
+        );
         if (onboardingData != null) {
-          final response = onboardingData.getResponse('onboarding_5_experience');
+          final response = onboardingData.getResponse(
+            'onboarding_5_experience',
+          );
           if (response != null && response['selectedOption'] != null) {
             setState(() {
               _selectedOption = response['selectedOption'];
@@ -58,10 +64,7 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
     );
   }
@@ -92,13 +95,13 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         final response = {
           'selectedOption': _selectedOption,
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveCarrierOnboardingResponse(
           carrier.uid,
           'onboarding_5_experience',
@@ -106,10 +109,12 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         print('Onboarding 5 response saved: $_selectedOption');
       }
     } catch (e) {
@@ -145,10 +150,7 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
               SizedBox(height: 20),
               Text(
                 'Loading...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
               ),
             ],
           ),
@@ -236,23 +238,42 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
               ),
 
               // Title text
-              Positioned(
-                top: 186 * scale,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: Text(
-                    'How often do you return with an empty \ntrailer after a delivery?',
-                    textAlign: TextAlign.left,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 20 * scale,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF000000),
+              if (!kIsWeb)
+                Positioned(
+                  top: 186 * scale,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Text(
+                      'How often do you return with an empty \ntrailer after a delivery?',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 20 * scale,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF000000),
+                      ),
                     ),
                   ),
                 ),
-              ),
+
+              if (kIsWeb)
+                Positioned(
+                  top: 186 * scale,
+                  left: 46,
+                  child: Center(
+                    child: Text(
+                      'How often do you return with an empty \ntrailer after a delivery?',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 20 * scale,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF000000),
+                      ),
+                    ),
+                  ),
+                ),
 
               // Options
               _buildOption(scale, 'Always', 275 * scale),
@@ -266,39 +287,50 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
                 top: 625 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: _isSaving ? null : () async {
-                    if (_selectedOption == null) {
-                      _showAlertDialog(context, 'Please select an option to proceed.');
-                      return;
-                    }
-                    
-                    setState(() => _isSaving = true);
-                    try {
-                      // Save the response before proceeding
-                      await _saveOnboardingResponse();
-                      
-                      if (!mounted) return;
-                      if (_selectedOption == 'Never') {
-                        Navigator.push(
-                          context,
-                          _createFadePageRoute(CarrierOnboarding7Screen(
-                            onOnboardingComplete: widget.onOnboardingComplete,
-                          )),
-                        );
-                      } else {
-                        Navigator.push(
-                          context,
-                          _createFadePageRoute(CarrierOnboarding6Screen(
-                            onOnboardingComplete: widget.onOnboardingComplete,
-                          )),
-                        );
-                      }
-                    } catch (e) {
-                      // Error handling is already in _saveOnboardingResponse
-                    } finally {
-                      if (mounted) setState(() => _isSaving = false);
-                    }
-                  },
+                  onTap: _isSaving
+                      ? null
+                      : () async {
+                          if (_selectedOption == null) {
+                            _showAlertDialog(
+                              context,
+                              'Please select an option to proceed.',
+                            );
+                            return;
+                          }
+
+                          setState(() => _isSaving = true);
+                          try {
+                            // Save the response before proceeding
+                            await _saveOnboardingResponse();
+
+                            if (!mounted) return;
+                            if (_selectedOption == 'Never') {
+                              Navigator.push(
+                                context,
+                                _createFadePageRoute(
+                                  CarrierOnboarding7Screen(
+                                    onOnboardingComplete:
+                                        widget.onOnboardingComplete,
+                                  ),
+                                ),
+                              );
+                            } else {
+                              Navigator.push(
+                                context,
+                                _createFadePageRoute(
+                                  CarrierOnboarding6Screen(
+                                    onOnboardingComplete:
+                                        widget.onOnboardingComplete,
+                                  ),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            // Error handling is already in _saveOnboardingResponse
+                          } finally {
+                            if (mounted) setState(() => _isSaving = false);
+                          }
+                        },
                   child: Container(
                     width: 110 * scale,
                     height: 55 * scale,
@@ -317,7 +349,9 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
                               height: 20 * scale,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : Text(
@@ -341,15 +375,16 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
               ),
 
               // Bottom image positioned to touch the bottom and side edges
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Image.asset(
-                  'assets/leather_up.png',
-                  fit: BoxFit.cover,
+              if (!kIsWeb)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Image.asset(
+                    'assets/leather_up.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -374,7 +409,9 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
               width: 34 * scale,
               height: 36 * scale,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF4B744F) : const Color(0xFFF8F8F8),
+                color: isSelected
+                    ? const Color(0xFF4B744F)
+                    : const Color(0xFFF8F8F8),
                 borderRadius: BorderRadius.circular(20 * scale),
                 boxShadow: const [
                   BoxShadow(
@@ -385,11 +422,7 @@ class _CarrierOnboarding5ScreenState extends State<CarrierOnboarding5Screen> {
                 ],
               ),
               child: isSelected
-                  ? Icon(
-                Icons.check,
-                color: Colors.white,
-                size: 24 * scale,
-              )
+                  ? Icon(Icons.check, color: Colors.white, size: 24 * scale)
                   : null,
             ),
             SizedBox(width: 20 * scale),

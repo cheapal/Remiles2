@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -11,7 +12,8 @@ class CarrierOnboarding2Screen extends StatefulWidget {
   const CarrierOnboarding2Screen({super.key, this.onOnboardingComplete});
 
   @override
-  State<CarrierOnboarding2Screen> createState() => _CarrierOnboarding2ScreenState();
+  State<CarrierOnboarding2Screen> createState() =>
+      _CarrierOnboarding2ScreenState();
 }
 
 class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
@@ -31,11 +33,15 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
-        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(
+          carrier.uid,
+        );
         if (onboardingData != null) {
-          final response = onboardingData.getResponse('onboarding_2_business_type');
+          final response = onboardingData.getResponse(
+            'onboarding_2_business_type',
+          );
           if (response != null && response['selectedOption'] != null) {
             setState(() {
               _selectedOption = response['selectedOption'];
@@ -57,10 +63,7 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
     );
   }
@@ -91,17 +94,17 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
     setState(() {
       _isSaving = true;
     });
-    
+
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         final response = {
           'selectedOption': _selectedOption,
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveCarrierOnboardingResponse(
           carrier.uid,
           'onboarding_2_business_type',
@@ -109,10 +112,12 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         print('Onboarding 2 response saved: $_selectedOption');
       }
     } catch (e) {
@@ -148,10 +153,7 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
               SizedBox(height: 20),
               Text(
                 'Loading...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
               ),
             ],
           ),
@@ -236,25 +238,54 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
               ),
 
               // Title text aligned with the options
-              Positioned(
-                top: 194 * scale,
-                left: 46 * scale, // Aligned with the checkboxes
-                child: Text(
-                  'How often are you looking to accept \nloads through the app?',
-                  textAlign: TextAlign.left,
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 20 * scale,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF000000),
+              if (!kIsWeb)
+                Positioned(
+                  top: 194 * scale,
+                  left: 46 * scale, // Aligned with the checkboxes
+                  child: Text(
+                    'How often are you looking to accept \nloads through the app?',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
                   ),
                 ),
-              ),
+
+              if (kIsWeb)
+                Positioned(
+                  top: 194 * scale,
+                  left: 50 * scale, // Aligned with the checkboxes
+                  child: Text(
+                    'How often are you looking to accept \nloads through the app?',
+                    textAlign: TextAlign.left,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 20 * scale,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF000000),
+                    ),
+                  ),
+                ),
 
               // Options
-              _buildOption(scale, 'full-time carrier/owner-operator — this is my primary work', 293 * scale),
-              _buildOption(scale, 'I drive part-time or when I’m available', 360 * scale),
-              _buildOption(scale, 'I’m just exploring the app right now', 427 * scale),
+              _buildOption(
+                scale,
+                'full-time carrier/owner-operator — this is my primary work',
+                293 * scale,
+              ),
+              _buildOption(
+                scale,
+                'I drive part-time or when I’m available',
+                360 * scale,
+              ),
+              _buildOption(
+                scale,
+                'I’m just exploring the app right now',
+                427 * scale,
+              ),
 
               // Other option as a button
               _buildOtherButton(scale, 'Other', 514 * scale, context),
@@ -264,23 +295,31 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                 top: 602 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: _isSaving ? null : () async {
-                    if (_selectedOption != null) {
-                      // Save the response before proceeding
-                      await _saveOnboardingResponse();
-                      
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          _createFadePageRoute(CarrierOnboarding3Screen(
-                            onOnboardingComplete: widget.onOnboardingComplete,
-                          )),
-                        );
-                      }
-                    } else {
-                      _showAlertDialog(context, 'Please select an option to proceed.');
-                    }
-                  },
+                  onTap: _isSaving
+                      ? null
+                      : () async {
+                          if (_selectedOption != null) {
+                            // Save the response before proceeding
+                            await _saveOnboardingResponse();
+
+                            if (mounted) {
+                              Navigator.push(
+                                context,
+                                _createFadePageRoute(
+                                  CarrierOnboarding3Screen(
+                                    onOnboardingComplete:
+                                        widget.onOnboardingComplete,
+                                  ),
+                                ),
+                              );
+                            }
+                          } else {
+                            _showAlertDialog(
+                              context,
+                              'Please select an option to proceed.',
+                            );
+                          }
+                        },
                   child: Container(
                     width: 110 * scale,
                     height: 55 * scale,
@@ -299,7 +338,9 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                               height: 20 * scale,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : Text(
@@ -323,15 +364,16 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
               ),
 
               // Bottom image positioned to touch the bottom and side edges
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Image.asset(
-                  'assets/leather_up.png',
-                  fit: BoxFit.cover,
+              if (!kIsWeb)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Image.asset(
+                    'assets/leather_up.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -356,7 +398,9 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
               width: 34 * scale,
               height: 36 * scale,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF4B744F) : const Color(0xFFF8F8F8),
+                color: isSelected
+                    ? const Color(0xFF4B744F)
+                    : const Color(0xFFF8F8F8),
                 borderRadius: BorderRadius.circular(20 * scale),
                 boxShadow: const [
                   BoxShadow(
@@ -367,11 +411,7 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
                 ],
               ),
               child: isSelected
-                  ? Icon(
-                Icons.check,
-                color: Colors.white,
-                size: 24 * scale,
-              )
+                  ? Icon(Icons.check, color: Colors.white, size: 24 * scale)
                   : null,
             ),
             SizedBox(width: 20 * scale),
@@ -393,7 +433,12 @@ class _CarrierOnboarding2ScreenState extends State<CarrierOnboarding2Screen> {
     );
   }
 
-  Widget _buildOtherButton(double scale, String text, double top, BuildContext context) {
+  Widget _buildOtherButton(
+    double scale,
+    String text,
+    double top,
+    BuildContext context,
+  ) {
     return Positioned(
       top: top,
       left: 50 * scale,

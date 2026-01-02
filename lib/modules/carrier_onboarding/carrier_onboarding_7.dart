@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/carrier_dashboard_1.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +11,8 @@ class CarrierOnboarding7Screen extends StatefulWidget {
   const CarrierOnboarding7Screen({super.key, this.onOnboardingComplete});
 
   @override
-  State<CarrierOnboarding7Screen> createState() => _CarrierOnboarding7ScreenState();
+  State<CarrierOnboarding7Screen> createState() =>
+      _CarrierOnboarding7ScreenState();
 }
 
 class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
@@ -19,14 +21,10 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
     );
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +81,8 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
                           fontFamily: 'Roboto',
                           letterSpacing: -1,
                           fontSize: 30 * scale,
-                          fontWeight: FontWeight.w800, // Replaced FontWeight.bold with w800
+                          fontWeight: FontWeight
+                              .w800, // Replaced FontWeight.bold with w800
                           fontStyle: FontStyle.italic,
                           color: const Color(0xFF000000),
                         ),
@@ -101,7 +100,6 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
                       ),
 
                       SizedBox(height: 22 * scale),
-
                     ],
                   ),
                 ),
@@ -129,18 +127,24 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
                 ),
               ),
 
-              // Here's how section, aligned left with the check icons
+              // Here's how section, aligned centered
               Positioned(
                 top: 448 * scale,
-                left: 45 * scale, // Aligned with the _buildFeaturePoint left padding
-                child: Text(
-                  'Here’s how:',
-                  textAlign: TextAlign.left,
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 16 * scale,
-                    fontWeight: FontWeight.bold,
-                    color: const Color(0xFF0B0B0B),
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: SizedBox(
+                    width: 388 * scale,
+                    child: Text(
+                      'Here’s how:',
+                      textAlign: TextAlign.left,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16 * scale,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF0B0B0B),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -151,86 +155,128 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
                   text: 'Find loads that match your truck type',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                TextSpan(
-                  text: ' to save time searching for suitable jobs',
-                ),
+                TextSpan(text: ' to save time searching for suitable jobs'),
               ], 479 * scale),
               _buildFeaturePoint(scale, [
                 TextSpan(
                   text: 'Reduce empty miles and increase revenue',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                TextSpan(
-                  text: ' by optimizing your routes.',
-                ),
+                TextSpan(text: ' by optimizing your routes.'),
               ], 532 * scale),
               _buildFeaturePoint(scale, [
                 TextSpan(
                   text: 'Secure timely payments from verified shippers',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
-                TextSpan(
-                  text: ' for peace of mind and financial stability.',
-                ),
+                TextSpan(text: ' for peace of mind and financial stability.'),
               ], 583 * scale),
 
               // Next button
               Positioned(
                 top: 677 * scale,
-                left: 287 * scale,
-                child: GestureDetector(
-                  onTap: _completing ? null : () => _handleOnboardingComplete(context),
-                  child: Container(
-                    width: 110 * scale,
-                    height: 55 * scale,
-                    decoration: const BoxDecoration(
-                      image: DecorationImage(
-                        image: AssetImage('assets/signup_button.png'),
-                        fit: BoxFit.fill,
-                      ),
-                      borderRadius: BorderRadius.all(Radius.circular(24.5)),
-                    ),
-                    child: Align(
-                      alignment: const Alignment(0, -0.2),
-                      child: _completing
-                          ? SizedBox(
-                              width: 20 * scale,
-                              height: 20 * scale,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                left: kIsWeb ? 0 : 287 * scale,
+                right: kIsWeb ? 0 : null,
+                child: kIsWeb
+                    ? Center(
+                        child: SizedBox(
+                          width: 200 * scale,
+                          height: 55 * scale,
+                          child: ElevatedButton(
+                            onPressed: _completing
+                                ? null
+                                : () => _handleOnboardingComplete(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4B744F),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                  27.5 * scale,
+                                ),
                               ),
-                            )
-                          : Text(
-                              "Next",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18 * scale,
-                                fontWeight: FontWeight.bold,
-                                shadows: const [
-                                  Shadow(
-                                    color: Color.fromRGBO(0, 0, 0, 0.3),
-                                    offset: Offset(0, 2),
-                                    blurRadius: 4,
-                                  ),
-                                ],
-                              ),
+                              elevation: 4,
                             ),
-                    ),
-                  ),
-                ),
+                            child: _completing
+                                ? SizedBox(
+                                    width: 20 * scale,
+                                    height: 20 * scale,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    "Next",
+                                    style: TextStyle(
+                                      fontSize: 18 * scale,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      )
+                    : GestureDetector(
+                        onTap: _completing
+                            ? null
+                            : () => _handleOnboardingComplete(context),
+                        child: Container(
+                          width: 110 * scale,
+                          height: 55 * scale,
+                          decoration: const BoxDecoration(
+                            image: DecorationImage(
+                              image: AssetImage('assets/signup_button.png'),
+                              fit: BoxFit.fill,
+                            ),
+                            borderRadius: BorderRadius.all(
+                              Radius.circular(24.5),
+                            ),
+                          ),
+                          child: Align(
+                            alignment: const Alignment(0, -0.2),
+                            child: _completing
+                                ? SizedBox(
+                                    width: 20 * scale,
+                                    height: 20 * scale,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Text(
+                                    "Next",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18 * scale,
+                                      fontWeight: FontWeight.bold,
+                                      shadows: const [
+                                        Shadow(
+                                          color: Color.fromRGBO(0, 0, 0, 0.3),
+                                          offset: Offset(0, 2),
+                                          blurRadius: 4,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
               ),
 
               // Bottom image positioned to touch the bottom and side edges
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Image.asset(
-                  'assets/leather_up.png',
-                  fit: BoxFit.cover,
+              if (!kIsWeb)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Image.asset(
+                    'assets/leather_up.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -243,14 +289,14 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         // Save final onboarding response
         final response = {
           'completed': true,
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveCarrierOnboardingResponse(
           carrier.uid,
           'onboarding_7_completion',
@@ -258,19 +304,21 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         // Mark onboarding as complete in Firebase
         await FirebaseService.markCarrierOnboardingComplete(carrier.uid);
-        
+
         print('Onboarding completed successfully');
       }
-      
+
       // Call the completion callback if provided
       widget.onOnboardingComplete?.call();
-      
+
       // Navigate to carrier dashboard 1 and clear all previous screens
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
@@ -302,26 +350,31 @@ class _CarrierOnboarding7ScreenState extends State<CarrierOnboarding7Screen> {
   Widget _buildFeaturePoint(double scale, List<TextSpan> spans, double top) {
     return Positioned(
       top: top,
-      left: 45 * scale,
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.check, color: Colors.black, size: 24 * scale),
-          SizedBox(width: 10 * scale),
-          Container(
-            width: 311 * scale,
-            child: RichText(
-              text: TextSpan(
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 16 * scale,
-                  color: const Color(0xFF000000),
+      left: 0,
+      right: 0,
+      child: Center(
+        child: SizedBox(
+          width: 388 * scale,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.check, color: Colors.black, size: 24 * scale),
+              SizedBox(width: 10 * scale),
+              Expanded(
+                child: RichText(
+                  text: TextSpan(
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 16 * scale,
+                      color: const Color(0xFF000000),
+                    ),
+                    children: spans,
+                  ),
                 ),
-                children: spans,
               ),
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -12,7 +13,8 @@ class CarrierOnboarding3Screen extends StatefulWidget {
   const CarrierOnboarding3Screen({super.key, this.onOnboardingComplete});
 
   @override
-  State<CarrierOnboarding3Screen> createState() => _CarrierOnboarding3ScreenState();
+  State<CarrierOnboarding3Screen> createState() =>
+      _CarrierOnboarding3ScreenState();
 }
 
 class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
@@ -32,11 +34,15 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
-        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(
+          carrier.uid,
+        );
         if (onboardingData != null) {
-          final response = onboardingData.getResponse('onboarding_3_service_areas');
+          final response = onboardingData.getResponse(
+            'onboarding_3_service_areas',
+          );
           if (response != null && response['selectedOptions'] != null) {
             setState(() {
               _selectedOptions = Set<String>.from(response['selectedOptions']);
@@ -58,10 +64,7 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
     );
   }
@@ -92,17 +95,17 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
     setState(() {
       _isSaving = true;
     });
-    
+
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         final response = {
           'selectedOptions': _selectedOptions.toList(),
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveCarrierOnboardingResponse(
           carrier.uid,
           'onboarding_3_service_areas',
@@ -110,10 +113,12 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         print('Onboarding 3 response saved: ${_selectedOptions.toList()}');
       }
     } catch (e) {
@@ -149,10 +154,7 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
               SizedBox(height: 20),
               Text(
                 'Loading...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
               ),
             ],
           ),
@@ -240,23 +242,42 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
               ),
 
               // Title text
-              Positioned(
-                top: 176 * scale,
-                left: 0,
-                right: 46,
-                child: Center(
-                  child: Text(
-                    'How do you currently find loads?',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 20 * scale,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF000000),
+              if (!kIsWeb)
+                Positioned(
+                  top: 176 * scale,
+                  left: 0,
+                  right: 46,
+                  child: Center(
+                    child: Text(
+                      'How do you currently find loads?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 20 * scale,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF000000),
+                      ),
                     ),
                   ),
                 ),
-              ),
+
+              if (kIsWeb)
+                Positioned(
+                  top: 176 * scale,
+                  left: 46,
+                  child: Center(
+                    child: Text(
+                      'How do you currently find loads?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 20 * scale,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF000000),
+                      ),
+                    ),
+                  ),
+                ),
 
               // Options
               _buildOption(scale, 'Dispatcher', 235 * scale),
@@ -273,23 +294,31 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
                 top: 625 * scale,
                 left: 287 * scale,
                 child: GestureDetector(
-                  onTap: _isSaving ? null : () async {
-                    if (_selectedOptions.isNotEmpty) {
-                      // Save the response before proceeding
-                      await _saveOnboardingResponse();
-                      
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          _createFadePageRoute(CarrierOnboarding4Screen(
-                            onOnboardingComplete: widget.onOnboardingComplete,
-                          )),
-                        );
-                      }
-                    } else {
-                      _showAlertDialog(context, 'Please select at least one option to proceed.');
-                    }
-                  },
+                  onTap: _isSaving
+                      ? null
+                      : () async {
+                          if (_selectedOptions.isNotEmpty) {
+                            // Save the response before proceeding
+                            await _saveOnboardingResponse();
+
+                            if (mounted) {
+                              Navigator.push(
+                                context,
+                                _createFadePageRoute(
+                                  CarrierOnboarding4Screen(
+                                    onOnboardingComplete:
+                                        widget.onOnboardingComplete,
+                                  ),
+                                ),
+                              );
+                            }
+                          } else {
+                            _showAlertDialog(
+                              context,
+                              'Please select at least one option to proceed.',
+                            );
+                          }
+                        },
                   child: Container(
                     width: 110 * scale,
                     height: 55 * scale,
@@ -308,7 +337,9 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
                               height: 20 * scale,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : Text(
@@ -332,15 +363,16 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
               ),
 
               // Bottom image positioned to touch the bottom and side edges
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Image.asset(
-                  'assets/leather_up.png',
-                  fit: BoxFit.cover,
+              if (!kIsWeb)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Image.asset(
+                    'assets/leather_up.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -369,7 +401,9 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
               width: 34 * scale,
               height: 36 * scale,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF4B744F) : const Color(0xFFF8F8F8),
+                color: isSelected
+                    ? const Color(0xFF4B744F)
+                    : const Color(0xFFF8F8F8),
                 borderRadius: BorderRadius.circular(5 * scale),
                 boxShadow: const [
                   BoxShadow(
@@ -380,11 +414,7 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
                 ],
               ),
               child: isSelected
-                  ? Icon(
-                Icons.check,
-                color: Colors.white,
-                size: 24 * scale,
-              )
+                  ? Icon(Icons.check, color: Colors.white, size: 24 * scale)
                   : null,
             ),
             SizedBox(width: 20 * scale),
@@ -403,7 +433,12 @@ class _CarrierOnboarding3ScreenState extends State<CarrierOnboarding3Screen> {
     );
   }
 
-  Widget _buildOtherButton(double scale, String text, double top, BuildContext context) {
+  Widget _buildOtherButton(
+    double scale,
+    String text,
+    double top,
+    BuildContext context,
+  ) {
     return Positioned(
       top: top,
       left: 48 * scale,

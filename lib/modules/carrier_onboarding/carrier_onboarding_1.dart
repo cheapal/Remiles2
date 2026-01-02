@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -13,7 +14,8 @@ class CarrierOnboarding1Screen extends StatefulWidget {
   const CarrierOnboarding1Screen({super.key, this.onOnboardingComplete});
 
   @override
-  State<CarrierOnboarding1Screen> createState() => _CarrierOnboarding1ScreenState();
+  State<CarrierOnboarding1Screen> createState() =>
+      _CarrierOnboarding1ScreenState();
 }
 
 class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
@@ -33,14 +35,20 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
-        final onboardingData = await FirebaseService.getCarrierOnboardingData(carrier.uid);
+        final onboardingData = await FirebaseService.getCarrierOnboardingData(
+          carrier.uid,
+        );
         if (onboardingData != null) {
-          final response = onboardingData.getResponse('onboarding_1_vehicle_types');
+          final response = onboardingData.getResponse(
+            'onboarding_1_vehicle_types',
+          );
           if (response != null && response['selectedVehicleTypes'] != null) {
             setState(() {
-              _selectedVehicleTypes = Set<String>.from(response['selectedVehicleTypes']);
+              _selectedVehicleTypes = Set<String>.from(
+                response['selectedVehicleTypes'],
+              );
             });
           }
         }
@@ -59,10 +67,7 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
     );
   }
@@ -93,13 +98,13 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         final response = {
           'selectedVehicleTypes': _selectedVehicleTypes.toList(),
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveCarrierOnboardingResponse(
           carrier.uid,
           'onboarding_1_vehicle_types',
@@ -107,10 +112,12 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         print('Onboarding 1 response saved: ${_selectedVehicleTypes.toList()}');
       }
     } catch (e) {
@@ -134,10 +141,7 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
               SizedBox(height: 20),
               Text(
                 'Loading...',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
               ),
             ],
           ),
@@ -227,27 +231,50 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
               ),
 
               // Title text
-              Positioned(
-                top: 190.5 * scale,
-                left: 0,
-                right: 17,
-                child: Center(
-                  child: Text(
-                    'What type of vehicle do you operate?',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 20 * scale,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF000000),
+              if (!kIsWeb)
+                Positioned(
+                  top: 190.5 * scale,
+                  left: 0,
+                  right: 17,
+                  child: Center(
+                    child: Text(
+                      'What type of vehicle do you operate?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 20 * scale,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF000000),
+                      ),
                     ),
                   ),
                 ),
-              ),
+
+              if (kIsWeb)
+                Positioned(
+                  top: 190.5 * scale,
+                  left: 50,
+                  child: Center(
+                    child: Text(
+                      'What type of vehicle do you operate?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 20 * scale,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF000000),
+                      ),
+                    ),
+                  ),
+                ),
 
               // Vehicle Type Options
               _buildVehicleOption(scale, 'Dry Van', 252.5 * scale),
-              _buildVehicleOption(scale, 'Reefer ( Refrigerated )', 319.5 * scale),
+              _buildVehicleOption(
+                scale,
+                'Reefer ( Refrigerated )',
+                319.5 * scale,
+              ),
               _buildVehicleOption(scale, 'Flatbed', 386.5 * scale),
               _buildVehicleOption(scale, 'Boxtruck', 453.5 * scale),
               _buildVehicleOption(scale, 'Tanker', 519.5 * scale),
@@ -262,22 +289,27 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
                 child: GestureDetector(
                   onTap: () async {
                     if (_selectedVehicleTypes.isEmpty) {
-                      _showAlertDialog(context, 'Please select at least one option to proceed.');
+                      _showAlertDialog(
+                        context,
+                        'Please select at least one option to proceed.',
+                      );
                       return;
                     }
                     if (_saving) return;
-                    
+
                     setState(() => _saving = true);
                     try {
                       // Save the response before proceeding
                       await _saveOnboardingResponse();
-                      
+
                       if (!mounted) return;
                       Navigator.push(
                         context,
-                        _createFadePageRoute(CarrierOnboarding2Screen(
-                          onOnboardingComplete: widget.onOnboardingComplete,
-                        )),
+                        _createFadePageRoute(
+                          CarrierOnboarding2Screen(
+                            onOnboardingComplete: widget.onOnboardingComplete,
+                          ),
+                        ),
                       );
                     } catch (e) {
                       if (mounted) {
@@ -311,7 +343,9 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
                               height: 20 * scale,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
                               ),
                             )
                           : Text(
@@ -335,15 +369,16 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
               ),
 
               // Bottom image positioned to touch the bottom and side edges
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Image.asset(
-                  'assets/leather_up.png',
-                  fit: BoxFit.cover,
+              if (!kIsWeb)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Image.asset(
+                    'assets/leather_up.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -375,7 +410,9 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
               width: 34 * scale,
               height: 36 * scale,
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF4B744F) : const Color(0xFFF8F8F8),
+                color: isSelected
+                    ? const Color(0xFF4B744F)
+                    : const Color(0xFFF8F8F8),
                 borderRadius: BorderRadius.circular(5 * scale),
                 boxShadow: [
                   BoxShadow(
@@ -386,11 +423,7 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
                 ],
               ),
               child: isSelected
-                  ? Icon(
-                Icons.check,
-                color: Colors.white,
-                size: 24 * scale,
-              )
+                  ? Icon(Icons.check, color: Colors.white, size: 24 * scale)
                   : null,
             ),
             SizedBox(width: 20 * scale),
@@ -410,9 +443,14 @@ class _CarrierOnboarding1ScreenState extends State<CarrierOnboarding1Screen> {
   }
 
   // Helper method to build the "Other" option as a button
-  Widget _buildOtherButton(double scale, String text, double top, BuildContext context) {
+  Widget _buildOtherButton(
+    double scale,
+    String text,
+    double top,
+    BuildContext context,
+  ) {
     return Positioned(
-      top: top+20,
+      top: top + 20,
       left: 50 * scale,
       child: GestureDetector(
         onTap: () {

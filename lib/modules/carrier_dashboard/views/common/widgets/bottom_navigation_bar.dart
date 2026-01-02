@@ -18,12 +18,8 @@ class BottomNavigationBarTab extends StatelessWidget {
       decoration: const BoxDecoration(
         color: Color(0xFF0A6837),
         image: DecorationImage(
-          image: AssetImage('assets/nav_leather.png'),
+          image: AssetImage('assets/leather_square.png'),
           fit: BoxFit.cover,
-        ),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
         ),
       ),
       child: BottomNavigationBar(
@@ -34,12 +30,44 @@ class BottomNavigationBarTab extends StatelessWidget {
         selectedItemColor: Colors.white,
         unselectedItemColor: Colors.white70,
         onTap: onTap,
-        items:  [
-          BottomNavigationBarItem(icon: SvgPicture.asset("assets/home.svg",width: 24, height: 24), label: "Home"),
-          BottomNavigationBarItem(icon: SvgPicture.asset("assets/manage_load.svg",width: 24, height: 24), label: "Manage Loads"),
-          BottomNavigationBarItem(icon: SvgPicture.asset("assets/marketplace_bottom_nav.svg",width: 24, height: 24), label: "Marketplace"),
-          BottomNavigationBarItem(icon: SvgPicture.asset("assets/person_bottom_nav.svg",width: 24, height: 24), label: "Profile"),
-          BottomNavigationBarItem(icon: SvgPicture.asset("assets/menu_bottom_nav.svg", color: Colors.white, width: 24, height: 24), label: "More"),
+        items: [
+          BottomNavigationBarItem(
+            icon: SvgPicture.asset("assets/home.svg", width: 24, height: 24),
+            label: "Home",
+          ),
+          BottomNavigationBarItem(
+            icon: SvgPicture.asset(
+              "assets/manage_load.svg",
+              width: 24,
+              height: 24,
+            ),
+            label: "Manage Loads",
+          ),
+          BottomNavigationBarItem(
+            icon: SvgPicture.asset(
+              "assets/marketplace_bottom_nav.svg",
+              width: 24,
+              height: 24,
+            ),
+            label: "Marketplace",
+          ),
+          BottomNavigationBarItem(
+            icon: SvgPicture.asset(
+              "assets/person_bottom_nav.svg",
+              width: 24,
+              height: 24,
+            ),
+            label: "Profile",
+          ),
+          BottomNavigationBarItem(
+            icon: SvgPicture.asset(
+              "assets/menu_bottom_nav.svg",
+              color: Colors.white,
+              width: 24,
+              height: 24,
+            ),
+            label: "More",
+          ),
         ],
       ),
     );

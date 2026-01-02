@@ -141,6 +141,7 @@ flutter:
     - assets/carvon_screen_bg.png
     - assets/green_box.png
     - assets/notifications.png
+    - assets/leather_square.png
 
   fonts:
     - family: RobotoFlex

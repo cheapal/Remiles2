@@ -1,4 +1,4 @@
-
+import 'package:flutter/foundation.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/academy.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/messages_page.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/notification.dart';
@@ -8,26 +8,25 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:remiles/providers/notification_provider.dart';
 
-
 Widget TopNavigationBar(BuildContext context) {
   final screenWidth = MediaQuery.of(context).size.width;
   final isSmallScreen = screenWidth < 375; // iPhone SE and similar
   final isVerySmallScreen = screenWidth < 360; // Very small screens
-  
+
   return Container(
     padding: EdgeInsets.symmetric(
-      horizontal: isVerySmallScreen ? 8 : isSmallScreen ? 12 : 16,
+      horizontal: isVerySmallScreen
+          ? 8
+          : isSmallScreen
+          ? 12
+          : 16,
       vertical: 12,
     ),
-    decoration: const BoxDecoration(
+    decoration: BoxDecoration(
       color: Color(0xFF0A6837), // dark green background
       image: DecorationImage(
-        image: AssetImage('assets/nav_leather.png'),
+        image: AssetImage('assets/leather_square.png'),
         fit: BoxFit.cover,
-      ),
-      borderRadius: BorderRadius.only(
-        topLeft: Radius.circular(1),
-        topRight: Radius.circular(1),
       ),
     ),
     child: SafeArea(
@@ -42,7 +41,11 @@ Widget TopNavigationBar(BuildContext context) {
                 fit: FlexFit.loose,
                 child: SvgPicture.asset(
                   'assets/remiles.svg',
-                  width: isVerySmallScreen ? 70 : isSmallScreen ? 80 : null,
+                  width: isVerySmallScreen
+                      ? 70
+                      : isSmallScreen
+                      ? 80
+                      : null,
                   fit: BoxFit.contain,
                 ),
               ),
@@ -58,53 +61,119 @@ Widget TopNavigationBar(BuildContext context) {
                         context,
                         icon: SvgPicture.asset(
                           "assets/academy_top_nav.svg",
-                          width: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
-                          height: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
+                          width: isVerySmallScreen
+                              ? 18
+                              : isSmallScreen
+                              ? 20
+                              : 24,
+                          height: isVerySmallScreen
+                              ? 18
+                              : isSmallScreen
+                              ? 20
+                              : 24,
                         ),
                         label: "Academy",
-                        fontSize: isVerySmallScreen ? 9 : isSmallScreen ? 10 : 12,
+                        fontSize: isVerySmallScreen
+                            ? 9
+                            : isSmallScreen
+                            ? 10
+                            : 12,
                         page: const AcademyScreen(),
                       ),
                     ),
-                    SizedBox(width: isVerySmallScreen ? 4 : isSmallScreen ? 6 : 8),
+                    SizedBox(
+                      width: isVerySmallScreen
+                          ? 4
+                          : isSmallScreen
+                          ? 6
+                          : 8,
+                    ),
                     Flexible(
                       child: _navItem(
                         context,
                         icon: SvgPicture.asset(
                           "assets/support_top_nav.svg",
-                          width: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
-                          height: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
+                          width: isVerySmallScreen
+                              ? 18
+                              : isSmallScreen
+                              ? 20
+                              : 24,
+                          height: isVerySmallScreen
+                              ? 18
+                              : isSmallScreen
+                              ? 20
+                              : 24,
                         ),
                         label: "Support",
-                        fontSize: isVerySmallScreen ? 9 : isSmallScreen ? 10 : 12,
+                        fontSize: isVerySmallScreen
+                            ? 9
+                            : isSmallScreen
+                            ? 10
+                            : 12,
                         page: SupportScreen(),
                       ),
                     ),
-                    SizedBox(width: isVerySmallScreen ? 4 : isSmallScreen ? 6 : 8),
+                    SizedBox(
+                      width: isVerySmallScreen
+                          ? 4
+                          : isSmallScreen
+                          ? 6
+                          : 8,
+                    ),
                     Flexible(
                       child: _navItem(
                         context,
                         icon: SvgPicture.asset(
                           "assets/messages_top_nav.svg",
-                          width: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
-                          height: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
+                          width: isVerySmallScreen
+                              ? 18
+                              : isSmallScreen
+                              ? 20
+                              : 24,
+                          height: isVerySmallScreen
+                              ? 18
+                              : isSmallScreen
+                              ? 20
+                              : 24,
                         ),
                         label: "Messages",
-                        fontSize: isVerySmallScreen ? 9 : isSmallScreen ? 10 : 12,
+                        fontSize: isVerySmallScreen
+                            ? 9
+                            : isSmallScreen
+                            ? 10
+                            : 12,
                         page: const MessagesPage(),
                       ),
                     ),
-                    SizedBox(width: isVerySmallScreen ? 4 : isSmallScreen ? 6 : 8),
+                    SizedBox(
+                      width: isVerySmallScreen
+                          ? 4
+                          : isSmallScreen
+                          ? 6
+                          : 8,
+                    ),
                     Flexible(
                       child: _notificationNavItem(
                         context,
                         icon: SvgPicture.asset(
                           "assets/notification_top_nav.svg",
-                          width: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
-                          height: isVerySmallScreen ? 18 : isSmallScreen ? 20 : 24,
+                          width: isVerySmallScreen
+                              ? 18
+                              : isSmallScreen
+                              ? 20
+                              : 24,
+                          height: isVerySmallScreen
+                              ? 18
+                              : isSmallScreen
+                              ? 20
+                              : 24,
                         ),
                         label: "Notifications",
-                        fontSize: isVerySmallScreen ? 9 : isSmallScreen ? 10 : 12,
+                        fontSize: isVerySmallScreen
+                            ? 9
+                            : isSmallScreen
+                            ? 10
+                            : 12,
                         page: const NoNotificationPage(),
                       ),
                     ),
@@ -119,14 +188,16 @@ Widget TopNavigationBar(BuildContext context) {
   );
 }
 
-Widget _navItem(BuildContext context,
-    {required SvgPicture icon, required String label, required Widget page, double fontSize = 12}) {
+Widget _navItem(
+  BuildContext context, {
+  required SvgPicture icon,
+  required String label,
+  required Widget page,
+  double fontSize = 12,
+}) {
   return InkWell(
     onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => page),
-      );
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
     },
     borderRadius: BorderRadius.circular(8),
     child: Column(
@@ -139,10 +210,7 @@ Widget _navItem(BuildContext context,
           fit: BoxFit.scaleDown,
           child: Text(
             label,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: fontSize,
-            ),
+            style: TextStyle(color: Colors.white, fontSize: fontSize),
           ),
         ),
       ],
@@ -150,19 +218,21 @@ Widget _navItem(BuildContext context,
   );
 }
 
-Widget _notificationNavItem(BuildContext context,
-    {required SvgPicture icon, required String label, required Widget page, double fontSize = 12}) {
+Widget _notificationNavItem(
+  BuildContext context, {
+  required SvgPicture icon,
+  required String label,
+  required Widget page,
+  double fontSize = 12,
+}) {
   return Consumer<NotificationProvider>(
     builder: (context, notificationProvider, child) {
       final hasUnread = notificationProvider.hasUnreadNotifications;
       final unreadCount = notificationProvider.unreadCount;
-      
+
       return InkWell(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => page),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (_) => page));
         },
         borderRadius: BorderRadius.circular(8),
         child: Stack(
@@ -178,10 +248,7 @@ Widget _notificationNavItem(BuildContext context,
                   fit: BoxFit.scaleDown,
                   child: Text(
                     label,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: fontSize,
-                    ),
+                    style: TextStyle(color: Colors.white, fontSize: fontSize),
                   ),
                 ),
               ],

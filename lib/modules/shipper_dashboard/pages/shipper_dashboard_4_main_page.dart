@@ -1,4 +1,3 @@
-// (Top-level bottom navigation is still used in web/mobile layouts; keep imports if needed elsewhere)
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/bottom_navigation_bar.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/more.dart';
 import 'package:remiles/modules/shipper_dashboard/pages/shipper_market_place_Screen.dart';
@@ -18,8 +17,6 @@ import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
 
 import '../../carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
-
-
 
 // Define the dark color for the side navigation and bottom bar.
 const Color webColor = Color(0xFF064232);
@@ -830,99 +827,64 @@ const Color offWhite = Color(0xFFFFF6E1);
 // /// A stateful Drawer widget with a custom header for the Re-Miles app.
 // /// It features a white background, black text, and highlights the selected
 // /// and hovered item with a green background and white text.
-class SideNavDrawer extends StatefulWidget {
-  const SideNavDrawer({super.key});
+class ShipperWebSideBar extends StatelessWidget {
+  final int currentIndex;
+  final ValueChanged<int> onTap;
 
-  @override
-  State<SideNavDrawer> createState() => _SideNavDrawerState();
-}
-
-class _SideNavDrawerState extends State<SideNavDrawer> {
-  int _selectedIndex = 0; // Tracks the selected item index
-
-  // Color constants for easy modification
-  static const Color selectedColor = Color(0xFF386544); // Green for selection
-  static const Color defaultColor = Colors.black87; // Black for text/icons
+  const ShipperWebSideBar({
+    super.key,
+    required this.currentIndex,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Drawer(
-      // The overall background of the drawer is white
-      backgroundColor: Colors.white,
-      elevation: 1, // A subtle shadow to distinguish from the main content
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: <Widget>[
-          // Custom Drawer Header
-          Container(
-            padding: const EdgeInsets.only(
-                top: 50.0, left: 20.0, right: 20.0, bottom: 20.0),
-            child: Row(
-              children: [
-                // ### UPDATED LOGO ###
-                const CircleAvatar(
-                  backgroundColor: Colors.transparent, // Avoid color clash
-                  backgroundImage: AssetImage('assets/remiles.png'),
-                ),
-                const SizedBox(width: 15),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+    // Defines the width of the sidebar
+    const double sidebarWidth = 250.0;
+    const Color selectedColor = Color(0xFF386544); // Green for selection
 
-                      // // ### UPDATED APP NAME ###
-                      // Text(
-                      //   'Re-Miles',
-                      //   style: TextStyle(
-                      //     color: Colors.black,
-                      //     fontSize: 18,
-                      //     fontWeight: FontWeight.bold,
-                      //   ),
-                      // ),
-                    ],
-                  ),
+    return Container(
+      width: sidebarWidth,
+      color: Colors.white,
+      child: Column(
+        children: [
+          // Header / Logo
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 40),
+            alignment: Alignment.center,
+            child: Image.asset('assets/remiles.png', height: 60),
+          ),
+
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildNavItem(0, 'assets/home.svg', 'Home', selectedColor),
+                _buildNavItem(
+                  1,
+                  'assets/manage_load.svg',
+                  'Manage Loads',
+                  selectedColor,
+                ),
+                _buildNavItem(
+                  2,
+                  'assets/marketplace_bottom_nav.svg',
+                  'Marketplace',
+                  selectedColor,
+                ),
+                _buildNavItem(
+                  3,
+                  'assets/person_bottom_nav.svg',
+                  'Profile',
+                  selectedColor,
+                ),
+                _buildNavItem(
+                  4,
+                  'assets/menu_bottom_nav.svg',
+                  'More',
+                  selectedColor,
                 ),
               ],
-            ),
-          ),
-          // Menu Section
-          _buildSectionHeader('Menus'),
-          _buildDrawerItem(
-              icon: Icons.dashboard, text: 'Dashboard', index: 0),
-          _buildDrawerItem(icon: Icons.task_alt, text: 'My Task', index: 1),
-          _buildDrawerItem(
-              icon: Icons.calendar_today, text: 'Calendar', index: 2),
-          _buildDrawerItem(icon: Icons.mail_outline, text: 'Mail', index: 3),
-          _buildDrawerItem(icon: Icons.history, text: 'Activity', index: 4),
-          const Divider(
-              height: 20, thickness: 1, indent: 20, endIndent: 20),
-          // Service Section
-          _buildSectionHeader('Service'),
-          _buildDrawerItem(
-              icon: Icons.analytics_outlined, text: 'SEO', index: 5),
-          _buildDrawerItem(
-              icon: Icons.web_outlined, text: 'Web Design', index: 6),
-          _buildDrawerItem(
-              icon: Icons.design_services_outlined,
-              text: 'Logo Design',
-              index: 7),
-          // This pushes the footer to the bottom
-          const SizedBox(height: 50),
-          // Footer Button
-          Padding(
-            padding: const EdgeInsets.all(20.0),
-            child: ElevatedButton.icon(
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text('Create new task',
-                  style: TextStyle(color: Colors.white)),
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF386544),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 15),
-              ),
             ),
           ),
         ],
@@ -930,67 +892,59 @@ class _SideNavDrawerState extends State<SideNavDrawer> {
     );
   }
 
-  // Helper widget for section headers
-  Widget _buildSectionHeader(String title) {
+  Widget _buildNavItem(
+    int index,
+    String iconPath,
+    String label,
+    Color selectedColor,
+  ) {
+    final bool isSelected = currentIndex == index;
+    // Styling constants
+    final Color textColor = isSelected ? Colors.white : Colors.black87;
+    final Color iconColor = isSelected ? Colors.white : Colors.black54;
+    final Color tileColor = isSelected ? selectedColor : Colors.transparent;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 15, 20, 5),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.black54,
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-
-
-
-
-  // Helper widget for drawer list items
-  Widget _buildDrawerItem(
-      {required IconData icon, required String text, required int index}) {
-    final bool isSelected = _selectedIndex == index;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
-      child: ListTile(
-        selected: isSelected,
-        // The background color when the item is selected.
-        selectedTileColor: selectedColor,
-        // The color when the user hovers over the item.
-        hoverColor: selectedColor.withOpacity(0.9),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.0),
-        ),
-        leading: Icon(
-          icon,
-          // Icon color is white if selected, otherwise black.
-          color: isSelected ? Colors.white : defaultColor,
-        ),
-        title: Text(
-          text,
-          style: TextStyle(
-            // Text color is white if selected, otherwise black.
-            color: isSelected ? Colors.white : defaultColor,
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => onTap(index),
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: tileColor,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 12.0,
+            ),
+            child: Row(
+              children: [
+                SvgPicture.asset(
+                  iconPath,
+                  width: 24,
+                  height: 24,
+                  color: iconColor,
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        onTap: () {
-          setState(() {
-            _selectedIndex = index;
-          });
-          // Add any navigation logic here, e.g., Navigator.pop(context);
-        },
-        dense: true,
       ),
     );
   }
 }
-
-
 
 ///
 
@@ -998,7 +952,8 @@ class ShipperDashboardMainPage extends StatefulWidget {
   const ShipperDashboardMainPage({super.key});
 
   @override
-  State<ShipperDashboardMainPage> createState() => _ShipperDashboardMainPageState();
+  State<ShipperDashboardMainPage> createState() =>
+      _ShipperDashboardMainPageState();
 }
 
 class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
@@ -1031,16 +986,15 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
       _isOnAiMileyPage = false; // Reset when switching tabs
     });
   }
-  
 
   @override
   Widget build(BuildContext context) {
     const Color green = Color(0xFF497A57);
-        final media = MediaQuery.of(context);
+    final media = MediaQuery.of(context);
     final screenW = media.size.width;
+
+    // Use a breakpoint for "wide" screens (e.g. tablet landscape / desktop)
     final bool isWide = screenW >= 900;
-//     // Drag bounds
-  // Drag bounds removed for web layout simplification
 
     return WillPopScope(
       // handle Android back button
@@ -1056,87 +1010,32 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
         return true;
       },
       child: Scaffold(
-        body: isWide
-            ? Row(
-                children: [
-                  SizedBox(width: 304, child: SideNavDrawer()),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        IndexedStack(
-                          index: _index,
-                          children: [
-                            _buildTabNavigator(_tabKeys[0],  ShipperDashboardHomePage()),
-                            _buildTabNavigator(_tabKeys[1], const ShipperManageLoadsScreen()),
-                            _buildTabNavigator(_tabKeys[2], const ShipperMarketplaceScreen()),
-                            _buildTabNavigator(_tabKeys[3],  ShipperProfile()),
-                            _buildTabNavigator(_tabKeys[4], More()//ShipperMoreOptions()
-                            ),
-                          ],
-                        ),
-                        // AI Miley floating button - only show when not on AI Miley page
-                        if (!_isOnAiMileyPage)
-                          Positioned(
-                            bottom: 35, // Position above the bottom navigation bar
-                            right: 20,
-                            child: GestureDetector(
-                              onTap: () {
-                                final currentNavigator = _tabKeys[_index].currentState;
-                                if (currentNavigator != null) {
-                                  setState(() {
-                                    _isOnAiMileyPage = true; // Hide button when navigating to AI Miley
-                                  });
-                                  Navigator.push(
-                                    currentNavigator.context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const AiMileyScreen(),
-                                    ),
-                                  ).then((_) {
-                                    // Show button again when returning from AI Miley page
-                                    setState(() {
-                                      _isOnAiMileyPage = false;
-                                    });
-                                  });
-                                }
-                              },
-                              child: Container(
-                                width: 72,
-                                height: 72,
-                                decoration: BoxDecoration(
-                                  color: green,
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: green.withOpacity(0.25),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 6),
-                                    )
-                                  ],
-                                ),
-                                child: const Image(
-                                    image: AssetImage('assets/miley_icon.png'),
-                                    width: 72,
-                                    height: 72,
-                                  ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            : Stack(
+        body: Row(
+          children: [
+            // Side Bar for Web/Wide screens
+            if (isWide) ShipperWebSideBar(currentIndex: _index, onTap: _onTap),
+
+            // Main Content Area
+            Expanded(
+              child: Stack(
                 children: [
                   IndexedStack(
                     index: _index,
                     children: [
-                      _buildTabNavigator(_tabKeys[0],  ShipperDashboardHomePage()),
-                      _buildTabNavigator(_tabKeys[1], const ShipperManageLoadsScreen()),
-                      _buildTabNavigator(_tabKeys[2], const ShipperMarketplaceScreen()),
-                      _buildTabNavigator(_tabKeys[3],  ShipperProfile()),
-                      _buildTabNavigator(_tabKeys[4], More()//ShipperMoreOptions()
+                      _buildTabNavigator(
+                        _tabKeys[0],
+                        const ShipperDashboardHomePage(),
                       ),
+                      _buildTabNavigator(
+                        _tabKeys[1],
+                        const ShipperManageLoadsScreen(),
+                      ),
+                      _buildTabNavigator(
+                        _tabKeys[2],
+                        const ShipperMarketplaceScreen(),
+                      ),
+                      _buildTabNavigator(_tabKeys[3], ShipperProfile()),
+                      _buildTabNavigator(_tabKeys[4], More()),
                     ],
                   ),
                   // AI Miley floating button - only show when not on AI Miley page
@@ -1146,10 +1045,12 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
                       right: 20,
                       child: GestureDetector(
                         onTap: () {
-                          final currentNavigator = _tabKeys[_index].currentState;
+                          final currentNavigator =
+                              _tabKeys[_index].currentState;
                           if (currentNavigator != null) {
                             setState(() {
-                              _isOnAiMileyPage = true; // Hide button when navigating to AI Miley
+                              _isOnAiMileyPage =
+                                  true; // Hide button when navigating to AI Miley
                             });
                             Navigator.push(
                               currentNavigator.context,
@@ -1158,9 +1059,11 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
                               ),
                             ).then((_) {
                               // Show button again when returning from AI Miley page
-                              setState(() {
-                                _isOnAiMileyPage = false;
-                              });
+                              if (mounted) {
+                                setState(() {
+                                  _isOnAiMileyPage = false;
+                                });
+                              }
                             });
                           }
                         },
@@ -1175,25 +1078,25 @@ class _ShipperDashboardMainPageState extends State<ShipperDashboardMainPage> {
                                 color: green.withOpacity(0.25),
                                 blurRadius: 12,
                                 offset: const Offset(0, 6),
-                              )
+                              ),
                             ],
                           ),
                           child: const Image(
-                              image: AssetImage('assets/miley_icon.png'),
-                              width: 72,
-                              height: 72,
-                            ),
+                            image: AssetImage('assets/miley_icon.png'),
+                            width: 72,
+                            height: 72,
+                          ),
                         ),
                       ),
                     ),
                 ],
               ),
-     
-       bottomNavigationBar: !isWide ? BottomNavigationBarTab(
-          currentIndex: _index,
-          onTap: _onTap,
-        ):null,
-        drawer: isWide ? SideNavDrawer() : null,
+            ),
+          ],
+        ),
+        bottomNavigationBar: !isWide
+            ? BottomNavigationBarTab(currentIndex: _index, onTap: _onTap)
+            : null,
       ),
     );
   }
@@ -1212,7 +1115,8 @@ class ShipperDashboardHomePage extends StatefulWidget {
   const ShipperDashboardHomePage({super.key});
 
   @override
-  State<ShipperDashboardHomePage> createState() => _ShipperDashboardHomePageState();
+  State<ShipperDashboardHomePage> createState() =>
+      _ShipperDashboardHomePageState();
 }
 
 class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
@@ -1220,7 +1124,7 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
   int _totalLoads = 0;
   int _completedLoads = 0;
   int _matchedLoads = 0;
-  
+
   // Loads list state
   List<Map<String, dynamic>> _loads = [];
   bool _isLoadingLoads = false;
@@ -1238,16 +1142,20 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
     try {
       final authProvider = context.read<AuthProvider>();
       final shipper = authProvider.shipperUser;
-      
+
       if (shipper != null) {
-        final dashboard3Data = await FirebaseService.getShipperDashboardResponse(
-          shipper.uid,
-          'dashboard_3_business_number',
-        );
-        
+        final dashboard3Data =
+            await FirebaseService.getShipperDashboardResponse(
+              shipper.uid,
+              'dashboard_3_business_number',
+            );
+
+        if (!mounted) return;
+
         if (dashboard3Data != null) {
           setState(() {
-            _isCarbonFootprintInterested = dashboard3Data['isCarbonFootprintInterested'] ?? false;
+            _isCarbonFootprintInterested =
+                dashboard3Data['isCarbonFootprintInterested'] ?? false;
           });
         } else {
           setState(() {
@@ -1255,12 +1163,14 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
           });
         }
       } else {
+        if (!mounted) return;
         setState(() {
           _isCarbonFootprintInterested = false;
         });
       }
     } catch (e) {
       print('Error loading carbon footprint interest: $e');
+      if (!mounted) return;
       setState(() {
         _isCarbonFootprintInterested = false;
       });
@@ -1283,7 +1193,8 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
       setState(() {
         _totalLoads = stats['total'] ?? 0;
         _completedLoads = stats['completed'] ?? 0;
-        _matchedLoads = (stats['booked'] ?? 0) +
+        _matchedLoads =
+            (stats['booked'] ?? 0) +
             (stats['inTransit'] ?? 0) +
             (stats['completed'] ?? 0);
       });
@@ -1294,13 +1205,13 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
 
   Future<void> _loadLoads() async {
     if (_isLoadingLoads) return;
-    
+
     setState(() => _isLoadingLoads = true);
-    
+
     try {
       final authProvider = context.read<AuthProvider>();
       final shipper = authProvider.shipperUser;
-      
+
       if (shipper == null) {
         setState(() {
           _loads = [];
@@ -1308,7 +1219,7 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
         });
         return;
       }
-      
+
       // Determine status filter based on selectedTab
       String statusFilter = 'all';
       if (selectedTab == 1) {
@@ -1317,25 +1228,28 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
       } else if (selectedTab == 2) {
         statusFilter = 'completed';
       }
-      
+
       final result = await FirebaseService.getShipperLoads(
         shipperUid: shipper.uid,
         status: statusFilter,
         limit: 10,
       );
-      
-      List<Map<String, dynamic>> loads = result['loads'] as List<Map<String, dynamic>>;
-      
+
+      List<Map<String, dynamic>> loads =
+          result['loads'] as List<Map<String, dynamic>>;
+
       // Filter for "In Progress" tab (active, inTransit, booked)
       if (selectedTab == 1) {
         loads = loads.where((load) {
           final status = load['status']?.toString() ?? '';
-          return status == 'active' || status == 'inTransit' || status == 'booked';
+          return status == 'active' ||
+              status == 'inTransit' ||
+              status == 'booked';
         }).toList();
       }
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _loads = loads;
         _isLoadingLoads = false;
@@ -1349,10 +1263,10 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
       });
     }
   }
-  
+
   String _formatDate(dynamic dateValue) {
     if (dateValue == null) return 'N/A';
-    
+
     try {
       DateTime date;
       if (dateValue is String) {
@@ -1365,10 +1279,22 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
       } else {
         return 'N/A';
       }
-      
+
       // Format as "Sep 1st, 2025"
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       final day = date.day;
       final suffix = _getDaySuffix(day);
       return '${months[date.month - 1]} ${day}$suffix, ${date.year}';
@@ -1376,23 +1302,29 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
       return 'N/A';
     }
   }
-  
+
   String _getDaySuffix(int day) {
     if (day >= 11 && day <= 13) {
       return 'th';
     }
     switch (day % 10) {
-      case 1: return 'st';
-      case 2: return 'nd';
-      case 3: return 'rd';
-      default: return 'th';
+      case 1:
+        return 'st';
+      case 2:
+        return 'nd';
+      case 3:
+        return 'rd';
+      default:
+        return 'th';
     }
   }
-  
+
   String _formatWeight(dynamic weight) {
     if (weight == null) return 'N/A';
     try {
-      final w = weight is String ? double.tryParse(weight) : (weight is num ? weight.toDouble() : null);
+      final w = weight is String
+          ? double.tryParse(weight)
+          : (weight is num ? weight.toDouble() : null);
       if (w == null) return 'N/A';
       return '${w.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} lb';
     } catch (e) {
@@ -1423,366 +1355,212 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
       builder: (context, authProvider, child) {
         final user = authProvider.currentUser;
         final shipper = authProvider.shipperUser;
-        
+
         // Use company name if available, otherwise use display name, otherwise fallback to 'User'
-        final displayName = shipper?.companyName ?? 
-                           user?.displayName ?? 
-                           'User';
-        
+        final displayName = shipper?.companyName ?? user?.displayName ?? 'User';
+
         return _buildHomePage(context, displayName);
       },
     );
   }
-  
+
   Widget _buildHomePage(BuildContext context, String displayName) {
     // Derived performance metrics
     final int totalLoads = _totalLoads;
     final int completedLoads = _completedLoads;
     final int matchedLoads = _matchedLoads;
 
-    final double deliveredOnTimePercent =
-        totalLoads > 0 ? (completedLoads / totalLoads * 100) : 0;
+    final double deliveredOnTimePercent = totalLoads > 0
+        ? (completedLoads / totalLoads * 100)
+        : 0;
 
-    final double carrierMatchPercent =
-        totalLoads > 0 ? (matchedLoads / totalLoads * 100) : 0;
+    final double carrierMatchPercent = totalLoads > 0
+        ? (matchedLoads / totalLoads * 100)
+        : 0;
 
-    final double carrierMatchProgress =
-        (carrierMatchPercent / 100).clamp(0.0, 1.0);
+    final double carrierMatchProgress = (carrierMatchPercent / 100).clamp(
+      0.0,
+      1.0,
+    );
 
-    return  // Main content start
-      SingleChildScrollView(
-        child: Column(
-          children: [
-            TopNavigationBar(context),
-            const SizedBox(height: 20),
-            Padding(
-      padding: EdgeInsets.symmetric(
-                  horizontal:  16.0),
+    return // Main content start
+    SingleChildScrollView(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Welcome + avatar
-          Row(
-            mainAxisAlignment:
-            MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  'Welcome\n$displayName',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    height: 1.2,
-                  ),
-                ),
-              ),
-              Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children:  [
-                      // Show eco SVG only if user is interested in carbon footprint tracking
-                      if (_isCarbonFootprintInterested) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(top:15),
-                          child: SvgPicture.asset('assets/eco.svg',
-                              width: 50, height: 50,),
+          TopNavigationBar(context),
+          const SizedBox(height: 20),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Welcome + avatar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Welcome\n$displayName',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 32,
+                          fontWeight: FontWeight.w800,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Show eco SVG only if user is interested in carbon footprint tracking
+                        if (_isCarbonFootprintInterested) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(top: 15),
+                            child: SvgPicture.asset(
+                              'assets/eco.svg',
+                              width: 50,
+                              height: 50,
+                            ),
+                          ),
+                          SizedBox(width: 20),
+                        ],
+                        Consumer<AuthProvider>(
+                          builder: (context, authProvider, child) {
+                            final shipper = authProvider.shipperUser;
+                            return SizedBox(
+                              width: 75,
+                              height: 65,
+                              child:
+                                  shipper?.profileImageUrl != null &&
+                                      shipper!.profileImageUrl!.isNotEmpty
+                                  ? ClipOval(
+                                      child: Image.network(
+                                        shipper.profileImageUrl!,
+                                        width: 75,
+                                        height: 65,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) {
+                                              return SvgPicture.asset(
+                                                'assets/person.svg',
+                                                width: 75,
+                                                height: 65,
+                                              );
+                                            },
+                                      ),
+                                    )
+                                  : SvgPicture.asset(
+                                      'assets/person.svg',
+                                      width: 75,
+                                      height: 65,
+                                    ),
+                            );
+                          },
                         ),
                         SizedBox(width: 20),
                       ],
-                      Consumer<AuthProvider>(
-                        builder: (context, authProvider, child) {
-                          final shipper = authProvider.shipperUser;
-                          return SizedBox(
-                            width: 75,
-                            height: 65,
-                            child: shipper?.profileImageUrl != null && shipper!.profileImageUrl!.isNotEmpty
-                                ? ClipOval(
-                                    child: Image.network(
-                                      shipper.profileImageUrl!,
-                                      width: 75,
-                                      height: 65,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return SvgPicture.asset('assets/person.svg',
-                                            width: 75, height: 65,);
-                                      },
-                                    ),
-                                  )
-                                : SvgPicture.asset('assets/person.svg',
-                                    width: 75, height: 65,),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // CTA buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          //show dialog
+                          showDialog(
+                            context: context,
+                            builder: (context) {
+                              return ShipperDashboardPostLoad();
+                            },
                           );
                         },
-                      ),
-                      SizedBox(width: 20),
-                    ],
-                  ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // CTA buttons
-          Row(
-            children: [
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    //show dialog
-                    showDialog(
-                      context: context,
-                      builder: (context) {
-                        return  ShipperDashboardPostLoad();
-                      },
-                    );
-                  },
-                  child: Container(
-                    height: 49,
-                    decoration: BoxDecoration(
-                      color: yellow,
-                      borderRadius: BorderRadius.circular(26),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                          Colors.black.withOpacity(0.66),
-                          spreadRadius: -1,
-                          blurRadius: 3.5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.add, color: Colors.black),
-                          SizedBox(width: 6),
-                          Text(
-                            'Post new load',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    // Navigate to payment page
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) =>
-                           const PaymentMethodsPage()),
-                    );
-                  },
-                  child: Container(
-                    height: 51,
-                    decoration: BoxDecoration(
-                      color: darkGreen,
-                      borderRadius: BorderRadius.circular(26),
-                      boxShadow: [
-                        BoxShadow(
-                          color:
-                          Colors.black.withOpacity(0.66),
-                          spreadRadius: -1,
-                          blurRadius: 3.5,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: const Center(
-                      child: Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '\$',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(width: 5),
-                          Text(
-                            'Payment',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Loads Summary
-          const Text(
-            'Loads Summary',
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFFFF),
-              borderRadius: BorderRadius.circular(26),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.green.withOpacity(0.36),
-                  spreadRadius: 0,
-                  blurRadius: 2.8,
-                  offset: const Offset(0, 2.8),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Tabs
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() => selectedTab = 0);
-                          _loadLoads();
-                        },
                         child: Container(
-                          padding:
-                          const EdgeInsets.symmetric(
-                              vertical: 8),
+                          height: 49,
                           decoration: BoxDecoration(
-                                    color: selectedTab == 0
-                                ? darkGreen
-                                : Colors.white,
-                            borderRadius:
-                            BorderRadius.circular(20),
+                            color: yellow,
+                            borderRadius: BorderRadius.circular(26),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.green
-                                    .withOpacity(0.36),
-                                spreadRadius: 0,
-                                blurRadius: 2.8,
-                                offset:
-                                const Offset(0, 2.8),
+                                color: Colors.black.withOpacity(0.66),
+                                spreadRadius: -1,
+                                blurRadius: 3.5,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                          child: Center(
-                            child: Text(
-                              'All Loads',
-                              style: TextStyle(
-                                        color: selectedTab == 0
-                                    ? Colors.white
-                                    : Colors.black,
-                                fontWeight:
-                                FontWeight.w600,
-                              ),
+                          child: const Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add, color: Colors.black),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Post new load',
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 15),
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          setState(() => selectedTab = 1);
-                          _loadLoads();
-                        },
-                        child: Container(
-                          padding:
-                          const EdgeInsets.symmetric(
-                              vertical: 8),
-                          decoration: BoxDecoration(
-                                    color: selectedTab == 1
-                                ? darkGreen
-                                : Colors.white,
-                            borderRadius:
-                            BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green
-                                    .withOpacity(0.36),
-                                spreadRadius: 0,
-                                blurRadius: 2.8,
-                                offset:
-                                const Offset(0, 2.8),
-                              ),
-                            ],
-                          ),
-                          child: Center(
-                            child: Text(
-                              'In Progress',
-                              style: TextStyle(
-                                        color: selectedTab == 1
-                                    ? Colors.white
-                                    : Colors.black,
-                                fontWeight:
-                                FontWeight.w600,
-                              ),
+                          // Navigate to payment page
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PaymentMethodsPage(),
                             ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          setState(() => selectedTab = 2);
-                          _loadLoads();
+                          );
                         },
                         child: Container(
-                          padding:
-                          const EdgeInsets.symmetric(
-                              vertical: 8),
+                          height: 51,
                           decoration: BoxDecoration(
-                                    color: selectedTab == 2
-                                ? darkGreen
-                                : Colors.white,
-                            borderRadius:
-                            BorderRadius.circular(20),
+                            color: darkGreen,
+                            borderRadius: BorderRadius.circular(26),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.green
-                                    .withOpacity(0.36),
-                                spreadRadius: 0,
-                                blurRadius: 2.8,
-                                offset:
-                                const Offset(0, 2.8),
+                                color: Colors.black.withOpacity(0.66),
+                                spreadRadius: -1,
+                                blurRadius: 3.5,
+                                offset: const Offset(0, 2),
                               ),
                             ],
                           ),
-                          child: Center(
-                            child: Text(
-                              'Completed',
-                              style: TextStyle(
-                                        color: selectedTab == 2
-                                    ? Colors.white
-                                    : Colors.black,
-                                fontWeight:
-                                FontWeight.w600,
-                              ),
+                          child: const Center(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '\$',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                SizedBox(width: 5),
+                                Text(
+                                  'Payment',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -1790,312 +1568,466 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
-                // Dynamic loads list
-                if (_isLoadingLoads)
-                  const Padding(
-                    padding: EdgeInsets.all(20.0),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (_loads.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: Center(
-                      child: Text(
-                        'No loads found',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  SizedBox(
-                    height: 260,
-                    child: ListView.builder(
-                      padding: EdgeInsets.zero,
-                      itemCount: _loads.length,
-                      itemBuilder: (context, index) {
-                        final load = _loads[index];
-                    final loadId = load['id']?.toString() ?? 'N/A';
-                    final from = '${load['originCity'] ?? ''}, ${load['originState'] ?? ''}'.trim();
-                    final to = '${load['destinationCity'] ?? ''}, ${load['destinationState'] ?? ''}'.trim();
-                    final pickupDate = load['pickupDate'];
-                    final deliveryDate = load['deliveryDate'];
-                    final weight = _formatWeight(load['weight']);
-                    final equipment = load['equipmentNeeded']?.toString() ?? 'N/A';
-                    final matchPercent = (load['matchPercentage'] != null 
-                        ? (load['matchPercentage'] is num 
-                            ? load['matchPercentage'].toDouble() 
-                            : double.tryParse(load['matchPercentage'].toString()) ?? 0.0)
-                        : 0.0).round();
-                    final rawStatus = load['status']?.toString() ?? 'active';
-                    final statusText = _formatStatus(rawStatus);
-                    
-                        // Count documents (simplified - you might want to fetch actual count)
-                        final docs = '0 Docs'; // TODO: Get actual document count if available
-                        
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: GestureDetector(
-                            onTap: () => _showLoadDetails(load),
-                            child: aiMatchCard(
-                              context,
-                              recommended: matchPercent >= 20,
-                              matchPercent: matchPercent,
-                              loadId: '#${loadId.length > 8 ? loadId.substring(0, 8) : loadId}',
-                              from: from.isEmpty ? 'N/A' : from,
-                              to: to.isEmpty ? 'N/A' : to,
-                              pickup: _formatDate(pickupDate),
-                              delivery: _formatDate(deliveryDate),
-                              weight: weight,
-                              docs: docs,
-                              equipment: equipment,
-                              status: statusText,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Stat cards row
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFFFF),
-                    borderRadius: const BorderRadius.all(
-                        Radius.circular(26)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6CA78A)
-                            .withOpacity(0.5),
-                        spreadRadius: 0,
-                        blurRadius: 10,
-                        offset: const Offset(0, 7),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.center,
-                    mainAxisAlignment:
-                    MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFFBFF497),
-                            ),
-                            child: const Center(
-                              child: Image(
-                                image: AssetImage(
-                                    'assets/green_trolly.png'),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                '$totalLoads',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight
-                                      .w500, // Updated font weight
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Total Loads Posted',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight
-                              .w600, // Updated font weight
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 15),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFFFFF),
-                    borderRadius: const BorderRadius.all(
-                        Radius.circular(26)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF6CA78A)
-                            .withOpacity(0.5),
-                        spreadRadius: 0,
-                        blurRadius: 10,
-                        offset: const Offset(0, 7),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment:
-                    CrossAxisAlignment.center,
-                    mainAxisAlignment:
-                    MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: offWhite,
-                            ),
-                            child: const Center(
-                              child: Image(
-                                image: AssetImage(
-                                    'assets/orange_tick.png'),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              child: Text(
-                                '${deliveredOnTimePercent.toStringAsFixed(0)}%',
-                                style: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight
-                                      .w500, // Updated font weight
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Loads Delivered on time',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontWeight: FontWeight
-                              .w600, // Updated font weight
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-          // Carrier Match Rate
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFFFFFFFF),
-              borderRadius:
-              BorderRadius.all(Radius.circular(26)),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                  Color.fromRGBO(0, 128, 0, 0.36),
-                  spreadRadius: 0,
-                  blurRadius: 2.8,
-                  offset: Offset(0, 2.8),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Row(
-                  children: [
-                    const Image(
-                      image: AssetImage(
-                          'assets/yellow_truck.png'),
-                      width: 46,
-                      height: 46,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: SizedBox(
-                        height: 6.0,
-                        child: ClipRRect(
-                          borderRadius:
-                          BorderRadius.circular(10),
-                          child: LinearProgressIndicator(
-                            value: carrierMatchProgress,
-                            backgroundColor:
-                            Colors.grey[300],
-                            valueColor:
-                            const AlwaysStoppedAnimation<
-                                Color>(
-                                Color(0xFFEE9D6F)),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      '${carrierMatchPercent.toStringAsFixed(0)}%',
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 20),
+                // Loads Summary
                 const Text(
-                  'Carrier Match Rate',
+                  'Loads Summary',
                   style: TextStyle(
                     color: Colors.black,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16.0),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFFFF),
+                    borderRadius: BorderRadius.circular(26),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.36),
+                        spreadRadius: 0,
+                        blurRadius: 2.8,
+                        offset: const Offset(0, 2.8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Tabs
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() => selectedTab = 0);
+                                _loadLoads();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selectedTab == 0
+                                      ? darkGreen
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.green.withOpacity(0.36),
+                                      spreadRadius: 0,
+                                      blurRadius: 2.8,
+                                      offset: const Offset(0, 2.8),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'All Loads',
+                                    style: TextStyle(
+                                      color: selectedTab == 0
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() => selectedTab = 1);
+                                _loadLoads();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selectedTab == 1
+                                      ? darkGreen
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.green.withOpacity(0.36),
+                                      spreadRadius: 0,
+                                      blurRadius: 2.8,
+                                      offset: const Offset(0, 2.8),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'In Progress',
+                                    style: TextStyle(
+                                      color: selectedTab == 1
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() => selectedTab = 2);
+                                _loadLoads();
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selectedTab == 2
+                                      ? darkGreen
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.green.withOpacity(0.36),
+                                      spreadRadius: 0,
+                                      blurRadius: 2.8,
+                                      offset: const Offset(0, 2.8),
+                                    ),
+                                  ],
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    'Completed',
+                                    style: TextStyle(
+                                      color: selectedTab == 2
+                                          ? Colors.white
+                                          : Colors.black,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      // Dynamic loads list
+                      if (_isLoadingLoads)
+                        const Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_loads.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Center(
+                            child: Text(
+                              'No loads found',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        SizedBox(
+                          height: 260,
+                          child: ListView.builder(
+                            padding: EdgeInsets.zero,
+                            itemCount: _loads.length,
+                            itemBuilder: (context, index) {
+                              final load = _loads[index];
+                              final loadId = load['id']?.toString() ?? 'N/A';
+                              final from =
+                                  '${load['originCity'] ?? ''}, ${load['originState'] ?? ''}'
+                                      .trim();
+                              final to =
+                                  '${load['destinationCity'] ?? ''}, ${load['destinationState'] ?? ''}'
+                                      .trim();
+                              final pickupDate = load['pickupDate'];
+                              final deliveryDate = load['deliveryDate'];
+                              final weight = _formatWeight(load['weight']);
+                              final equipment =
+                                  load['equipmentNeeded']?.toString() ?? 'N/A';
+                              final matchPercent =
+                                  (load['matchPercentage'] != null
+                                          ? (load['matchPercentage'] is num
+                                                ? load['matchPercentage']
+                                                      .toDouble()
+                                                : double.tryParse(
+                                                        load['matchPercentage']
+                                                            .toString(),
+                                                      ) ??
+                                                      0.0)
+                                          : 0.0)
+                                      .round();
+                              final rawStatus =
+                                  load['status']?.toString() ?? 'active';
+                              final statusText = _formatStatus(rawStatus);
+
+                              // Count documents (simplified - you might want to fetch actual count)
+                              final docs =
+                                  '0 Docs'; // TODO: Get actual document count if available
+
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 16.0),
+                                child: GestureDetector(
+                                  onTap: () => _showLoadDetails(load),
+                                  child: aiMatchCard(
+                                    context,
+                                    recommended: matchPercent >= 20,
+                                    matchPercent: matchPercent,
+                                    loadId:
+                                        '#${loadId.length > 8 ? loadId.substring(0, 8) : loadId}',
+                                    from: from.isEmpty ? 'N/A' : from,
+                                    to: to.isEmpty ? 'N/A' : to,
+                                    pickup: _formatDate(pickupDate),
+                                    delivery: _formatDate(deliveryDate),
+                                    weight: weight,
+                                    docs: docs,
+                                    equipment: equipment,
+                                    status: statusText,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Stat cards row
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFFFF),
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(26),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6CA78A).withOpacity(0.5),
+                              spreadRadius: 0,
+                              blurRadius: 10,
+                              offset: const Offset(0, 7),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 46,
+                                  height: 46,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Color(0xFFBFF497),
+                                  ),
+                                  child: const Center(
+                                    child: Image(
+                                      image: AssetImage(
+                                        'assets/green_trolly.png',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      '$totalLoads',
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight
+                                            .w500, // Updated font weight
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Total Loads Posted',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight:
+                                    FontWeight.w600, // Updated font weight
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFFFF),
+                          borderRadius: const BorderRadius.all(
+                            Radius.circular(26),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6CA78A).withOpacity(0.5),
+                              spreadRadius: 0,
+                              blurRadius: 10,
+                              offset: const Offset(0, 7),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 46,
+                                  height: 46,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: offWhite,
+                                  ),
+                                  child: const Center(
+                                    child: Image(
+                                      image: AssetImage(
+                                        'assets/orange_tick.png',
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Flexible(
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Text(
+                                      '${deliveredOnTimePercent.toStringAsFixed(0)}%',
+                                      style: const TextStyle(
+                                        color: Colors.black,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight
+                                            .w500, // Updated font weight
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Loads Delivered on time',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight:
+                                    FontWeight.w600, // Updated font weight
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                // Carrier Match Rate
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFFFFFF),
+                    borderRadius: BorderRadius.all(Radius.circular(26)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color.fromRGBO(0, 128, 0, 0.36),
+                        spreadRadius: 0,
+                        blurRadius: 2.8,
+                        offset: Offset(0, 2.8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Row(
+                        children: [
+                          const Image(
+                            image: AssetImage('assets/yellow_truck.png'),
+                            width: 46,
+                            height: 46,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: SizedBox(
+                              height: 6.0,
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: LinearProgressIndicator(
+                                  value: carrierMatchProgress,
+                                  backgroundColor: Colors.grey[300],
+                                  valueColor:
+                                      const AlwaysStoppedAnimation<Color>(
+                                        Color(0xFFEE9D6F),
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            '${carrierMatchPercent.toStringAsFixed(0)}%',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Carrier Match Rate',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 120), // spacing above bottom nav
               ],
             ),
           ),
-          const SizedBox(
-              height: 120), // spacing above bottom nav
-                ],
-              ),
-            ),
         ],
       ),
     );

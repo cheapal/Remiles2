@@ -12,17 +12,18 @@ class SignScreen extends StatelessWidget {
   final Widget nextScreen;
   final VoidCallback? onOnboardingComplete;
 
-  const SignScreen({super.key, required this.nextScreen, this.onOnboardingComplete});
+  const SignScreen({
+    super.key,
+    required this.nextScreen,
+    this.onOnboardingComplete,
+  });
 
   // A custom page route to handle the fade transition
   PageRouteBuilder _createFadePageRoute(Widget page) {
     return PageRouteBuilder(
       pageBuilder: (context, animation, secondaryAnimation) => page,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
     );
   }
@@ -33,7 +34,7 @@ class SignScreen extends StatelessWidget {
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light, // White icons for Android
-        statusBarBrightness: Brightness.dark,      // White icons for iOS
+        statusBarBrightness: Brightness.dark, // White icons for iOS
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFFFFFEF6),
@@ -46,32 +47,31 @@ class SignScreen extends StatelessWidget {
                 // Web: two-column layout with leather background on the left and controls on the right
                 return Row(
                   children: [
-                   
-              Expanded(
-                flex: 1,
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      /// Remiles logo image
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        top: 300, // Positioned at the top instead of bottom
-                        child: Center(
-                          child: SizedBox(
-                            width: 200, // Smaller width
-                            height: 200, // Smaller height
-                            child: Image.asset('assets/remiles.png', fit: BoxFit.contain),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      GestureDetector(
+                    Expanded(
+                      flex: 1,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            /// Remiles logo image
+                            Center(
+                              child: SizedBox(
+                                width: 200, // Smaller width
+                                height: 200, // Smaller height
+                                child: Image.asset(
+                                  'assets/remiles.png',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                            GestureDetector(
                               onTap: () {
                                 if (context.mounted) {
-                                  Navigator.of(context).push(_createFadePageRoute(const LoginScreen()));
+                                  Navigator.of(context).push(
+                                    _createFadePageRoute(const LoginScreen()),
+                                  );
                                 }
                               },
                               child: Container(
@@ -105,7 +105,14 @@ class SignScreen extends StatelessWidget {
                             GestureDetector(
                               onTap: () {
                                 if (context.mounted) {
-                                  Navigator.of(context).push(_createFadePageRoute(RoleSelectionScreen(onOnboardingComplete: onOnboardingComplete)));
+                                  Navigator.of(context).push(
+                                    _createFadePageRoute(
+                                      RoleSelectionScreen(
+                                        onOnboardingComplete:
+                                            onOnboardingComplete,
+                                      ),
+                                    ),
+                                  );
                                 }
                               },
                               child: Container(
@@ -162,9 +169,9 @@ class SignScreen extends StatelessWidget {
                       child: GestureDetector(
                         onTap: () {
                           if (context.mounted) {
-                            Navigator.of(context).push(
-                              _createFadePageRoute(const LoginScreen()),
-                            );
+                            Navigator.of(
+                              context,
+                            ).push(_createFadePageRoute(const LoginScreen()));
                           }
                         },
                         child: Container(
@@ -178,7 +185,7 @@ class SignScreen extends StatelessWidget {
                                 color: Colors.black.withOpacity(0.25),
                                 blurRadius: 4,
                                 offset: const Offset(0, 3),
-                              )
+                              ),
                             ],
                           ),
                           alignment: Alignment.center,
@@ -205,7 +212,11 @@ class SignScreen extends StatelessWidget {
                         onTap: () {
                           if (context.mounted) {
                             Navigator.of(context).push(
-                              _createFadePageRoute(RoleSelectionScreen(onOnboardingComplete: onOnboardingComplete)),
+                              _createFadePageRoute(
+                                RoleSelectionScreen(
+                                  onOnboardingComplete: onOnboardingComplete,
+                                ),
+                              ),
                             );
                           }
                         },
@@ -220,7 +231,7 @@ class SignScreen extends StatelessWidget {
                                 color: Colors.black.withOpacity(0.25),
                                 blurRadius: 4,
                                 offset: const Offset(0, 3),
-                              )
+                              ),
                             ],
                           ),
                           alignment: Alignment.center,
@@ -238,7 +249,6 @@ class SignScreen extends StatelessWidget {
                       ),
                     ),
 
-
                     /// Remiles logo image
                     Positioned(
                       left: 0,
@@ -248,7 +258,10 @@ class SignScreen extends StatelessWidget {
                         child: SizedBox(
                           width: 200, // Smaller width
                           height: 200, // Smaller height
-                          child: Image.asset('assets/remiles.png', fit: BoxFit.contain),
+                          child: Image.asset(
+                            'assets/remiles.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
                       ),
                     ),
@@ -262,4 +275,3 @@ class SignScreen extends StatelessWidget {
     );
   }
 }
-

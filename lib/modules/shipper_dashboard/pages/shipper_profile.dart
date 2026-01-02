@@ -11,7 +11,7 @@ import 'package:remiles/modules/shipper_dashboard/pages/shipper_help_legal_page.
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+
 import '../../../providers/auth_provider.dart';
 import '../../../providers/app_state_provider.dart';
 import '../../../providers/payment_methods_provider.dart';
@@ -96,10 +96,9 @@ class _ShipperProfileState extends State<ShipperProfile>
       appStateProvider.showLoadingWithMessage('Uploading profile picture...');
 
       // Upload image to Firebase Storage
-      final imageFile = File(image.path);
       final imageUrl = await FirebaseService.uploadShipperProfileImage(
         shipper.uid,
-        imageFile,
+        image,
       );
 
       if (imageUrl == null) {

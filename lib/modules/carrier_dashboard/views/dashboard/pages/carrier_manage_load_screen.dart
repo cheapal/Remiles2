@@ -1,6 +1,5 @@
-import 'package:remiles/modules/carrier_dashboard/views/common/widgets/custom_progress_bar.dart';
-import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:http/http.dart' as http;
@@ -8,20 +7,24 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:io';
 import 'package:google_polyline_algorithm/google_polyline_algorithm.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
+import 'package:signature/signature.dart';
 import 'package:provider/provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/custom_progress_bar.dart';
+import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:remiles/providers/auth_provider.dart';
 import 'package:remiles/core/firebase_service.dart';
 import 'package:remiles/models/load_model.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/support.dart';
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/user_profile_dialog.dart';
 import 'package:remiles/models/user_model.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:signature/signature.dart';
 import 'package:remiles/core/constants/app_constants.dart';
 
 class CarrierManageLoadScreen extends StatefulWidget {
@@ -3086,9 +3089,9 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
   String? _selectedReason;
   String _customReason = '';
   bool _showCustomReason = false;
-  File? _selectedImage;
-  File? _podFile; // Proof of Delivery file
-  File? _deliveryPhoto; // Delivery photo
+  dynamic _selectedImage;
+  dynamic _podFile; // Proof of Delivery file
+  dynamic _deliveryPhoto; // Delivery photo
   bool _isSubmitting = false;
 
   // For pickup success: 'complete' or 'partial' - MUST be explicitly selected by user
@@ -4013,12 +4016,21 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: Image.file(
-                              _selectedImage!,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
+                            child: kIsWeb
+                                ? Image.network(
+                                    (_selectedImage as XFile).path,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    _selectedImage is XFile
+                                        ? File((_selectedImage as XFile).path)
+                                        : _selectedImage as File,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
                           ),
                           Positioned(
                             top: 8,
@@ -4171,12 +4183,21 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: Image.file(
-                              _selectedImage!,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
+                            child: kIsWeb
+                                ? Image.network(
+                                    (_selectedImage as XFile).path,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    _selectedImage is XFile
+                                        ? File((_selectedImage as XFile).path)
+                                        : _selectedImage as File,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
                           ),
                           Positioned(
                             top: 8,
@@ -4311,12 +4332,21 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: Image.file(
-                              _selectedImage!,
-                              width: double.infinity,
-                              height: double.infinity,
-                              fit: BoxFit.cover,
-                            ),
+                            child: kIsWeb
+                                ? Image.network(
+                                    (_selectedImage as XFile).path,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                  )
+                                : Image.file(
+                                    _selectedImage is XFile
+                                        ? File((_selectedImage as XFile).path)
+                                        : _selectedImage as File,
+                                    width: double.infinity,
+                                    height: double.infinity,
+                                    fit: BoxFit.cover,
+                                  ),
                           ),
                           Positioned(
                             top: 8,
@@ -4667,7 +4697,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
   Widget _buildFileUploadButton({
     required String label,
     required String subtitle,
-    required File? file,
+    required dynamic file,
     required VoidCallback onTap,
     required bool isRequired,
     VoidCallback? onRemove,
@@ -4740,7 +4770,9 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        file.path.split('/').last,
+                        file is XFile
+                            ? (file as XFile).name
+                            : (file as File).path.split('/').last,
                         style: TextStyle(
                           fontSize: 12,
                           color: green,
@@ -4797,7 +4829,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
 
       if (image != null) {
         setState(() {
-          _podFile = File(image.path);
+          _podFile = image; // Store XFile directly
         });
       }
     } catch (e) {
@@ -4821,7 +4853,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
 
       if (image != null) {
         setState(() {
-          _deliveryPhoto = File(image.path);
+          _deliveryPhoto = image; // Store XFile directly
         });
       }
     } catch (e) {
@@ -4874,7 +4906,7 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
 
       if (image != null) {
         setState(() {
-          _selectedImage = File(image.path);
+          _selectedImage = image; // Store XFile directly
         });
       }
     } catch (e) {
@@ -5120,7 +5152,22 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             final ref = FirebaseService.storage.ref().child(
               'loads/${widget.loadId}/delivery_pod_${DateTime.now().millisecondsSinceEpoch}.jpg',
             );
-            final uploadTask = ref.putFile(_podFile!);
+
+            UploadTask uploadTask;
+            if (kIsWeb) {
+              final xfile = _podFile as XFile;
+              final bytes = await xfile.readAsBytes();
+              uploadTask = ref.putData(
+                bytes,
+                SettableMetadata(contentType: 'image/jpeg'),
+              );
+            } else {
+              final file = _podFile is XFile
+                  ? File((_podFile as XFile).path)
+                  : _podFile as File;
+              uploadTask = ref.putFile(file);
+            }
+
             final snapshot = await uploadTask;
             podUrl = await snapshot.ref.getDownloadURL();
           } catch (e) {
@@ -5135,7 +5182,22 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
             final ref = FirebaseService.storage.ref().child(
               'loads/${widget.loadId}/delivery_photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
             );
-            final uploadTask = ref.putFile(_deliveryPhoto!);
+
+            UploadTask uploadTask;
+            if (kIsWeb) {
+              final xfile = _deliveryPhoto as XFile;
+              final bytes = await xfile.readAsBytes();
+              uploadTask = ref.putData(
+                bytes,
+                SettableMetadata(contentType: 'image/jpeg'),
+              );
+            } else {
+              final file = _deliveryPhoto is XFile
+                  ? File((_deliveryPhoto as XFile).path)
+                  : _deliveryPhoto as File;
+              uploadTask = ref.putFile(file);
+            }
+
             final snapshot = await uploadTask;
             deliveryPhotoUrl = await snapshot.ref.getDownloadURL();
           } catch (e) {
@@ -5156,7 +5218,22 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           final ref = FirebaseService.storage.ref().child(
             'loads/${widget.loadId}/${widget.locationType}_${imageType}_${DateTime.now().millisecondsSinceEpoch}.jpg',
           );
-          final uploadTask = ref.putFile(_selectedImage!);
+
+          UploadTask uploadTask;
+          if (kIsWeb) {
+            final xfile = _selectedImage as XFile;
+            final bytes = await xfile.readAsBytes();
+            uploadTask = ref.putData(
+              bytes,
+              SettableMetadata(contentType: 'image/jpeg'),
+            );
+          } else {
+            final file = _selectedImage is XFile
+                ? File((_selectedImage as XFile).path)
+                : _selectedImage as File;
+            uploadTask = ref.putFile(file);
+          }
+
           final snapshot = await uploadTask;
           imageUrl = await snapshot.ref.getDownloadURL();
 
@@ -5219,27 +5296,39 @@ class _ConfirmationPageState extends State<_ConfirmationPage> {
           try {
             final signatureData = await _signatureController.toPngBytes();
             if (signatureData != null) {
-              // Save signature as temporary file
-              final tempDir = Directory.systemTemp;
-              final signatureFile = File(
-                '${tempDir.path}/signature_${DateTime.now().millisecondsSinceEpoch}.png',
-              );
-              await signatureFile.writeAsBytes(signatureData);
-
               // Upload signature to Firebase Storage
               final ref = FirebaseService.storage.ref().child(
                 'loads/${widget.loadId}/delivery_signature_${DateTime.now().millisecondsSinceEpoch}.png',
               );
-              final uploadTask = ref.putFile(signatureFile);
-              final snapshot = await uploadTask;
-              signatureUrl = await snapshot.ref.getDownloadURL();
 
-              // Clean up temp file
-              try {
-                await signatureFile.delete();
-              } catch (e) {
-                // Ignore cleanup errors
+              String? downloadUrl;
+              if (kIsWeb) {
+                final uploadTask = ref.putData(
+                  signatureData,
+                  SettableMetadata(contentType: 'image/png'),
+                );
+                final snapshot = await uploadTask;
+                downloadUrl = await snapshot.ref.getDownloadURL();
+              } else {
+                // Save signature as temporary file
+                final tempDir = Directory.systemTemp;
+                final signatureFile = File(
+                  '${tempDir.path}/signature_${DateTime.now().millisecondsSinceEpoch}.png',
+                );
+                await signatureFile.writeAsBytes(signatureData);
+
+                final uploadTask = ref.putFile(signatureFile);
+                final snapshot = await uploadTask;
+                downloadUrl = await snapshot.ref.getDownloadURL();
+
+                // Clean up temp file
+                try {
+                  await signatureFile.delete();
+                } catch (e) {
+                  // Ignore cleanup errors
+                }
               }
+              signatureUrl = downloadUrl;
             }
           } catch (e) {
             print('Error uploading signature: $e');

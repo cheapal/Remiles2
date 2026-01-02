@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+
 import 'package:intl/intl.dart';
 import 'package:remiles/providers/auth_provider.dart';
 import 'package:remiles/models/user_model.dart';
@@ -20,7 +20,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
   bool _isLoading = true;
   bool _isUploading = false;
   Map<String, DocumentInfo> _documents = {};
-  
+
   // Document definitions for carriers
   static const List<DocumentInfo> _carrierDocuments = [
     DocumentInfo(
@@ -93,11 +93,11 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
 
   Future<void> _loadDocuments() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final authProvider = context.read<AuthProvider>();
       final userRole = authProvider.userRole;
-      
+
       if (userRole == UserRole.carrier) {
         final carrier = authProvider.carrierUser;
         if (carrier != null) {
@@ -106,22 +106,24 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
             carrier.uid,
             'dashboard_2_business_info',
           );
-          
+
           // Load dashboard 3 documents
           final dashboard3 = await FirebaseService.getCarrierDashboardResponse(
             carrier.uid,
             'dashboard_3_business_number',
           );
-          
+
           final Map<String, DocumentInfo> docs = {};
           for (var docInfo in _carrierDocuments) {
             String? url;
-            if (docInfo.screenKey == 'dashboard_2_business_info' && dashboard2 != null) {
+            if (docInfo.screenKey == 'dashboard_2_business_info' &&
+                dashboard2 != null) {
               url = dashboard2[docInfo.key];
-            } else if (docInfo.screenKey == 'dashboard_3_business_number' && dashboard3 != null) {
+            } else if (docInfo.screenKey == 'dashboard_3_business_number' &&
+                dashboard3 != null) {
               url = dashboard3[docInfo.key];
             }
-            
+
             docs[docInfo.key] = DocumentInfo(
               key: docInfo.key,
               storageKey: docInfo.storageKey,
@@ -131,7 +133,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
               url: url,
             );
           }
-          
+
           setState(() {
             _documents = docs;
             _isLoading = false;
@@ -145,14 +147,14 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
             shipper.uid,
             'dashboard_2_business_info',
           );
-          
+
           final Map<String, DocumentInfo> docs = {};
           for (var docInfo in _shipperDocuments) {
             String? url;
             if (dashboard2 != null) {
               url = dashboard2[docInfo.key];
             }
-            
+
             docs[docInfo.key] = DocumentInfo(
               key: docInfo.key,
               storageKey: docInfo.storageKey,
@@ -162,7 +164,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
               url: url,
             );
           }
-          
+
           setState(() {
             _documents = docs;
             _isLoading = false;
@@ -240,7 +242,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
           newUrl = await FirebaseService.uploadCarrierDocument(
             carrier.uid,
             docInfo.storageKey,
-            File(image.path),
+            image,
           );
         }
       } else if (userRole == UserRole.shipper) {
@@ -249,7 +251,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
           newUrl = await FirebaseService.uploadImage(
             shipper.uid,
             docInfo.storageKey,
-            File(image.path),
+            image,
           );
         }
       }
@@ -266,13 +268,13 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
             carrier.uid,
             docInfo.screenKey,
           );
-          
+
           final updatedData = {
             ...?currentData,
             docInfo.key: newUrl,
             'timestamp': DateTime.now().toIso8601String(),
           };
-          
+
           await FirebaseService.saveCarrierDashboardResponse(
             carrier.uid,
             docInfo.screenKey,
@@ -286,7 +288,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
             shipper.uid,
             docInfo.screenKey,
           );
-          
+
           final Map<String, dynamic> updatedData = {
             ...?currentData,
             docInfo.key: newUrl,
@@ -297,7 +299,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
           if (docInfo.key == 'insuranceDocumentUrl' && newExpiryStr != null) {
             updatedData['expiryDate'] = newExpiryStr;
           }
-          
+
           await FirebaseService.saveShipperDashboardResponse(
             shipper.uid,
             docInfo.screenKey,
@@ -322,9 +324,11 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
       }
     } catch (e) {
       final appStateProvider = context.read<AppStateProvider>();
-      appStateProvider.showError('Failed to upload document. Please try again.');
+      appStateProvider.showError(
+        'Failed to upload document. Please try again.',
+      );
       print('Error uploading document: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -358,20 +362,14 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
           ),
           content: Text(
             'Are you sure you want to delete "${docInfo.displayName}"? This action cannot be undone.',
-            style: const TextStyle(
-              fontSize: 16,
-              color: Color(0xFF666666),
-            ),
+            style: const TextStyle(fontSize: 16, color: Color(0xFF666666)),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: const Text(
                 'Cancel',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFF666666),
-                ),
+                style: TextStyle(fontSize: 16, color: Color(0xFF666666)),
               ),
             ),
             TextButton(
@@ -417,14 +415,14 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
             carrier.uid,
             docInfo.screenKey,
           );
-          
+
           if (currentData != null) {
             final updatedData = {
               ...currentData,
               docInfo.key: null,
               'timestamp': DateTime.now().toIso8601String(),
             };
-            
+
             await FirebaseService.saveCarrierDashboardResponse(
               carrier.uid,
               docInfo.screenKey,
@@ -439,14 +437,14 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
             shipper.uid,
             docInfo.screenKey,
           );
-          
+
           if (currentData != null) {
             final updatedData = {
               ...currentData,
               docInfo.key: null,
               'timestamp': DateTime.now().toIso8601String(),
             };
-            
+
             await FirebaseService.saveShipperDashboardResponse(
               shipper.uid,
               docInfo.screenKey,
@@ -472,9 +470,11 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
       }
     } catch (e) {
       final appStateProvider = context.read<AppStateProvider>();
-      appStateProvider.showError('Failed to delete document. Please try again.');
+      appStateProvider.showError(
+        'Failed to delete document. Please try again.',
+      );
       print('Error deleting document: $e');
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -489,7 +489,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
 
   void _viewDocument(String? url) {
     if (url == null || url.isEmpty) return;
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -538,8 +538,8 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
                     itemBuilder: (context, index) {
                       final docInfo = documents[index];
                       final currentDoc = _documents[docInfo.key] ?? docInfo;
-                      final hasDocument = currentDoc.url != null &&
-                          currentDoc.url!.isNotEmpty;
+                      final hasDocument =
+                          currentDoc.url != null && currentDoc.url!.isNotEmpty;
 
                       return _buildDocumentCard(currentDoc, hasDocument);
                     },
@@ -550,9 +550,7 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
           Positioned.fill(
             child: Container(
               color: Colors.black.withOpacity(0.3),
-              child: const Center(
-                child: CircularProgressIndicator(),
-              ),
+              child: const Center(child: CircularProgressIndicator()),
             ),
           ),
       ],
@@ -562,14 +560,14 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
   Widget _buildDocumentCard(DocumentInfo docInfo, bool hasDocument) {
     return Card(
       elevation: 2,
-                  shape: RoundedRectangleBorder(
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
           color: docInfo.isRequired && !hasDocument
               ? Colors.red.withOpacity(0.5)
               : Colors.grey.shade300,
           width: docInfo.isRequired && !hasDocument ? 2 : 1,
-                ),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -666,7 +664,10 @@ class _ProfileDocUploadState extends State<ProfileDocUpload> {
                         docInfo.url!,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
-                          return const Icon(Icons.broken_image, color: Colors.grey);
+                          return const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          );
                         },
                       ),
                     ),
@@ -775,11 +776,11 @@ class _DocumentViewerScreen extends StatelessWidget {
                     Text(
                       'Failed to load image',
                       style: TextStyle(color: Colors.white),
-                ),
+                    ),
                   ],
-              ),
-            );
-          },
+                ),
+              );
+            },
           ),
         ),
       ),

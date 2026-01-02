@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+
 import 'package:intl/intl.dart';
 import 'package:remiles/core/constants/app_constants.dart';
 
@@ -26,24 +26,35 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
   int _selectedTab = 0;
   bool _saving = false;
   bool _isLoading = true;
-  
+
   // Form controllers
-  final TextEditingController _businessAddressController = TextEditingController();
-  final TextEditingController _operatingProvincesController = TextEditingController();
-  final TextEditingController _commercialInsuranceProviderController = TextEditingController();
-  final TextEditingController _commercialPolicyNumberController = TextEditingController();
-  final TextEditingController _commercialExpiryDateController = TextEditingController();
-  final TextEditingController _commercialCoverageLimitController = TextEditingController();
-  final TextEditingController _cargoInsuranceProviderController = TextEditingController();
-  final TextEditingController _cargoPolicyNumberController = TextEditingController();
-  final TextEditingController _cargoExpiryDateController = TextEditingController();
-  final TextEditingController _cargoCoverageLimitController = TextEditingController();
-  final TextEditingController _yearsOfExperienceController = TextEditingController();
-  
+  final TextEditingController _businessAddressController =
+      TextEditingController();
+  final TextEditingController _operatingProvincesController =
+      TextEditingController();
+  final TextEditingController _commercialInsuranceProviderController =
+      TextEditingController();
+  final TextEditingController _commercialPolicyNumberController =
+      TextEditingController();
+  final TextEditingController _commercialExpiryDateController =
+      TextEditingController();
+  final TextEditingController _commercialCoverageLimitController =
+      TextEditingController();
+  final TextEditingController _cargoInsuranceProviderController =
+      TextEditingController();
+  final TextEditingController _cargoPolicyNumberController =
+      TextEditingController();
+  final TextEditingController _cargoExpiryDateController =
+      TextEditingController();
+  final TextEditingController _cargoCoverageLimitController =
+      TextEditingController();
+  final TextEditingController _yearsOfExperienceController =
+      TextEditingController();
+
   // Multi-select state
   List<String> _selectedIndustryTypes = [];
   List<String> _selectedShipmentTypes = [];
-  
+
   // Options for multi-select
   static const List<String> _industryTypeOptions = [
     'Manufacturing',
@@ -62,7 +73,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
     'E-commerce',
     'Other',
   ];
-  
+
   static const List<String> _shipmentTypeOptions = [
     'Pallets',
     'Containers',
@@ -77,17 +88,17 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
     'Bulk',
     'Other',
   ];
-  
+
   // Google Places API Key - using AppConstants
-  
+
   // Image picker
   final ImagePicker _picker = ImagePicker();
-  
+
   // Image storage
-  File? _driversLicenseImage;
-  File? _vehicleRegistrationImage;
-  File? _nscImage;
-  
+  dynamic _driversLicenseImage;
+  dynamic _vehicleRegistrationImage;
+  dynamic _nscImage;
+
   // Image URLs from saved data
   String? _driversLicenseUrl;
   String? _vehicleRegistrationUrl;
@@ -124,30 +135,45 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         final savedData = await FirebaseService.getCarrierDashboardResponse(
           carrier.uid,
           'dashboard_2_business_info',
         );
-        
+
         if (savedData != null) {
           setState(() {
-            _businessAddressController.text = savedData['businessAddress'] ?? '';
-            _operatingProvincesController.text = savedData['operatingProvinces'] ?? '';
-            _selectedIndustryTypes = List<String>.from(savedData['industryType'] ?? []);
-            _selectedShipmentTypes = List<String>.from(savedData['shipmentType'] ?? []);
-            _commercialInsuranceProviderController.text = savedData['commercialInsuranceProvider'] ?? '';
-            _commercialPolicyNumberController.text = savedData['commercialPolicyNumber'] ?? '';
-            _commercialExpiryDateController.text = savedData['commercialExpiryDate'] ?? '';
-            _commercialCoverageLimitController.text = savedData['commercialCoverageLimit'] ?? '';
-            _cargoInsuranceProviderController.text = savedData['cargoInsuranceProvider'] ?? '';
-            _cargoPolicyNumberController.text = savedData['cargoPolicyNumber'] ?? '';
-            _cargoExpiryDateController.text = savedData['cargoExpiryDate'] ?? '';
-            _cargoCoverageLimitController.text = savedData['cargoCoverageLimit'] ?? '';
-            _yearsOfExperienceController.text = savedData['yearsOfExperience'] ?? '';
+            _businessAddressController.text =
+                savedData['businessAddress'] ?? '';
+            _operatingProvincesController.text =
+                savedData['operatingProvinces'] ?? '';
+            _selectedIndustryTypes = List<String>.from(
+              savedData['industryType'] ?? [],
+            );
+            _selectedShipmentTypes = List<String>.from(
+              savedData['shipmentType'] ?? [],
+            );
+            _commercialInsuranceProviderController.text =
+                savedData['commercialInsuranceProvider'] ?? '';
+            _commercialPolicyNumberController.text =
+                savedData['commercialPolicyNumber'] ?? '';
+            _commercialExpiryDateController.text =
+                savedData['commercialExpiryDate'] ?? '';
+            _commercialCoverageLimitController.text =
+                savedData['commercialCoverageLimit'] ?? '';
+            _cargoInsuranceProviderController.text =
+                savedData['cargoInsuranceProvider'] ?? '';
+            _cargoPolicyNumberController.text =
+                savedData['cargoPolicyNumber'] ?? '';
+            _cargoExpiryDateController.text =
+                savedData['cargoExpiryDate'] ?? '';
+            _cargoCoverageLimitController.text =
+                savedData['cargoCoverageLimit'] ?? '';
+            _yearsOfExperienceController.text =
+                savedData['yearsOfExperience'] ?? '';
             _agreeToTerms = savedData['agreeToTerms'] ?? false;
-            
+
             // Store image URLs for restoration
             _driversLicenseUrl = savedData['driversLicenseUrl'];
             _vehicleRegistrationUrl = savedData['vehicleRegistrationUrl'];
@@ -178,9 +204,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
     if (_isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFFFFFEF6),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -195,15 +219,18 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
               // ======== Top section ========
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 20,
+                ),
                 decoration: BoxDecoration(
                   color: topPanelColor,
                   image: isWide
                       ? null
                       : const DecorationImage(
-                    image: AssetImage('assets/top_leather.png'),
-                    fit: BoxFit.cover,
-                  ),
+                          image: AssetImage('assets/top_leather.png'),
+                          fit: BoxFit.cover,
+                        ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.2),
@@ -273,7 +300,8 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
               // ======== Form fields ========
               Padding(
                 padding: EdgeInsets.symmetric(
-                    horizontal: isWide ? 100.0 : 40.0),
+                  horizontal: isWide ? 100.0 : 40.0,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 760),
                   child: Column(
@@ -494,10 +522,10 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
                               ),
                               child: _agreeToTerms
                                   ? const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 20,
-                              )
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 20,
+                                    )
                                   : null,
                             ),
                           ),
@@ -527,8 +555,9 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
                                 image: AssetImage('assets/signup_button.png'),
                                 fit: BoxFit.fill,
                               ),
-                              borderRadius:
-                              BorderRadius.all(Radius.circular(24.5)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(24.5),
+                              ),
                             ),
                             child: Align(
                               alignment: const Alignment(0, -0.2),
@@ -538,7 +567,10 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : const Text(
@@ -578,9 +610,9 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
           image: isWide
               ? null
               : const DecorationImage(
-            image: AssetImage('assets/nav_leather.png'),
-            fit: BoxFit.cover,
-          ),
+                  image: AssetImage('assets/nav_leather.png'),
+                  fit: BoxFit.cover,
+                ),
           borderRadius: const BorderRadius.only(
             topLeft: Radius.circular(65),
             topRight: Radius.circular(65),
@@ -634,7 +666,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
   }
 
   // ======== Methods ========
-  
+
   Future<void> _pickImage(String imageType) async {
     try {
       final XFile? image = await _picker.pickImage(
@@ -643,25 +675,25 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
         maxHeight: 1800,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           switch (imageType) {
             case 'drivers_license':
-              _driversLicenseImage = File(image.path);
+              _driversLicenseImage = image;
               _driversLicenseUrl = null; // Clear URL when new image is selected
               break;
             case 'vehicle_registration':
-              _vehicleRegistrationImage = File(image.path);
+              _vehicleRegistrationImage = image;
               _vehicleRegistrationUrl = null;
               break;
             case 'nsc':
-              _nscImage = File(image.path);
+              _nscImage = image;
               _nscUrl = null;
               break;
           }
         });
-        
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -673,18 +705,19 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
       }
     } catch (e) {
       String errorMessage = 'Error picking image';
-      
+
       // Handle specific permission errors
-      if (e.toString().contains('Permission denied') || 
+      if (e.toString().contains('Permission denied') ||
           e.toString().contains('permission')) {
-        errorMessage = 'Permission denied. Please allow access to photos in app settings.';
+        errorMessage =
+            'Permission denied. Please allow access to photos in app settings.';
       } else if (e.toString().contains('User cancelled')) {
         // User cancelled, don't show error
         return;
       } else {
         errorMessage = 'Error picking image: ${e.toString()}';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -696,7 +729,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
       }
     }
   }
-  
+
   Future<void> _handleNext() async {
     // Validate required fields
     if (_businessAddressController.text.trim().isEmpty ||
@@ -711,25 +744,26 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
       _showAlertDialog(context, 'Please fill in all required fields.');
       return;
     }
-    
+
     // Validate required images
     if ((_driversLicenseImage == null && _driversLicenseUrl == null) ||
-        (_vehicleRegistrationImage == null && _vehicleRegistrationUrl == null) ||
+        (_vehicleRegistrationImage == null &&
+            _vehicleRegistrationUrl == null) ||
         (_nscImage == null && _nscUrl == null)) {
       _showAlertDialog(context, 'Please upload all required documents.');
       return;
     }
-    
+
     if (!_agreeToTerms) {
       _showAlertDialog(context, 'Please agree to the terms and conditions.');
       return;
     }
-    
+
     setState(() => _saving = true);
     try {
       final authProvider = context.read<AuthProvider>();
       final carrier = authProvider.carrierUser;
-      
+
       if (carrier != null) {
         // Upload images first (only if new images were selected)
         String? driversLicenseUrl = _driversLicenseUrl;
@@ -743,7 +777,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
             throw Exception('Failed to upload drivers license');
           }
         }
-        
+
         String? vehicleRegistrationUrl = _vehicleRegistrationUrl;
         if (_vehicleRegistrationImage != null) {
           vehicleRegistrationUrl = await FirebaseService.uploadCarrierDocument(
@@ -755,7 +789,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
             throw Exception('Failed to upload vehicle registration');
           }
         }
-        
+
         String? nscUrl = _nscUrl;
         if (_nscImage != null) {
           nscUrl = await FirebaseService.uploadCarrierDocument(
@@ -767,7 +801,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
             throw Exception('Failed to upload NSC');
           }
         }
-        
+
         final response = {
           'businessAddress': _businessAddressController.text.trim(),
           'operatingProvinces': _operatingProvincesController.text.trim(),
@@ -776,27 +810,33 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
           'driversLicenseUrl': driversLicenseUrl,
           'vehicleRegistrationUrl': vehicleRegistrationUrl,
           'nscUrl': nscUrl,
-          'commercialInsuranceProvider': _commercialInsuranceProviderController.text.trim(),
-          'commercialPolicyNumber': _commercialPolicyNumberController.text.trim(),
+          'commercialInsuranceProvider': _commercialInsuranceProviderController
+              .text
+              .trim(),
+          'commercialPolicyNumber': _commercialPolicyNumberController.text
+              .trim(),
           'commercialExpiryDate': _commercialExpiryDateController.text.trim(),
-          'commercialCoverageLimit': _commercialCoverageLimitController.text.trim(),
-          'cargoInsuranceProvider': _cargoInsuranceProviderController.text.trim().isEmpty 
-              ? null 
+          'commercialCoverageLimit': _commercialCoverageLimitController.text
+              .trim(),
+          'cargoInsuranceProvider':
+              _cargoInsuranceProviderController.text.trim().isEmpty
+              ? null
               : _cargoInsuranceProviderController.text.trim(),
-          'cargoPolicyNumber': _cargoPolicyNumberController.text.trim().isEmpty 
-              ? null 
+          'cargoPolicyNumber': _cargoPolicyNumberController.text.trim().isEmpty
+              ? null
               : _cargoPolicyNumberController.text.trim(),
-          'cargoExpiryDate': _cargoExpiryDateController.text.trim().isEmpty 
-              ? null 
+          'cargoExpiryDate': _cargoExpiryDateController.text.trim().isEmpty
+              ? null
               : _cargoExpiryDateController.text.trim(),
-          'cargoCoverageLimit': _cargoCoverageLimitController.text.trim().isEmpty 
-              ? null 
+          'cargoCoverageLimit':
+              _cargoCoverageLimitController.text.trim().isEmpty
+              ? null
               : _cargoCoverageLimitController.text.trim(),
           'yearsOfExperience': _yearsOfExperienceController.text.trim(),
           'agreeToTerms': _agreeToTerms,
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveCarrierDashboardResponse(
           carrier.uid,
           'dashboard_2_business_info',
@@ -804,13 +844,15 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         print('Carrier Dashboard 2 response saved successfully');
       }
-      
+
       if (!mounted) return;
       Navigator.push(
         context,
@@ -830,7 +872,7 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
       if (mounted) setState(() => _saving = false);
     }
   }
-  
+
   void _showAlertDialog(BuildContext context, String message) {
     showDialog(
       context: context,
@@ -884,7 +926,11 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
             padding: const EdgeInsets.symmetric(horizontal: 15),
             child: Row(
               children: [
-                Icon(icon, size: 24, color: const Color.fromRGBO(0, 0, 0, 0.45)),
+                Icon(
+                  icon,
+                  size: 24,
+                  color: const Color.fromRGBO(0, 0, 0, 0.45),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -930,12 +976,12 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
   Widget _buildUploadField({
     required BuildContext context,
     required String text,
-    File? image,
+    dynamic image,
     String? imageUrl,
     VoidCallback? onTap,
   }) {
     final hasImage = image != null || imageUrl != null;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

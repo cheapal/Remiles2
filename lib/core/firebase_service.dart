@@ -1240,11 +1240,25 @@ class FirebaseService {
     dynamic imageFile,
   ) async {
     try {
-      // On mobile, imageFile is a File. On web, this path should not be used.
       final ref = _storage.ref().child(
         'shippers/$shipperUid/documents/$imageType.jpg',
       );
-      final uploadTask = ref.putFile(imageFile);
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final xfile = imageFile as XFile;
+        final bytes = await xfile.readAsBytes();
+        uploadTask = ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        final file = imageFile is XFile
+            ? File(imageFile.path)
+            : imageFile as File;
+        uploadTask = ref.putFile(file);
+      }
+
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
@@ -1295,13 +1309,28 @@ class FirebaseService {
   // Upload carrier profile image to Firebase Storage
   static Future<String?> uploadCarrierProfileImage(
     String carrierUid,
-    File imageFile,
+    dynamic imageFile, // Can be File or XFile
   ) async {
     try {
       final ref = _storage.ref().child(
         'carriers/$carrierUid/profile/profile_image.jpg',
       );
-      final uploadTask = ref.putFile(imageFile);
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final xfile = imageFile as XFile;
+        final bytes = await xfile.readAsBytes();
+        uploadTask = ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        final file = imageFile is XFile
+            ? File(imageFile.path)
+            : imageFile as File;
+        uploadTask = ref.putFile(file);
+      }
+
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
@@ -1318,13 +1347,28 @@ class FirebaseService {
   // Upload shipper profile image to Firebase Storage
   static Future<String?> uploadShipperProfileImage(
     String shipperUid,
-    File imageFile,
+    dynamic imageFile, // Can be File or XFile
   ) async {
     try {
       final ref = _storage.ref().child(
         'shippers/$shipperUid/profile/profile_image.jpg',
       );
-      final uploadTask = ref.putFile(imageFile);
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final xfile = imageFile as XFile;
+        final bytes = await xfile.readAsBytes();
+        uploadTask = ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        final file = imageFile is XFile
+            ? File(imageFile.path)
+            : imageFile as File;
+        uploadTask = ref.putFile(file);
+      }
+
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
@@ -1413,13 +1457,28 @@ class FirebaseService {
   static Future<String?> uploadCarrierDocument(
     String carrierUid,
     String documentType,
-    File imageFile,
+    dynamic imageFile,
   ) async {
     try {
       final ref = _storage.ref().child(
         'carriers/$carrierUid/documents/$documentType.jpg',
       );
-      final uploadTask = ref.putFile(imageFile);
+
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final xfile = imageFile as XFile;
+        final bytes = await xfile.readAsBytes();
+        uploadTask = ref.putData(
+          bytes,
+          SettableMetadata(contentType: 'image/jpeg'),
+        );
+      } else {
+        final file = imageFile is XFile
+            ? File(imageFile.path)
+            : imageFile as File;
+        uploadTask = ref.putFile(file);
+      }
+
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
@@ -5037,10 +5096,20 @@ class FirebaseService {
   // ==================== Academy Content Methods ====================
 
   /// Upload academy thumbnail image
-  static Future<String?> uploadAcademyThumbnail(File imageFile) async {
+  static Future<String?> uploadAcademyThumbnail(dynamic imageFile) async {
     try {
+      int fileSize;
+      if (kIsWeb) {
+        final xfile = imageFile as XFile;
+        fileSize = (await xfile.readAsBytes()).length;
+      } else {
+        final file = imageFile is XFile
+            ? File(imageFile.path)
+            : imageFile as File;
+        fileSize = await file.length();
+      }
+
       // Validate file size (5MB limit)
-      final fileSize = await imageFile.length();
       if (fileSize > 5 * 1024 * 1024) {
         throw Exception('Image file is too large. Maximum size is 5MB');
       }
@@ -5054,7 +5123,18 @@ class FirebaseService {
         cacheControl: 'public, max-age=31536000',
       );
 
-      final uploadTask = ref.putFile(imageFile, metadata);
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final xfile = imageFile as XFile;
+        final bytes = await xfile.readAsBytes();
+        uploadTask = ref.putData(bytes, metadata);
+      } else {
+        final file = imageFile is XFile
+            ? File(imageFile.path)
+            : imageFile as File;
+        uploadTask = ref.putFile(file, metadata);
+      }
+
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
@@ -5069,10 +5149,20 @@ class FirebaseService {
   }
 
   /// Upload academy video
-  static Future<String?> uploadAcademyVideo(File videoFile) async {
+  static Future<String?> uploadAcademyVideo(dynamic videoFile) async {
     try {
+      int fileSize;
+      if (kIsWeb) {
+        final xfile = videoFile as XFile;
+        fileSize = (await xfile.readAsBytes()).length;
+      } else {
+        final file = videoFile is XFile
+            ? File(videoFile.path)
+            : videoFile as File;
+        fileSize = await file.length();
+      }
+
       // Validate file size (50MB limit)
-      final fileSize = await videoFile.length();
       if (fileSize > 50 * 1024 * 1024) {
         throw Exception('Video file is too large. Maximum size is 50MB');
       }
@@ -5086,7 +5176,18 @@ class FirebaseService {
         cacheControl: 'public, max-age=31536000',
       );
 
-      final uploadTask = ref.putFile(videoFile, metadata);
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final xfile = videoFile as XFile;
+        final bytes = await xfile.readAsBytes();
+        uploadTask = ref.putData(bytes, metadata);
+      } else {
+        final file = videoFile is XFile
+            ? File(videoFile.path)
+            : videoFile as File;
+        uploadTask = ref.putFile(file, metadata);
+      }
+
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;
@@ -5101,16 +5202,13 @@ class FirebaseService {
   }
 
   /// Upload academy document
-  static Future<String?> uploadAcademyDocument(File documentFile) async {
+  static Future<String?> uploadAcademyDocument(dynamic documentFile) async {
     try {
-      // Validate file size (10MB limit)
-      final fileSize = await documentFile.length();
-      if (fileSize > 10 * 1024 * 1024) {
-        throw Exception('Document file is too large. Maximum size is 10MB');
-      }
-
+      final String filePath = documentFile is XFile
+          ? documentFile.path
+          : (documentFile as File).path;
       final fileName = 'document_${DateTime.now().millisecondsSinceEpoch}';
-      final extension = documentFile.path.split('.').last;
+      final extension = filePath.split('.').last;
       final ref = _storage.ref().child(
         'academy/documents/$fileName.$extension',
       );
@@ -5139,7 +5237,18 @@ class FirebaseService {
         cacheControl: 'public, max-age=31536000',
       );
 
-      final uploadTask = ref.putFile(documentFile, metadata);
+      UploadTask uploadTask;
+      if (kIsWeb) {
+        final xfile = documentFile as XFile;
+        final bytes = await xfile.readAsBytes();
+        uploadTask = ref.putData(bytes, metadata);
+      } else {
+        final file = documentFile is XFile
+            ? File(documentFile.path)
+            : documentFile as File;
+        uploadTask = ref.putFile(file, metadata);
+      }
+
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
       return downloadUrl;

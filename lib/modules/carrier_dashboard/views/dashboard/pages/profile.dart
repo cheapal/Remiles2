@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+
 import '../../../../../providers/auth_provider.dart';
 import '../../../../../providers/app_state_provider.dart';
 import '../../../../../providers/payment_methods_provider.dart';
@@ -95,10 +95,9 @@ class _ProfileState extends State<Profile> {
       appStateProvider.showLoadingWithMessage('Uploading profile picture...');
 
       // Upload image to Firebase Storage
-      final imageFile = File(image.path);
       final imageUrl = await FirebaseService.uploadCarrierProfileImage(
         carrier.uid,
-        imageFile,
+        image,
       );
 
       if (imageUrl == null) {

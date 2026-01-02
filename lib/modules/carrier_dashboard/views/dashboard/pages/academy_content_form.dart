@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
@@ -24,11 +25,11 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
   final _tagController = TextEditingController();
 
   final ImagePicker _imagePicker = ImagePicker();
-  File? _thumbnailFile;
+  dynamic _thumbnailFile;
   String? _existingThumbnailUrl;
-  File? _videoFile;
+  dynamic _videoFile;
   String? _existingVideoUrl;
-  File? _documentFile;
+  dynamic _documentFile;
   String? _existingDocumentUrl;
 
   String _contentType = 'video';
@@ -93,9 +94,8 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
         maxHeight: 1080,
       );
       if (image != null) {
-        final file = File(image.path);
         // Validate image size (5MB limit)
-        final fileSize = await file.length();
+        final fileSize = await image.length();
         if (fileSize > 5 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -104,17 +104,17 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
           }
           return;
         }
-        
+
         setState(() {
-          _thumbnailFile = file;
+          _thumbnailFile = image;
           _existingThumbnailUrl = null;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
       }
     }
   }
@@ -122,31 +122,34 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
   Future<void> _pickVideo() async {
     try {
       // Use image_picker for better iOS compatibility
-      final XFile? video = await _imagePicker.pickVideo(source: ImageSource.gallery);
+      final XFile? video = await _imagePicker.pickVideo(
+        source: ImageSource.gallery,
+      );
       if (video != null) {
-        final file = File(video.path);
         // Validate video size (50MB limit)
-        final fileSize = await file.length();
+        final fileSize = await video.length();
         if (fileSize > 50 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Video size must be less than 50MB')),
+              const SnackBar(
+                content: Text('Video size must be less than 50MB'),
+              ),
             );
           }
           return;
         }
-        
+
         setState(() {
-          _videoFile = file;
+          _videoFile = video;
           _existingVideoUrl = null;
           _contentType = 'video';
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking video: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking video: $e')));
       }
     }
   }
@@ -158,18 +161,25 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
         allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
       );
       if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
+        final dynamic file = kIsWeb
+            ? XFile.fromData(
+                result.files.single.bytes!,
+                name: result.files.single.name,
+              )
+            : File(result.files.single.path!);
         // Validate document size (10MB limit)
         final fileSize = await file.length();
         if (fileSize > 10 * 1024 * 1024) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Document size must be less than 10MB')),
+              const SnackBar(
+                content: Text('Document size must be less than 10MB'),
+              ),
             );
           }
           return;
         }
-        
+
         setState(() {
           _documentFile = file;
           _existingDocumentUrl = null;
@@ -178,9 +188,9 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking document: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking document: $e')));
       }
     }
   }
@@ -206,14 +216,18 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
       return;
     }
 
-    if (_contentType == 'video' && _videoFile == null && _existingVideoUrl == null) {
+    if (_contentType == 'video' &&
+        _videoFile == null &&
+        _existingVideoUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a video file')),
       );
       return;
     }
 
-    if (_contentType == 'document' && _documentFile == null && _existingDocumentUrl == null) {
+    if (_contentType == 'document' &&
+        _documentFile == null &&
+        _existingDocumentUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select a document file')),
       );
@@ -234,7 +248,9 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
 
       // Upload thumbnail if new
       if (_thumbnailFile != null) {
-        thumbnailUrl = await FirebaseService.uploadAcademyThumbnail(_thumbnailFile!);
+        thumbnailUrl = await FirebaseService.uploadAcademyThumbnail(
+          _thumbnailFile!,
+        );
         if (thumbnailUrl == null) {
           throw Exception('Failed to upload thumbnail');
         }
@@ -250,7 +266,9 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
 
       // Upload document if new
       if (_documentFile != null) {
-        documentUrl = await FirebaseService.uploadAcademyDocument(_documentFile!);
+        documentUrl = await FirebaseService.uploadAcademyDocument(
+          _documentFile!,
+        );
         if (documentUrl == null) {
           throw Exception('Failed to upload document');
         }
@@ -267,7 +285,9 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
         tags: _tags,
         playlistId: _selectedPlaylistId,
         playlistName: _selectedPlaylistName,
-        createdAt: _isEditing ? widget.contentToEdit!.createdAt : DateTime.now(),
+        createdAt: _isEditing
+            ? widget.contentToEdit!.createdAt
+            : DateTime.now(),
         updatedAt: DateTime.now(),
         order: _isEditing ? widget.contentToEdit!.order : 0,
       );
@@ -401,11 +421,17 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                           labelStyle: TextStyle(color: primaryColor),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: primaryColor, width: 2),
+                            borderSide: BorderSide(
+                              color: primaryColor,
+                              width: 2,
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: primaryColor, width: 2),
+                            borderSide: BorderSide(
+                              color: primaryColor,
+                              width: 2,
+                            ),
                           ),
                           filled: true,
                           fillColor: Colors.white,
@@ -428,11 +454,17 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                           labelStyle: TextStyle(color: primaryColor),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: primaryColor, width: 2),
+                            borderSide: BorderSide(
+                              color: primaryColor,
+                              width: 2,
+                            ),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: primaryColor, width: 2),
+                            borderSide: BorderSide(
+                              color: primaryColor,
+                              width: 2,
+                            ),
                           ),
                           filled: true,
                           fillColor: Colors.white,
@@ -469,23 +501,33 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                           child: _thumbnailFile != null
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.file(
-                                    _thumbnailFile!,
-                                    fit: BoxFit.cover,
-                                  ),
+                                  child: kIsWeb
+                                      ? Image.network(
+                                          (_thumbnailFile as XFile).path,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Image.file(
+                                          _thumbnailFile is XFile
+                                              ? File(
+                                                  (_thumbnailFile as XFile)
+                                                      .path,
+                                                )
+                                              : _thumbnailFile as File,
+                                          fit: BoxFit.cover,
+                                        ),
                                 )
                               : _existingThumbnailUrl != null
-                                  ? ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Image.network(
-                                        _existingThumbnailUrl!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (context, error, stackTrace) {
-                                          return _buildPlaceholder(Icons.image);
-                                        },
-                                      ),
-                                    )
-                                  : _buildPlaceholder(Icons.add_photo_alternate),
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    _existingThumbnailUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return _buildPlaceholder(Icons.image);
+                                    },
+                                  ),
+                                )
+                              : _buildPlaceholder(Icons.add_photo_alternate),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -507,7 +549,13 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                           Icons.video_file,
                           _videoFile != null || _existingVideoUrl != null,
                           _pickVideo,
-                          _videoFile?.path ?? (_existingVideoUrl != null ? 'Video uploaded' : null),
+                          _videoFile is XFile
+                              ? (_videoFile as XFile).name
+                              : (_videoFile is File
+                                    ? (_videoFile as File).path.split('/').last
+                                    : (_existingVideoUrl != null
+                                          ? 'Video uploaded'
+                                          : null)),
                         ),
                       ] else ...[
                         Text(
@@ -525,7 +573,15 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                           Icons.description,
                           _documentFile != null || _existingDocumentUrl != null,
                           _pickDocument,
-                          _documentFile?.path.split('/').last ?? (_existingDocumentUrl != null ? 'Document uploaded' : null),
+                          _documentFile is XFile
+                              ? (_documentFile as XFile).name
+                              : (_documentFile is File
+                                    ? (_documentFile as File).path
+                                          .split('/')
+                                          .last
+                                    : (_existingDocumentUrl != null
+                                          ? 'Document uploaded'
+                                          : null)),
                         ),
                       ],
                       const SizedBox(height: 16),
@@ -550,11 +606,17 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                                 hintText: 'Enter tag and press +',
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(color: primaryColor, width: 2),
+                                  borderSide: BorderSide(
+                                    color: primaryColor,
+                                    width: 2,
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  borderSide: BorderSide(color: primaryColor, width: 2),
+                                  borderSide: BorderSide(
+                                    color: primaryColor,
+                                    width: 2,
+                                  ),
                                 ),
                                 filled: true,
                                 fillColor: Colors.white,
@@ -565,7 +627,11 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                           const SizedBox(width: 8),
                           IconButton(
                             onPressed: _addTag,
-                            icon: Icon(Icons.add_circle, color: primaryColor, size: 32),
+                            icon: Icon(
+                              Icons.add_circle,
+                              color: primaryColor,
+                              size: 32,
+                            ),
                           ),
                         ],
                       ),
@@ -606,11 +672,17 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                           decoration: InputDecoration(
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: primaryColor, width: 2),
+                              borderSide: BorderSide(
+                                color: primaryColor,
+                                width: 2,
+                              ),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(10),
-                              borderSide: BorderSide(color: primaryColor, width: 2),
+                              borderSide: BorderSide(
+                                color: primaryColor,
+                                width: 2,
+                              ),
                             ),
                             filled: true,
                             fillColor: Colors.white,
@@ -631,7 +703,9 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                             setState(() {
                               _selectedPlaylistId = value;
                               if (value != null) {
-                                final playlist = _playlists.firstWhere((p) => p['id'] == value);
+                                final playlist = _playlists.firstWhere(
+                                  (p) => p['id'] == value,
+                                );
                                 _selectedPlaylistName = playlist['name'];
                               } else {
                                 _selectedPlaylistName = null;
@@ -660,7 +734,9 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
                                   ),
                                 )
                               : const Text(
@@ -698,14 +774,15 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
         decoration: BoxDecoration(
           color: isSelected ? primaryColor : Colors.white,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: primaryColor,
-            width: 2,
-          ),
+          border: Border.all(color: primaryColor, width: 2),
         ),
         child: Column(
           children: [
-            Icon(icon, color: isSelected ? Colors.white : primaryColor, size: 32),
+            Icon(
+              icon,
+              color: isSelected ? Colors.white : primaryColor,
+              size: 32,
+            ),
             const SizedBox(height: 8),
             Text(
               label,
@@ -791,4 +868,3 @@ class _AcademyContentFormState extends State<AcademyContentForm> {
     );
   }
 }
-

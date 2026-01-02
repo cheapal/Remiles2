@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+
 import 'package:intl/intl.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
@@ -28,19 +28,23 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
   late AnimationController _progressController1;
   int _selectedTab = 0;
   bool _saving = false;
-  
+
   // Form controllers
-  final TextEditingController _businessAddressController = TextEditingController();
-  final TextEditingController _operatingProvincesController = TextEditingController();
-  final TextEditingController _insuranceProviderController = TextEditingController();
+  final TextEditingController _businessAddressController =
+      TextEditingController();
+  final TextEditingController _operatingProvincesController =
+      TextEditingController();
+  final TextEditingController _insuranceProviderController =
+      TextEditingController();
   final TextEditingController _policyNumberController = TextEditingController();
   final TextEditingController _expiryDateController = TextEditingController();
-  final TextEditingController _coverageLimitController = TextEditingController();
-  
+  final TextEditingController _coverageLimitController =
+      TextEditingController();
+
   // Multi-select state
   List<String> _selectedIndustryTypes = [];
   List<String> _selectedShipmentTypes = [];
-  
+
   // Options for multi-select
   static const List<String> _industryTypeOptions = [
     'Manufacturing',
@@ -59,7 +63,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
     'E-commerce',
     'Other',
   ];
-  
+
   static const List<String> _shipmentTypeOptions = [
     'Pallets',
     'Containers',
@@ -74,17 +78,17 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
     'Bulk',
     'Other',
   ];
-  
+
   // Google Places API Key - using AppConstants
-  
+
   // Image picker
   final ImagePicker _picker = ImagePicker();
-  
+
   // Image storage
-  File? _businessRegistrationImage;
-  File? _insuranceDocumentImage;
-  File? _governmentIdImage;
-  File? _proofOfAddressImage;
+  dynamic _businessRegistrationImage;
+  dynamic _insuranceDocumentImage;
+  dynamic _governmentIdImage;
+  dynamic _proofOfAddressImage;
 
   @override
   void initState() {
@@ -129,15 +133,18 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
               // ======== Top section ========
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 20,
+                ),
                 decoration: BoxDecoration(
                   color: topPanelColor,
                   image: isWide
                       ? null
                       : const DecorationImage(
-                    image: AssetImage('assets/top_leather.png'),
-                    fit: BoxFit.cover,
-                  ),
+                          image: AssetImage('assets/top_leather.png'),
+                          fit: BoxFit.cover,
+                        ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withOpacity(0.2),
@@ -208,7 +215,8 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
               // ======== Form fields ========
               Padding(
                 padding: EdgeInsets.symmetric(
-                    horizontal: isWide ? 100.0 : 40.0),
+                  horizontal: isWide ? 100.0 : 40.0,
+                ),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 760),
                   child: Column(
@@ -278,7 +286,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                       _buildUploadField(
                         context: context,
                         text:
-                        "Business Registration (Articles of Incorporation or Sole Proprietor Certificate)",
+                            "Business Registration (Articles of Incorporation or Sole Proprietor Certificate)",
                         image: _businessRegistrationImage,
                         onTap: () => _pickImage('business_registration'),
                       ),
@@ -286,7 +294,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                       _buildUploadField(
                         context: context,
                         text:
-                        "Upload Proof of Business Insurance (Commercial General Liability, Cargo Insurance, etc.)",
+                            "Upload Proof of Business Insurance (Commercial General Liability, Cargo Insurance, etc.)",
                         image: _insuranceDocumentImage,
                         onTap: () => _pickImage('insurance_document'),
                       ),
@@ -362,10 +370,10 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                               ),
                               child: _agreeToTerms
                                   ? const Icon(
-                                Icons.check,
-                                color: Colors.white,
-                                size: 20,
-                              )
+                                      Icons.check,
+                                      color: Colors.white,
+                                      size: 20,
+                                    )
                                   : null,
                             ),
                           ),
@@ -386,7 +394,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                       _buildUploadField(
                         context: context,
                         text:
-                        "Government-Issued ID (for business owner or authorized user)",
+                            "Government-Issued ID (for business owner or authorized user)",
                         image: _governmentIdImage,
                         onTap: () => _pickImage('government_id'),
                       ),
@@ -410,8 +418,9 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                                 image: AssetImage('assets/signup_button.png'),
                                 fit: BoxFit.fill,
                               ),
-                              borderRadius:
-                              BorderRadius.all(Radius.circular(24.5)),
+                              borderRadius: BorderRadius.all(
+                                Radius.circular(24.5),
+                              ),
                             ),
                             child: Align(
                               alignment: const Alignment(0, -0.2),
@@ -421,7 +430,10 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                                       height: 20,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : const Text(
@@ -513,39 +525,38 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
       //     ),
       //   ),
       // ),
-    
     );
   }
 
   // ======== Methods ========
-  
+
   Future<void> _pickImage(String imageType) async {
-      try {
+    try {
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1800,
         maxHeight: 1800,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         setState(() {
           switch (imageType) {
             case 'business_registration':
-              _businessRegistrationImage = File(image.path);
+              _businessRegistrationImage = image;
               break;
             case 'insurance_document':
-              _insuranceDocumentImage = File(image.path);
+              _insuranceDocumentImage = image;
               break;
             case 'government_id':
-              _governmentIdImage = File(image.path);
+              _governmentIdImage = image;
               break;
             case 'proof_of_address':
-              _proofOfAddressImage = File(image.path);
+              _proofOfAddressImage = image;
               break;
           }
         });
-        
+
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -557,18 +568,19 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
       }
     } catch (e) {
       String errorMessage = 'Error picking image';
-      
+
       // Handle specific permission errors
-      if (e.toString().contains('Permission denied') || 
+      if (e.toString().contains('Permission denied') ||
           e.toString().contains('permission')) {
-        errorMessage = 'Permission denied. Please allow access to photos in app settings.';
+        errorMessage =
+            'Permission denied. Please allow access to photos in app settings.';
       } else if (e.toString().contains('User cancelled')) {
         // User cancelled, don't show error
         return;
       } else {
         errorMessage = 'Error picking image: ${e.toString()}';
       }
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -580,7 +592,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
       }
     }
   }
-  
+
   Future<void> _handleNext() async {
     // Validate required fields
     if (_businessAddressController.text.trim().isEmpty ||
@@ -602,12 +614,12 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
       _showAlertDialog(context, 'Please upload all required documents.');
       return;
     }
-    
+
     if (!_agreeToTerms) {
       _showAlertDialog(context, 'Please agree to the terms and conditions.');
       return;
     }
-    
+
     setState(() => _saving = true);
     try {
       final authProvider = context.read<AuthProvider>();
@@ -619,109 +631,45 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
         String? insuranceDocumentUrl;
         String? governmentIdUrl;
         String? proofOfAddressUrl;
-       
-        if (kIsWeb) {
 
-          ///add empty
-          businessRegistrationUrl = 'web_placeholder';
-          insuranceDocumentUrl = 'web_placeholder';
-          governmentIdUrl = 'web_placeholder';
-          proofOfAddressUrl = 'web_placeholder';
-
-          //todo: add this later for web platform
-          // Upload images from bytes (Uint8List) all at once to save time
-        //   final businessRegistrationBytes = await _businessRegistrationImage!.readAsBytes();
-        //   final insuranceDocumentBytes = await _insuranceDocumentImage!.readAsBytes();
-        //   final governmentIdBytes = await _governmentIdImage!.readAsBytes();
-        //   final proofOfAddressBytes = await _proofOfAddressImage!.readAsBytes();
-
-        //   final uploadFutures = [
-        //     FirebaseService.uploadImageBytes(
-        //       shipper.uid,
-        //       'business_registration',
-        //       businessRegistrationBytes,
-        //     ),
-        //     FirebaseService.uploadImageBytes(
-        //       shipper.uid,
-        //       'insurance_document',
-        //       insuranceDocumentBytes,
-        //     ),
-        //     FirebaseService.uploadImageBytes(
-        //       shipper.uid,
-        //       'government_id',
-        //       governmentIdBytes,
-        //     ),
-        //     FirebaseService.uploadImageBytes(
-        //       shipper.uid,
-        //       'proof_of_address',
-        //       proofOfAddressBytes,
-        //     ),
-        //   ];
-        //   print('log this ${uploadFutures}');
-        // final bytesList = await Future.wait(uploadFutures);
-        // businessRegistrationUrl = bytesList[0];
-        // insuranceDocumentUrl = bytesList[1];
-        // governmentIdUrl = bytesList[2];
-        // proofOfAddressUrl = bytesList[3];
-   
-        // final invalid = [
-        //     businessRegistrationUrl,
-        //     insuranceDocumentUrl,
-        //     governmentIdUrl,
-        //     proofOfAddressUrl
-        //   ].any((e) => e == null || e == '' || e == 'web_placeholder' || e == 'Failed to save');
-        //   if (invalid) {
-        //     if (mounted) {
-        //       ScaffoldMessenger.of(context).showSnackBar(
-        //         const SnackBar(
-        //           content: Text('Web image upload failed. Please try again.'),
-        //           backgroundColor: Colors.red,
-        //         ),
-        //       );
-        //     }
-        //     return;
-        //   }
-     
-
-     
-     
-        } else
-         {
-          // Mobile/desktop: perform normal file uploads
-          businessRegistrationUrl = await FirebaseService.uploadImage(
+        // Perform file uploads (web-safe internally in FirebaseService)
+        final uploadResults = await Future.wait([
+          FirebaseService.uploadImage(
             shipper.uid,
             'business_registration',
             _businessRegistrationImage!,
-          );
-          
-          insuranceDocumentUrl = await FirebaseService.uploadImage(
+          ),
+          FirebaseService.uploadImage(
             shipper.uid,
             'insurance_document',
             _insuranceDocumentImage!,
-          );
-          
-          governmentIdUrl = await FirebaseService.uploadImage(
+          ),
+          FirebaseService.uploadImage(
             shipper.uid,
             'government_id',
             _governmentIdImage!,
-          );
-          
-          proofOfAddressUrl = await FirebaseService.uploadImage(
+          ),
+          FirebaseService.uploadImage(
             shipper.uid,
             'proof_of_address',
             _proofOfAddressImage!,
-          );
-        }
-        
+          ),
+        ]);
+
+        businessRegistrationUrl = uploadResults[0];
+        insuranceDocumentUrl = uploadResults[1];
+        governmentIdUrl = uploadResults[2];
+        proofOfAddressUrl = uploadResults[3];
+
         // ensure all uploads succeeded
-        
-          if (businessRegistrationUrl == null ||
-              insuranceDocumentUrl == null ||
-              governmentIdUrl == null ||
-              proofOfAddressUrl == null) {
-            throw Exception('Failed to upload one or more images');
-          }
-        
+
+        if (businessRegistrationUrl == null ||
+            insuranceDocumentUrl == null ||
+            governmentIdUrl == null ||
+            proofOfAddressUrl == null) {
+          throw Exception('Failed to upload one or more images');
+        }
+
         final response = {
           'businessAddress': _businessAddressController.text.trim(),
           'operatingProvinces': _operatingProvincesController.text.trim(),
@@ -738,7 +686,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
           'proofOfAddressImageUrl': proofOfAddressUrl,
           'timestamp': DateTime.now().toIso8601String(),
         };
-        
+
         await FirebaseService.saveShipperDashboardResponse(
           shipper.uid,
           'dashboard_2_business_info',
@@ -746,13 +694,15 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
         ).timeout(
           const Duration(seconds: 10),
           onTimeout: () {
-            throw Exception('Network timeout. Please check your internet connection.');
+            throw Exception(
+              'Network timeout. Please check your internet connection.',
+            );
           },
         );
-        
+
         print('Dashboard 2 response saved successfully');
       }
-      
+
       if (!mounted) return;
       Navigator.push(
         context,
@@ -773,7 +723,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
       if (mounted) setState(() => _saving = false);
     }
   }
-  
+
   void _showAlertDialog(BuildContext context, String message) {
     showDialog(
       context: context,
@@ -827,7 +777,11 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
             padding: const EdgeInsets.symmetric(horizontal: 15),
             child: Row(
               children: [
-                Icon(icon, size: 24, color: const Color.fromRGBO(0, 0, 0, 0.45)),
+                Icon(
+                  icon,
+                  size: 24,
+                  color: const Color.fromRGBO(0, 0, 0, 0.45),
+                ),
                 const SizedBox(width: 10),
                 // FIX: TextField is not const; remove const from Expanded/TextField
                 Expanded(
@@ -874,7 +828,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
   Widget _buildUploadField({
     required BuildContext context,
     required String text,
-    File? image,
+    dynamic image,
     VoidCallback? onTap,
   }) {
     return Column(
@@ -902,11 +856,7 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
                   ? Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.check_circle,
-                          color: Colors.green,
-                          size: 24,
-                        ),
+                        Icon(Icons.check_circle, color: Colors.green, size: 24),
                         SizedBox(width: 8),
                         Text(
                           'Image Selected',
@@ -1033,7 +983,11 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
               padding: const EdgeInsets.symmetric(horizontal: 15),
               child: Row(
                 children: [
-                  Icon(icon, size: 24, color: const Color.fromRGBO(0, 0, 0, 0.45)),
+                  Icon(
+                    icon,
+                    size: 24,
+                    color: const Color.fromRGBO(0, 0, 0, 0.45),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(

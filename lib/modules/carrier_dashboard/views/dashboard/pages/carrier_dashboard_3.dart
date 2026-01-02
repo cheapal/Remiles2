@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 
 class CarrierDashboard3 extends StatefulWidget {
   const CarrierDashboard3({super.key});
@@ -31,8 +30,8 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
   final ImagePicker _picker = ImagePicker();
 
   // Image storage
-  File? _driversAbstractImage;
-  File? _backgroundCheckImage;
+  dynamic _driversAbstractImage;
+  dynamic _backgroundCheckImage;
 
   // Image URLs from saved data
   String? _driversAbstractUrl;
@@ -420,12 +419,12 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
         setState(() {
           switch (imageType) {
             case 'drivers_abstract':
-              _driversAbstractImage = File(image.path);
+              _driversAbstractImage = image;
               _driversAbstractUrl =
                   null; // Clear URL when new image is selected
               break;
             case 'background_check':
-              _backgroundCheckImage = File(image.path);
+              _backgroundCheckImage = image;
               _backgroundCheckUrl = null;
               break;
           }
@@ -654,7 +653,7 @@ class _CarrierDashboard3State extends State<CarrierDashboard3>
   Widget _buildUploadField({
     required BuildContext context,
     required String text,
-    File? image,
+    dynamic image,
     String? imageUrl,
     VoidCallback? onTap,
   }) {

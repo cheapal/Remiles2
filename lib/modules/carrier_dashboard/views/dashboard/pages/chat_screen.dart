@@ -57,7 +57,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _errorMessage;
   ChatConversation? _conversation;
   bool _isNegotiationExpired = false;
-  bool _canSendMessages = true; // Can send messages (not expired for non-booked carriers)
+  bool _canSendMessages = false; // Initially false until conditions met
+  String _disabledHint = 'Messaging disabled';
   Map<String, OfferModel> _offersCache = {}; // Cache offers by offerId
   OfferModel? _activeOffer; // Current active offer for this conversation
   bool _isLoadBooked = false; // Track if load is booked
@@ -68,25 +69,31 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _loadShipperId; // Track shipper ID for the load
   String? _otherUserProfileImage; // Profile image of the other user
   Set<String> _sendingMessageIds = {}; // Track messages that are being sent
-  StreamSubscription<QuerySnapshot>? _messagesSubscription; // Stream listener for real-time updates
-  String? _extractedOtherUserId; // Extracted otherUserId from conversation if not provided in widget
-  String? _extractedOtherUserName; // Extracted otherUserName from user data if not provided in widget
+  StreamSubscription<QuerySnapshot>?
+  _messagesSubscription; // Stream listener for real-time updates
+  StreamSubscription<DocumentSnapshot>?
+  _loadSubscription; // Stream listener for load updates
+  String?
+  _extractedOtherUserId; // Extracted otherUserId from conversation if not provided in widget
+  String?
+  _extractedOtherUserName; // Extracted otherUserName from user data if not provided in widget
 
   @override
   void initState() {
     super.initState();
     // Register this conversation as currently open
     ConversationTracker.setCurrentConversation(widget.conversationId);
-    
+
     // Pre-fill message if provided
-    if (widget.preFilledMessage != null && widget.preFilledMessage!.isNotEmpty) {
+    if (widget.preFilledMessage != null &&
+        widget.preFilledMessage!.isNotEmpty) {
       _messageController.text = widget.preFilledMessage!;
     }
     _loadConversation();
     _loadMessages();
     _setupMessagesListener();
     _markConversationAsRead();
-    
+
     // Check timer expiration periodically
     if (widget.loadId != null) {
       Future.delayed(const Duration(seconds: 1), () {
@@ -111,53 +118,67 @@ class _ChatScreenState extends State<ChatScreen> {
                   final realMessages = snapshot.docs
                       .map((doc) => ChatMessage.fromFirestore(doc))
                       .toList();
-                  
+
                   // Keep optimistic messages that are still sending
                   final optimisticMessages = _messages
                       .where((msg) => _sendingMessageIds.contains(msg.id))
                       .toList();
-                  
+
                   // Merge: real messages + optimistic messages
                   // Remove optimistic messages that have been confirmed (same content and sender)
-                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  final authProvider = Provider.of<AuthProvider>(
+                    context,
+                    listen: false,
+                  );
                   final currentUserId = authProvider.currentUser?.uid;
-                  
+
                   final confirmedOptimisticIds = <String>{};
                   for (final optimistic in optimisticMessages) {
                     // Check if a real message with same content and sender exists (within 5 seconds)
-                    final matchingReal = realMessages.where(
-                      (real) => real.content == optimistic.content &&
-                                real.senderId == optimistic.senderId &&
-                                real.senderId == currentUserId &&
-                                (real.timestamp.difference(optimistic.timestamp).inSeconds.abs() < 5),
-                    ).firstOrNull;
-                    
+                    final matchingReal = realMessages
+                        .where(
+                          (real) =>
+                              real.content == optimistic.content &&
+                              real.senderId == optimistic.senderId &&
+                              real.senderId == currentUserId &&
+                              (real.timestamp
+                                      .difference(optimistic.timestamp)
+                                      .inSeconds
+                                      .abs() <
+                                  5),
+                        )
+                        .firstOrNull;
+
                     if (matchingReal != null) {
                       confirmedOptimisticIds.add(optimistic.id);
                     }
                   }
-                  
+
                   // Remove confirmed optimistic messages
                   final remainingOptimistic = optimisticMessages
                       .where((msg) => !confirmedOptimisticIds.contains(msg.id))
                       .toList();
-                  
+
                   // Combine and sort
                   _messages = [...realMessages, ...remainingOptimistic];
                   _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-                  
+
                   // Remove confirmed optimistic IDs from sending set
                   _sendingMessageIds.removeAll(confirmedOptimisticIds);
-                  
+
                   _isLoading = false;
                   _errorMessage = null;
                 } catch (e, stackTrace) {
                   print('Error processing message stream: $e');
-                  FirebaseService.recordError(e, stackTrace, reason: 'Error processing message stream in chat_screen');
+                  FirebaseService.recordError(
+                    e,
+                    stackTrace,
+                    reason: 'Error processing message stream in chat_screen',
+                  );
                   // Keep existing messages on error
                 }
               });
-              
+
               // Scroll to bottom when new messages arrive
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 _scrollToBottom();
@@ -173,40 +194,48 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _loadConversation() async {
     try {
-      final convDoc = await FirebaseService.conversations.doc(widget.conversationId).get();
+      final convDoc = await FirebaseService.conversations
+          .doc(widget.conversationId)
+          .get();
       if (convDoc.exists) {
         setState(() {
           _conversation = ChatConversation.fromFirestore(convDoc);
           _isNegotiationExpired = _conversation?.isNegotiationExpired ?? false;
           _updateCanSendMessages();
         });
-        
+
         // For support chats, ensure we can always send messages
         if (_conversation!.isSupport || widget.isSupportChat) {
           setState(() {
             _canSendMessages = true;
           });
         }
-        
+
         // Extract otherUserId from conversation if not provided
         if (widget.otherUserId == null || widget.otherUserId!.isEmpty) {
-          final authProvider = Provider.of<AuthProvider>(context, listen: false);
+          final authProvider = Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          );
           final currentUserId = authProvider.currentUser?.uid;
           if (currentUserId != null && _conversation != null) {
-            final extractedOtherUserId = _conversation!.getOtherParticipant(currentUserId);
+            final extractedOtherUserId = _conversation!.getOtherParticipant(
+              currentUserId,
+            );
             if (extractedOtherUserId.isNotEmpty) {
               // Update widget's otherUserId by storing it in state
               // We'll use a local variable to track this
               _extractedOtherUserId = extractedOtherUserId;
               // Load user name if not provided
-              if (widget.otherUserName == null || widget.otherUserName!.isEmpty) {
+              if (widget.otherUserName == null ||
+                  widget.otherUserName!.isEmpty) {
                 _loadOtherUserName(extractedOtherUserId);
               }
             }
           }
         }
       }
-      
+
       // Check if load is booked (do this first to prevent button flicker)
       // Also preload the load data for faster access
       if (widget.loadId != null) {
@@ -222,22 +251,27 @@ class _ChatScreenState extends State<ChatScreen> {
           });
         }
       }
-      
+
       // Load other user's profile image (skip for support chats)
       if (!widget.isSupportChat) {
         await _loadOtherUserProfile();
       }
     } catch (e, stackTrace) {
       print('Error loading conversation: $e');
-      await FirebaseService.recordError(e, stackTrace, reason: 'Failed to load conversation in chat_screen');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Failed to load conversation in chat_screen',
+      );
     }
   }
 
   Future<void> _loadOtherUserProfile() async {
     // Get otherUserId from widget or extracted from conversation
     final otherUserId = widget.otherUserId ?? _extractedOtherUserId;
-    if (otherUserId == null || otherUserId.isEmpty) return; // Skip if no other user ID
-    
+    if (otherUserId == null || otherUserId.isEmpty)
+      return; // Skip if no other user ID
+
     try {
       // Try to get user profile image
       final shipper = await FirebaseService.getShipper(otherUserId);
@@ -249,7 +283,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         return;
       }
-      
+
       final carrier = await FirebaseService.getCarrier(otherUserId);
       if (carrier != null && carrier.profileImageUrl != null && mounted) {
         setState(() {
@@ -258,19 +292,23 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e, stackTrace) {
       print('Error loading other user profile: $e');
-      await FirebaseService.recordError(e, stackTrace, reason: 'Failed to load other user profile in chat_screen');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Failed to load other user profile in chat_screen',
+      );
     }
   }
 
   Future<void> _loadOtherUserName(String userId) async {
     if (userId.isEmpty) return;
-    
+
     try {
       // Try to get shipper name
       final shipper = await FirebaseService.getShipper(userId);
       if (shipper != null) {
-        final name = shipper.companyName.isNotEmpty 
-            ? shipper.companyName 
+        final name = shipper.companyName.isNotEmpty
+            ? shipper.companyName
             : (shipper.displayName ?? 'Shipper');
         if (mounted) {
           setState(() {
@@ -279,7 +317,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         return;
       }
-      
+
       // Try to get carrier name
       final carrier = await FirebaseService.getCarrier(userId);
       if (carrier != null && mounted) {
@@ -292,7 +330,11 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e, stackTrace) {
       print('Error loading other user name: $e');
-      await FirebaseService.recordError(e, stackTrace, reason: 'Failed to load other user name in chat_screen');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Failed to load other user name in chat_screen',
+      );
       // Set default name on error
       if (mounted) {
         setState(() {
@@ -312,7 +354,7 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         return;
       }
-      
+
       // Find the load in shipper subcollections
       final shippersSnapshot = await FirebaseService.shippers.get();
       for (final shipperDoc in shippersSnapshot.docs) {
@@ -321,22 +363,28 @@ class _ChatScreenState extends State<ChatScreen> {
             .collection('loads')
             .doc(widget.loadId!)
             .get();
-        
+
         if (loadDoc.exists) {
           final loadData = loadDoc.data();
           final status = loadData?['status'] as String?;
-          
+
           if (mounted) {
             setState(() {
-              _isLoadBooked = status == 'booked' || status == 'in-transit' || status == 'completed';
+              _isLoadBooked =
+                  status == 'booked' ||
+                  status == 'in-transit' ||
+                  status == 'completed';
               _loadShipperId = shipperDoc.id; // Store shipper ID from the load
               _isLoadingLoadStatus = false; // Mark as loaded
             });
+
+            // Setup real-time listener for this load to catch payment updates
+            _setupLoadListener();
           }
           return; // Exit after finding the load
         }
       }
-      
+
       // If load not found, mark as loaded
       if (mounted) {
         setState(() {
@@ -345,7 +393,11 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e, stackTrace) {
       print('Error checking load status: $e');
-      await FirebaseService.recordError(e, stackTrace, reason: 'Failed to check load status in chat_screen');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Failed to check load status in chat_screen',
+      );
       if (mounted) {
         setState(() {
           _isLoadingLoadStatus = false;
@@ -354,47 +406,74 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _setupLoadListener() {
+    if (widget.loadId == null || _loadShipperId == null) return;
+
+    _loadSubscription?.cancel();
+    _loadSubscription = FirebaseService.shippers
+        .doc(_loadShipperId)
+        .collection('loads')
+        .doc(widget.loadId!)
+        .snapshots()
+        .listen((snapshot) {
+          if (snapshot.exists && mounted) {
+            final load = LoadModel.fromFirestore(
+              snapshot,
+              parentShipperUid: _loadShipperId,
+            );
+            final status = load.status;
+
+            setState(() {
+              _cachedLoad = load;
+              _isLoadBooked =
+                  status == 'booked' ||
+                  status == 'in-transit' ||
+                  status == 'completed';
+
+              _updateCanSendMessages();
+            });
+          }
+        });
+  }
+
   void _updateCanSendMessages() async {
     final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
     if (user == null) {
       _canSendMessages = false;
+      _disabledHint = 'User not authenticated';
       return;
     }
 
-    // If it's a load negotiation and timer expired
-    if (widget.loadId != null && _isNegotiationExpired) {
-      // Check if user is the booked carrier (they can still chat after booking)
-      try {
-        // Try to find if this carrier booked the load
-        final shippersSnapshot = await FirebaseService.firestore.collection('shippers').get();
-        bool isBookedByThisCarrier = false;
-        
-        for (final shipperDoc in shippersSnapshot.docs) {
-          final loadDoc = await FirebaseService.firestore
-              .collection('shippers')
-              .doc(shipperDoc.id)
-              .collection('loads')
-              .doc(widget.loadId!)
-              .get();
-          
-          if (loadDoc.exists) {
-            final loadData = loadDoc.data();
-            if (loadData != null && loadData['bookedByCarrierId'] == user.uid) {
-              isBookedByThisCarrier = true;
-              break;
-            }
-          }
+    // Check if it's a load negotiation
+    if (widget.loadId != null) {
+      if (_isLoadBooked) {
+        // Condition: Price agreed (Booked) AND Payment made
+        final isPaymentDeposited =
+            _cachedLoad?.escrowPaymentStatus == 'deposited';
+
+        if (isPaymentDeposited) {
+          _canSendMessages = true;
+          _disabledHint = '';
+        } else {
+          _canSendMessages = false;
+          _disabledHint = 'Waiting for shipper payment...';
         }
-        
-        _canSendMessages = isBookedByThisCarrier;
-      } catch (e, stackTrace) {
-        await FirebaseService.recordError(e, stackTrace, reason: 'Failed to update can send messages in chat_screen');
+      } else {
+        // Price not yet agreed upon (available/active)
         _canSendMessages = false;
+        _disabledHint = 'Booking and payment required to chat';
+      }
+
+      // Additional check for timer expiration in negotiation phase (though messaging is already blocked)
+      if (!_isLoadBooked && _isNegotiationExpired) {
+        _disabledHint = 'Negotiation expired';
       }
     } else {
+      // Not a load negotiation (general chat or support)
       _canSendMessages = true;
+      _disabledHint = '';
     }
-    
+
     if (mounted) {
       setState(() {});
     }
@@ -414,8 +493,9 @@ class _ChatScreenState extends State<ChatScreen> {
   void dispose() {
     // Unregister this conversation when chat screen is closed
     ConversationTracker.clearCurrentConversation();
-    
+
     _messagesSubscription?.cancel();
+    _loadSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     _messageFocusNode.dispose();
@@ -425,7 +505,7 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _loadMessages() async {
     try {
       print('Loading messages for conversation: ${widget.conversationId}');
-      
+
       // Check if conversation ID is valid
       if (widget.conversationId.isEmpty) {
         print('Conversation ID is empty');
@@ -437,19 +517,21 @@ class _ChatScreenState extends State<ChatScreen> {
         }
         return;
       }
-      
+
       // Add timeout to prevent infinite loading
-      final messages = await FirebaseService.getConversationMessagesOnce(widget.conversationId)
-          .timeout(
+      final messages =
+          await FirebaseService.getConversationMessagesOnce(
+            widget.conversationId,
+          ).timeout(
             const Duration(seconds: 10),
             onTimeout: () {
               print('Message loading timed out');
               throw Exception('Message loading timed out');
             },
           );
-      
+
       print('Loaded ${messages.length} messages');
-      
+
       // Load offers for offer messages
       final offersToLoad = <String>{};
       for (final message in messages) {
@@ -457,23 +539,23 @@ class _ChatScreenState extends State<ChatScreen> {
           offersToLoad.add(message.offerId!);
         }
       }
-      
+
       // Load all offers
       for (final offerId in offersToLoad) {
         final offer = await FirebaseService.getOfferById(offerId);
         if (offer != null) {
           _offersCache[offerId] = offer;
           // Track active offer for this conversation (include accepted offers to hide buttons)
-          if (offer.conversationId == widget.conversationId && 
-              (offer.status == OfferStatus.pending || 
-               offer.status == OfferStatus.counterOffered ||
-               offer.status == OfferStatus.accepted) &&
+          if (offer.conversationId == widget.conversationId &&
+              (offer.status == OfferStatus.pending ||
+                  offer.status == OfferStatus.counterOffered ||
+                  offer.status == OfferStatus.accepted) &&
               offer.isActive) {
             _activeOffer = offer;
           }
         }
       }
-      
+
       // Also check conversation's activeOfferId
       if (_conversation?.activeOfferId != null) {
         final activeOfferId = _conversation!.activeOfferId!;
@@ -503,29 +585,31 @@ class _ChatScreenState extends State<ChatScreen> {
         // If no activeOfferId in conversation, clear active offer
         _activeOffer = null;
       }
-      
+
       if (mounted) {
         setState(() {
           // Merge with optimistic messages
           final optimisticMessages = _messages
               .where((msg) => _sendingMessageIds.contains(msg.id))
               .toList();
-          
+
           // Combine real messages with optimistic ones
           _messages = [...messages, ...optimisticMessages];
           _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
-          
+
           _isLoading = false;
           _errorMessage = null;
         });
-        
+
         // Check load status after loading messages (if not already checked)
         if (widget.loadId != null && _isLoadingLoadStatus) {
           await _checkLoadStatus();
         }
-        
+
         // If load is booked and offer is accepted, ensure activeOffer reflects this
-        if (_isLoadBooked && _activeOffer != null && _activeOffer!.status != OfferStatus.accepted) {
+        if (_isLoadBooked &&
+            _activeOffer != null &&
+            _activeOffer!.status != OfferStatus.accepted) {
           // Load might be booked via direct booking, so clear offer
           if (mounted) {
             setState(() {
@@ -533,7 +617,7 @@ class _ChatScreenState extends State<ChatScreen> {
             });
           }
         }
-        
+
         // Scroll to bottom
         WidgetsBinding.instance.addPostFrameCallback((_) {
           _scrollToBottom();
@@ -541,7 +625,11 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e, stackTrace) {
       print('Error loading messages: $e');
-      await FirebaseService.recordError(e, stackTrace, reason: 'Failed to load messages in chat_screen');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Failed to load messages in chat_screen',
+      );
       if (mounted) {
         setState(() {
           _errorMessage = e.toString();
@@ -556,13 +644,13 @@ class _ChatScreenState extends State<ChatScreen> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
       final carrier = authProvider.carrierUser;
-      
+
       if (user == null || widget.loadId == null) return;
 
       final carrierName = carrier?.companyName ?? user.displayName ?? 'Carrier';
-      
+
       if (widget.otherUserId == null) return; // Skip if no other user
-      
+
       // Send offer and get the offer ID
       final offerId = await FirebaseService.sendOffer(
         conversationId: widget.conversationId,
@@ -585,7 +673,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // Reload conversation and messages to ensure everything is in sync
       await _loadConversation();
       await _loadMessages();
-      
+
       // Scroll to bottom to show new offer
       if (_scrollController.hasClients) {
         Future.delayed(const Duration(milliseconds: 300), () {
@@ -612,7 +700,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _handleAcceptOffer(String offerId) async {
     if (_isProcessingOffer) return; // Prevent multiple simultaneous requests
-    
+
     try {
       if (widget.loadId == null) return;
 
@@ -628,7 +716,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _isProcessingOffer = true;
         });
-        
+
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -654,27 +742,28 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       // Process offer with timeout
-      final success = await FirebaseService.acceptOffer(
-        offerId: offerId,
-        loadId: widget.loadId!,
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          if (mounted) {
-            Navigator.of(context).pop(); // Close loading dialog
-            setState(() {
-              _isProcessingOffer = false;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Request timed out. Please try again.'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-          return false;
-        },
-      );
+      final success =
+          await FirebaseService.acceptOffer(
+            offerId: offerId,
+            loadId: widget.loadId!,
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              if (mounted) {
+                Navigator.of(context).pop(); // Close loading dialog
+                setState(() {
+                  _isProcessingOffer = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Request timed out. Please try again.'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+              return false;
+            },
+          );
 
       // Close loading dialog
       if (mounted && Navigator.canPop(context)) {
@@ -687,7 +776,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final messageText = isCarrier
             ? 'Offer accepted at \$${acceptedPrice.toStringAsFixed(2)} by carrier'
             : 'Offer accepted at \$${acceptedPrice.toStringAsFixed(2)} by shipper';
-        
+
         if (widget.otherUserId != null) {
           await FirebaseService.sendMessage(
             conversationId: widget.conversationId,
@@ -701,7 +790,7 @@ class _ChatScreenState extends State<ChatScreen> {
         await _checkLoadStatus();
         await _loadConversation();
         await _loadMessages();
-        
+
         if (mounted) {
           setState(() {
             _isProcessingOffer = false;
@@ -710,7 +799,7 @@ class _ChatScreenState extends State<ChatScreen> {
               _activeOffer = null;
             }
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Offer accepted! Load has been booked.'),
@@ -723,10 +812,12 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {
             _isProcessingOffer = false;
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to accept offer. Load may have been booked by another carrier.'),
+              content: Text(
+                'Failed to accept offer. Load may have been booked by another carrier.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -737,12 +828,12 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
-      
+
       if (mounted) {
         setState(() {
           _isProcessingOffer = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error accepting offer: ${e.toString()}'),
@@ -814,13 +905,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _handleBookAtOriginalPrice() async {
     if (_isProcessingOffer) return; // Prevent multiple simultaneous requests
-    
+
     try {
       if (widget.loadId == null || widget.loadPrice == null) return;
 
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user == null) return;
 
       // Show confirmation dialog
@@ -855,7 +946,7 @@ class _ChatScreenState extends State<ChatScreen> {
         setState(() {
           _isProcessingOffer = true;
         });
-        
+
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -881,27 +972,28 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       // Book the load at original price with timeout
-      final success = await FirebaseService.bookLoad(
-        loadId: widget.loadId!,
-        carrierUid: user.uid,
-      ).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          if (mounted) {
-            Navigator.of(context).pop(); // Close loading dialog
-            setState(() {
-              _isProcessingOffer = false;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Request timed out. Please try again.'),
-                backgroundColor: Colors.orange,
-              ),
-            );
-          }
-          return false;
-        },
-      );
+      final success =
+          await FirebaseService.bookLoad(
+            loadId: widget.loadId!,
+            carrierUid: user.uid,
+          ).timeout(
+            const Duration(seconds: 30),
+            onTimeout: () {
+              if (mounted) {
+                Navigator.of(context).pop(); // Close loading dialog
+                setState(() {
+                  _isProcessingOffer = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Request timed out. Please try again.'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+              return false;
+            },
+          );
 
       // Close loading dialog
       if (mounted && Navigator.canPop(context)) {
@@ -914,14 +1006,15 @@ class _ChatScreenState extends State<ChatScreen> {
           conversationId: widget.conversationId,
           senderId: user.uid,
           receiverId: widget.otherUserId!,
-          content: 'Load booked at original price of \$${widget.loadPrice!.toStringAsFixed(2)} by carrier',
+          content:
+              'Load booked at original price of \$${widget.loadPrice!.toStringAsFixed(2)} by carrier',
         );
 
         // Reload everything
         await _checkLoadStatus();
         await _loadConversation();
         await _loadMessages();
-        
+
         if (mounted) {
           setState(() {
             _isProcessingOffer = false;
@@ -930,7 +1023,7 @@ class _ChatScreenState extends State<ChatScreen> {
               _activeOffer = null;
             }
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Load booked successfully at original price!'),
@@ -943,10 +1036,12 @@ class _ChatScreenState extends State<ChatScreen> {
           setState(() {
             _isProcessingOffer = false;
           });
-          
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Failed to book load. It may have been booked by another carrier.'),
+              content: Text(
+                'Failed to book load. It may have been booked by another carrier.',
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -957,12 +1052,12 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted && Navigator.canPop(context)) {
         Navigator.of(context).pop();
       }
-      
+
       if (mounted) {
         setState(() {
           _isProcessingOffer = false;
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error booking load: ${e.toString()}'),
@@ -986,7 +1081,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       // Fetch the full listing details
-      final listing = await FirebaseService.getProductListingById(widget.listingId!);
+      final listing = await FirebaseService.getProductListingById(
+        widget.listingId!,
+      );
       if (listing != null) {
         Navigator.push(
           context,
@@ -1018,7 +1115,9 @@ class _ChatScreenState extends State<ChatScreen> {
     if (!_canSendMessages) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Negotiation timer has expired. You can only chat if you booked this load.'),
+          content: Text(
+            'Negotiation timer has expired. You can only chat if you booked this load.',
+          ),
           backgroundColor: Colors.orange,
         ),
       );
@@ -1027,22 +1126,22 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
-    
+
     if (user == null) return;
 
     final messageContent = _messageController.text.trim();
     final tempMessageId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
-    
+
     // Clear message field immediately
     _messageController.clear();
-    
+
     // Keep focus on text field after sending (use post-frame callback to ensure it happens after UI updates)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _messageFocusNode.canRequestFocus) {
         _messageFocusNode.requestFocus();
       }
     });
-    
+
     // Get receiverId for optimistic message
     String? receiverId = widget.otherUserId ?? _extractedOtherUserId;
     if (receiverId == null || receiverId.isEmpty) {
@@ -1053,7 +1152,7 @@ class _ChatScreenState extends State<ChatScreen> {
       // Fallback to support user ID if still empty (shouldn't happen for non-support chats)
       receiverId = receiverId ?? FirebaseService.supportUserId;
     }
-    
+
     // Create optimistic message
     final optimisticMessage = ChatMessage(
       id: tempMessageId,
@@ -1063,13 +1162,13 @@ class _ChatScreenState extends State<ChatScreen> {
       content: messageContent,
       timestamp: DateTime.now(),
     );
-    
+
     // Add to local list immediately (optimistic update)
     setState(() {
       _messages.add(optimisticMessage);
       _sendingMessageIds.add(tempMessageId);
     });
-    
+
     // Scroll to bottom immediately
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -1084,7 +1183,8 @@ class _ChatScreenState extends State<ChatScreen> {
     // Send message in background
     try {
       // Use support message function for support chats
-      if (widget.isSupportChat || (_conversation != null && _conversation!.isSupport)) {
+      if (widget.isSupportChat ||
+          (_conversation != null && _conversation!.isSupport)) {
         await FirebaseService.sendSupportMessage(
           conversationId: widget.conversationId,
           senderId: user.uid,
@@ -1099,7 +1199,7 @@ class _ChatScreenState extends State<ChatScreen> {
             receiverId = _conversation!.getOtherParticipant(user.uid);
           }
         }
-        
+
         // Only send if we have a valid receiverId
         if (receiverId != null && receiverId.isNotEmpty) {
           await FirebaseService.sendMessage(
@@ -1112,7 +1212,7 @@ class _ChatScreenState extends State<ChatScreen> {
           throw Exception('Cannot send message: receiver ID not found');
         }
       }
-      
+
       // Remove from sending set - the real message will come from the stream
       if (mounted) {
         setState(() {
@@ -1126,7 +1226,7 @@ class _ChatScreenState extends State<ChatScreen> {
           _messages.removeWhere((msg) => msg.id == tempMessageId);
           _sendingMessageIds.remove(tempMessageId);
         });
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to send message: ${e.toString()}'),
@@ -1141,7 +1241,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (_conversation != null && widget.loadId != null) {
       final wasExpired = _isNegotiationExpired;
       final isNowExpired = _conversation!.isNegotiationExpired;
-      
+
       if (wasExpired != isNowExpired) {
         setState(() {
           _isNegotiationExpired = isNowExpired;
@@ -1155,9 +1255,12 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final user = authProvider.currentUser;
-      
+
       if (user != null) {
-        await FirebaseService.markMessagesAsRead(widget.conversationId, user.uid);
+        await FirebaseService.markMessagesAsRead(
+          widget.conversationId,
+          user.uid,
+        );
       }
     } catch (e) {
       print('Error marking conversation as read: $e');
@@ -1171,7 +1274,9 @@ class _ChatScreenState extends State<ChatScreen> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF2C5E4A),
-        title: widget.isSupportChat || (_conversation != null && _conversation!.isSupport)
+        title:
+            widget.isSupportChat ||
+                (_conversation != null && _conversation!.isSupport)
             ? Row(
                 children: [
                   const Icon(
@@ -1194,10 +1299,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                         Text(
                           'We\'re here to help',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                       ],
                     ),
@@ -1226,20 +1328,26 @@ class _ChatScreenState extends State<ChatScreen> {
                   // Sticky timer for load negotiations (hide if booked or offer accepted)
                   if (!_isLoadingLoadStatus &&
                       !_isLoadBooked &&
-                      widget.loadId != null && 
+                      widget.loadId != null &&
                       _activeOffer?.status != OfferStatus.accepted &&
-                      ((_conversation != null && 
-                        _conversation!.isNegotiationActive &&
-                        _conversation!.negotiationExpiresAt != null) ||
-                       (_activeOffer != null && 
-                        _activeOffer!.isActive && 
-                        _activeOffer!.status != OfferStatus.accepted)))
+                      ((_conversation != null &&
+                              _conversation!.isNegotiationActive &&
+                              _conversation!.negotiationExpiresAt != null) ||
+                          (_activeOffer != null &&
+                              _activeOffer!.isActive &&
+                              _activeOffer!.status != OfferStatus.accepted)))
                     Padding(
                       padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
                       child: NegotiationTimer(
-                        expiresAt: _conversation?.negotiationExpiresAt ?? _activeOffer!.expiresAt,
-                        isExpired: _isNegotiationExpired || 
-                                  (_activeOffer != null && _activeOffer!.expiresAt.isBefore(DateTime.now())),
+                        expiresAt:
+                            _conversation?.negotiationExpiresAt ??
+                            _activeOffer!.expiresAt,
+                        isExpired:
+                            _isNegotiationExpired ||
+                            (_activeOffer != null &&
+                                _activeOffer!.expiresAt.isBefore(
+                                  DateTime.now(),
+                                )),
                       ),
                     ),
                 ],
@@ -1255,21 +1363,22 @@ class _ChatScreenState extends State<ChatScreen> {
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
               ),
-             
             ],
           ),
         ),
         actions: [
           // Report button (hide for support chats)
-          if (!widget.isSupportChat && (_conversation == null || !_conversation!.isSupport))
+          if (!widget.isSupportChat &&
+              (_conversation == null || !_conversation!.isSupport))
             IconButton(
               icon: const Icon(Icons.flag_outlined, color: Colors.white),
               onPressed: () => _showReportDialog(),
               tooltip: 'Report',
             ),
-      
+
           // Profile avatar (show support icon for support chats)
-          if (widget.isSupportChat || (_conversation != null && _conversation!.isSupport))
+          if (widget.isSupportChat ||
+              (_conversation != null && _conversation!.isSupport))
             Padding(
               padding: const EdgeInsets.only(right: 14),
               child: CircleAvatar(
@@ -1294,11 +1403,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       ? NetworkImage(_otherUserProfileImage!)
                       : null,
                   child: _otherUserProfileImage == null
-                      ? const Icon(
-                          Icons.person,
-                          color: Colors.white,
-                          size: 18,
-                        )
+                      ? const Icon(Icons.person, color: Colors.white, size: 18)
                       : null,
                 ),
               ),
@@ -1308,12 +1413,13 @@ class _ChatScreenState extends State<ChatScreen> {
       body: Column(
         children: [
           // Sticky action buttons bar (for load negotiations) - hide for support chats
-          if (!widget.isSupportChat && 
+          if (!widget.isSupportChat &&
               (_conversation == null || !_conversation!.isSupport) &&
-              widget.loadId != null && widget.loadPrice != null)
+              widget.loadId != null &&
+              widget.loadPrice != null)
             _buildStickyActionBar(),
           // Listing info card (for product listings) - hide for support chats
-          if (!widget.isSupportChat && 
+          if (!widget.isSupportChat &&
               (_conversation == null || !_conversation!.isSupport) &&
               widget.listingTitle != null)
             GestureDetector(
@@ -1342,12 +1448,16 @@ class _ChatScreenState extends State<ChatScreen> {
                               width: 50,
                               height: 50,
                               color: Colors.grey.shade300,
-                              child: const Icon(Icons.image, color: Colors.grey),
+                              child: const Icon(
+                                Icons.image,
+                                color: Colors.grey,
+                              ),
                             );
                           },
                         ),
                       ),
-                    if (widget.listingImageUrl != null) const SizedBox(width: 12),
+                    if (widget.listingImageUrl != null)
+                      const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1364,10 +1474,7 @@ class _ChatScreenState extends State<ChatScreen> {
                           const SizedBox(height: 4),
                           const Text(
                             'Tap to view details',
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
-                            ),
+                            style: TextStyle(color: Colors.grey, fontSize: 12),
                           ),
                         ],
                       ),
@@ -1382,15 +1489,14 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
             ),
           // Chat messages area
-          Expanded(
-            child: _buildMessagesArea(),
-          ),
+          Expanded(child: _buildMessagesArea()),
           // Message input field
           _MessageInputField(
             controller: _messageController,
             focusNode: _messageFocusNode,
             onSend: _sendMessage,
             enabled: _canSendMessages,
+            disabledHint: _disabledHint,
           ),
         ],
       ),
@@ -1399,12 +1505,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildMessagesArea() {
-    print('Building messages area - Loading: $_isLoading, Messages: ${_messages.length}, Error: $_errorMessage');
-    
+    print(
+      'Building messages area - Loading: $_isLoading, Messages: ${_messages.length}, Error: $_errorMessage',
+    );
+
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-    
+
     if (_errorMessage != null) {
       return Center(
         child: Column(
@@ -1448,7 +1556,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    
+
     if (_messages.isEmpty) {
       return Center(
         child: Column(
@@ -1469,7 +1577,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       );
     }
-    
+
     return ListView.builder(
       controller: _scrollController,
       padding: const EdgeInsets.all(16.0),
@@ -1482,15 +1590,13 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _buildLoadInfoMessage(),
           );
         }
-        
-        final messageIndex = widget.loadId != null 
-            ? index - 1 
-            : index;
+
+        final messageIndex = widget.loadId != null ? index - 1 : index;
         final message = _messages[messageIndex];
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final user = authProvider.currentUser;
         final isMe = user?.uid == message.senderId;
-        
+
         // Handle offer messages differently
         if (message.type == MessageType.offer && message.offerId != null) {
           final offer = _offersCache[message.offerId!];
@@ -1499,25 +1605,31 @@ class _ChatScreenState extends State<ChatScreen> {
             child: _buildOfferMessage(message, offer, isMe),
           );
         }
-        
-        final isSupportChat = widget.isSupportChat || (_conversation != null && _conversation!.isSupport);
+
+        final isSupportChat =
+            widget.isSupportChat ||
+            (_conversation != null && _conversation!.isSupport);
         final isSending = _sendingMessageIds.contains(message.id);
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: isMe 
+          child: isMe
               ? _SentMessage(text: message.content, isSending: isSending)
-              : _ReceivedMessage(text: message.content, isSupportChat: isSupportChat),
+              : _ReceivedMessage(
+                  text: message.content,
+                  isSupportChat: isSupportChat,
+                ),
         );
       },
     );
   }
 
-
   Widget _buildLoadInfoMessage() {
     // Get price from widget or cached load
     final price = widget.loadPrice ?? _cachedLoad?.price ?? 0.0;
-    final displayPrice = price > 0 ? '\$${price.toStringAsFixed(0)}' : 'Price N/A';
-    
+    final displayPrice = price > 0
+        ? '\$${price.toStringAsFixed(0)}'
+        : 'Price N/A';
+
     return Align(
       alignment: Alignment.center,
       child: GestureDetector(
@@ -1560,18 +1672,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  '•',
-                  style: TextStyle(color: primaryColor),
-                ),
+                Text('•', style: TextStyle(color: primaryColor)),
                 const SizedBox(width: 8),
                 Flexible(
                   child: Text(
                     'Load #${widget.loadId!.substring(0, 8)}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: primaryColor,
-                    ),
+                    style: TextStyle(fontSize: 14, color: primaryColor),
                     softWrap: true,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -1588,21 +1694,24 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _preloadLoadData() async {
     if (widget.loadId == null || _cachedLoad != null) return;
-    
+
     try {
       // Find and fetch the load
       final shippersSnapshot = await FirebaseService.shippers.get();
-      
+
       for (final shipperDoc in shippersSnapshot.docs) {
         final loadDoc = await FirebaseService.shippers
             .doc(shipperDoc.id)
             .collection('loads')
             .doc(widget.loadId!)
             .get();
-        
+
         if (loadDoc.exists) {
           // Pass shipperUid from parent document path
-          final load = LoadModel.fromFirestore(loadDoc, parentShipperUid: shipperDoc.id);
+          final load = LoadModel.fromFirestore(
+            loadDoc,
+            parentShipperUid: shipperDoc.id,
+          );
           if (mounted) {
             setState(() {
               _cachedLoad = load;
@@ -1637,17 +1746,20 @@ class _ChatScreenState extends State<ChatScreen> {
       if (load == null) {
         // Find and fetch the load
         final shippersSnapshot = await FirebaseService.shippers.get();
-        
+
         for (final shipperDoc in shippersSnapshot.docs) {
           final loadDoc = await FirebaseService.shippers
               .doc(shipperDoc.id)
               .collection('loads')
               .doc(widget.loadId!)
               .get();
-          
+
           if (loadDoc.exists) {
             // Pass shipperUid from parent document path
-            load = LoadModel.fromFirestore(loadDoc, parentShipperUid: shipperDoc.id);
+            load = LoadModel.fromFirestore(
+              loadDoc,
+              parentShipperUid: shipperDoc.id,
+            );
             // Cache it for next time
             if (mounted) {
               setState(() {
@@ -1664,7 +1776,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final authProvider = Provider.of<AuthProvider>(context, listen: false);
         final currentUser = authProvider.currentUser;
         final currentUserId = currentUser?.uid;
-        
+
         // Check if user is a shipper by checking if they own this load
         bool isShipper = false;
         if (currentUserId != null && _loadShipperId != null) {
@@ -1672,20 +1784,22 @@ class _ChatScreenState extends State<ChatScreen> {
         } else if (currentUserId != null) {
           // Fallback: check if current user is in shippers collection
           try {
-            final shipperDoc = await FirebaseService.shippers.doc(currentUserId).get();
+            final shipperDoc = await FirebaseService.shippers
+                .doc(currentUserId)
+                .get();
             isShipper = shipperDoc.exists;
           } catch (e) {
             print('Error checking shipper status: $e');
           }
         }
-        
+
         // Reset flag before navigation
         if (mounted) {
           setState(() {
             _isNavigatingToLoad = false;
           });
         }
-        
+
         if (isShipper) {
           // Navigate to shipper load details page
           // Convert LoadModel to Map for shipper_load_details_page
@@ -1696,13 +1810,11 @@ class _ChatScreenState extends State<ChatScreen> {
           } else if (currentUserId != null) {
             loadData['shipperUid'] = currentUserId;
           }
-          
+
           await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (ctx) => ShipperLoadDetailsPage(
-                load: loadData,
-              ),
+              builder: (ctx) => ShipperLoadDetailsPage(load: loadData),
             ),
           );
         } else {
@@ -1715,11 +1827,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 insetPadding: const EdgeInsets.all(16),
-                child: SingleChildScrollView(
-                  child: BookedNow(
-                    load: load!,
-                  ),
-                ),
+                child: SingleChildScrollView(child: BookedNow(load: load!)),
               );
             },
           );
@@ -1736,7 +1844,11 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     } catch (e, stackTrace) {
       print('Error loading load details: $e');
-      await FirebaseService.recordError(e, stackTrace, reason: 'Failed to load load details in chat_screen');
+      await FirebaseService.recordError(
+        e,
+        stackTrace,
+        reason: 'Failed to load load details in chat_screen',
+      );
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -1762,7 +1874,7 @@ class _ChatScreenState extends State<ChatScreen> {
         final currentUser = authProvider.currentUser;
         bool carrierCheck = false;
         bool isShipper = false;
-        
+
         if (currentUser != null) {
           if (_activeOffer != null) {
             carrierCheck = currentUser.uid == _activeOffer!.carrierId;
@@ -1787,24 +1899,34 @@ class _ChatScreenState extends State<ChatScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
             color: Colors.grey.shade50,
-            border: Border(
-              bottom: BorderSide(color: Colors.grey.shade200),
-            ),
+            border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
           ),
           child: Row(
             children: [
               // For Carriers only (hide buttons if load is booked or user is shipper)
               // Also hide buttons while loading load status to prevent flicker
-              if (!_isLoadingLoadStatus && !_isLoadBooked && !isShipper && (carrierCheck || (currentUser != null && _activeOffer == null))) ...[
+              if (!_isLoadingLoadStatus &&
+                  !_isLoadBooked &&
+                  !isShipper &&
+                  (carrierCheck ||
+                      (currentUser != null && _activeOffer == null))) ...[
                 // Book at Original Price button (always available unless already booked or offer accepted)
                 if (_activeOffer?.status != OfferStatus.accepted)
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: _handleBookAtOriginalPrice,
-                      icon: const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                      icon: const Icon(
+                        Icons.check_circle,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                       label: Text(
                         'Book @ \$${widget.loadPrice!.toStringAsFixed(0)}',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.teal,
@@ -1824,10 +1946,18 @@ class _ChatScreenState extends State<ChatScreen> {
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _handleAcceptOffer(_activeOffer!.id),
-                      icon: const Icon(Icons.check, color: Colors.white, size: 18),
+                      icon: const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 18,
+                      ),
                       label: const Text(
                         'Accept',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
@@ -1852,13 +1982,21 @@ class _ChatScreenState extends State<ChatScreen> {
                         );
                       },
                       icon: Icon(
-                        (_activeOffer == null || _activeOffer!.isExpired) ? Icons.add : Icons.reply,
+                        (_activeOffer == null || _activeOffer!.isExpired)
+                            ? Icons.add
+                            : Icons.reply,
                         color: Colors.white,
                         size: 18,
                       ),
                       label: Text(
-                        (_activeOffer == null || _activeOffer!.isExpired) ? 'Make Offer' : 'New Offer',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                        (_activeOffer == null || _activeOffer!.isExpired)
+                            ? 'Make Offer'
+                            : 'New Offer',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
@@ -1874,11 +2012,11 @@ class _ChatScreenState extends State<ChatScreen> {
               // Also hide buttons while loading load status to prevent flicker
               if (!_isLoadingLoadStatus &&
                   !_isLoadBooked &&
-                  !carrierCheck && 
+                  !carrierCheck &&
                   _activeOffer != null &&
                   !_activeOffer!.isExpired &&
-                  (_activeOffer!.status == OfferStatus.pending || 
-                   _activeOffer!.status == OfferStatus.counterOffered) &&
+                  (_activeOffer!.status == OfferStatus.pending ||
+                      _activeOffer!.status == OfferStatus.counterOffered) &&
                   _activeOffer!.isActive &&
                   !_isNegotiationExpired)
                 Expanded(
@@ -1886,19 +2024,29 @@ class _ChatScreenState extends State<ChatScreen> {
                     onPressed: () {
                       showDialog(
                         context: context,
-                      builder: (context) => CounterOfferDialog(
-                        originalOfferAmount: _activeOffer!.counterOfferAmount ?? _activeOffer!.offerAmount,
-                        currentPrice: widget.loadPrice,
-                        onCounterOffer: (amount) => _handleCounterOffer(_activeOffer!.id, amount),
-                        onAccept: () => _handleAcceptOffer(_activeOffer!.id),
-                        onReject: () => _handleRejectOffer(_activeOffer!.id),
-                      ),
+                        builder: (context) => CounterOfferDialog(
+                          originalOfferAmount:
+                              _activeOffer!.counterOfferAmount ??
+                              _activeOffer!.offerAmount,
+                          currentPrice: widget.loadPrice,
+                          onCounterOffer: (amount) =>
+                              _handleCounterOffer(_activeOffer!.id, amount),
+                          onAccept: () => _handleAcceptOffer(_activeOffer!.id),
+                          onReject: () => _handleRejectOffer(_activeOffer!.id),
+                        ),
                       );
                     },
-                    icon: const Icon(Icons.attach_money, color: Colors.white, size: 18),
+                    icon: const Icon(
+                      Icons.attach_money,
+                      color: Colors.white,
+                      size: 18,
+                    ),
                     label: const Text(
                       'Respond',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.orange,
@@ -1920,23 +2068,31 @@ class _ChatScreenState extends State<ChatScreen> {
     if (offer == null) {
       // Fallback if offer not loaded
       final isSending = _sendingMessageIds.contains(message.id);
-      return isMe 
+      return isMe
           ? _SentMessage(text: message.content, isSending: isSending)
           : _ReceivedMessage(
               text: message.content,
-              isSupportChat: widget.isSupportChat || (_conversation != null && _conversation!.isSupport),
+              isSupportChat:
+                  widget.isSupportChat ||
+                  (_conversation != null && _conversation!.isSupport),
             );
     }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
     final isShipper = user?.uid == offer.shipperId;
-    final isExpired = offer.isExpired || (offer.status == OfferStatus.pending && DateTime.now().isAfter(offer.expiresAt));
+    final isExpired =
+        offer.isExpired ||
+        (offer.status == OfferStatus.pending &&
+            DateTime.now().isAfter(offer.expiresAt));
     final isAccepted = offer.status == OfferStatus.accepted || _isLoadBooked;
-    final isGreyedOut = isAccepted || offer.status == OfferStatus.rejected || isExpired;
+    final isGreyedOut =
+        isAccepted || offer.status == OfferStatus.rejected || isExpired;
 
     return Column(
-      crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: isMe
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         Opacity(
           opacity: isGreyedOut ? 0.5 : 1.0,
@@ -1949,73 +2105,77 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: BoxDecoration(
                 color: isAccepted
                     ? Colors.green.shade50
-                    : isMe 
-                        ? primaryColor.withOpacity(0.1) 
-                        : Colors.blue.shade50,
+                    : isMe
+                    ? primaryColor.withOpacity(0.1)
+                    : Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isAccepted
                       ? Colors.green
-                      : isMe 
-                          ? primaryColor 
-                          : Colors.blue.shade300,
+                      : isMe
+                      ? primaryColor
+                      : Colors.blue.shade300,
                   width: 2,
                 ),
               ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.attach_money,
-                    color: isMe ? primaryColor : Colors.blue.shade700,
-                  ),
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(
-                      'Offer: \$${offer.offerAmount.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isMe ? primaryColor : Colors.blue.shade900,
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.attach_money,
+                        color: isMe ? primaryColor : Colors.blue.shade700,
                       ),
-                      softWrap: true,
-                      overflow: TextOverflow.visible,
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          'Offer: \$${offer.offerAmount.toStringAsFixed(2)}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: isMe ? primaryColor : Colors.blue.shade900,
+                          ),
+                          softWrap: true,
+                          overflow: TextOverflow.visible,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (offer.counterOfferAmount != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Counter-offer: \$${offer.counterOfferAmount!.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Text(
+                    _getOfferStatusText(offer, isExpired),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isExpired
+                          ? Colors.red.shade600
+                          : Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ],
               ),
-              if (offer.counterOfferAmount != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Counter-offer: \$${offer.counterOfferAmount!.toStringAsFixed(2)}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.orange.shade700,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                _getOfferStatusText(offer, isExpired),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isExpired ? Colors.red.shade600 : Colors.grey.shade600,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ],
-          ),
             ),
           ),
         ),
         // Action buttons for shippers on pending/counter-offered offers (hide if booked or expired)
         if (!_isLoadBooked &&
             !isExpired &&
-            isShipper && !isMe && 
-            (offer.status == OfferStatus.pending || offer.status == OfferStatus.counterOffered) &&
+            isShipper &&
+            !isMe &&
+            (offer.status == OfferStatus.pending ||
+                offer.status == OfferStatus.counterOffered) &&
             offer.isActive)
           Padding(
             padding: const EdgeInsets.only(top: 8),
@@ -2027,9 +2187,11 @@ class _ChatScreenState extends State<ChatScreen> {
                     showDialog(
                       context: context,
                       builder: (context) => CounterOfferDialog(
-                        originalOfferAmount: offer.counterOfferAmount ?? offer.offerAmount,
+                        originalOfferAmount:
+                            offer.counterOfferAmount ?? offer.offerAmount,
                         currentPrice: widget.loadPrice,
-                        onCounterOffer: (amount) => _handleCounterOffer(offer.id, amount),
+                        onCounterOffer: (amount) =>
+                            _handleCounterOffer(offer.id, amount),
                         onAccept: () => _handleAcceptOffer(offer.id),
                         onReject: () => _handleRejectOffer(offer.id),
                       ),
@@ -2038,7 +2200,10 @@ class _ChatScreenState extends State<ChatScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.orange,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
                   child: const Text('Respond'),
                 ),
@@ -2054,7 +2219,7 @@ class _ChatScreenState extends State<ChatScreen> {
     if (isExpired) {
       return 'Offer expired';
     }
-    
+
     switch (offer.status) {
       case OfferStatus.pending:
         return 'Pending response';
@@ -2089,9 +2254,10 @@ class _ChatScreenState extends State<ChatScreen> {
     // Get otherUserId and otherUserName from widget or extracted values
     final otherUserId = widget.otherUserId ?? _extractedOtherUserId;
     final otherUserName = widget.otherUserName ?? _extractedOtherUserName;
-    
-    if (otherUserId == null || otherUserId.isEmpty) return; // Skip for support chats
-    
+
+    if (otherUserId == null || otherUserId.isEmpty)
+      return; // Skip for support chats
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -2108,21 +2274,24 @@ class _ChatScreenState extends State<ChatScreen> {
   void _showReportDialog() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
-    final isCarrier = user != null && 
-        (widget.loadId == null || (_activeOffer != null && user.uid == _activeOffer!.carrierId));
-    
+    final isCarrier =
+        user != null &&
+        (widget.loadId == null ||
+            (_activeOffer != null && user.uid == _activeOffer!.carrierId));
+
     // Get otherUserName from widget or extracted values
     final otherUserName = widget.otherUserName ?? _extractedOtherUserName;
-    
+
     // Determine what/who is being reported
     String reportedEntityName;
-    
+
     if (widget.loadId != null) {
       // Reporting in load negotiation context
       if (isCarrier) {
         reportedEntityName = otherUserName ?? 'User';
       } else {
-        reportedEntityName = _activeOffer?.carrierName ?? otherUserName ?? 'User';
+        reportedEntityName =
+            _activeOffer?.carrierName ?? otherUserName ?? 'User';
       }
     } else {
       // Reporting in general conversation
@@ -2130,7 +2299,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final reasonController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -2177,9 +2346,12 @@ class _ChatScreenState extends State<ChatScreen> {
               }
 
               // Submit report to Firebase
-              final authProvider = Provider.of<AuthProvider>(context, listen: false);
+              final authProvider = Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              );
               final reporter = authProvider.currentUser;
-              
+
               if (reporter == null) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -2195,7 +2367,7 @@ class _ChatScreenState extends State<ChatScreen> {
               // Get otherUserId from widget or extracted value
               final otherUserId = widget.otherUserId ?? _extractedOtherUserId;
               if (otherUserId == null || otherUserId.isEmpty) return;
-              
+
               final success = await FirebaseService.submitReport(
                 reporterId: reporter.uid,
                 reportedUserId: otherUserId,
@@ -2210,9 +2382,11 @@ class _ChatScreenState extends State<ChatScreen> {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(success 
-                        ? 'Report submitted successfully' 
-                        : 'Failed to submit report. Please try again.'),
+                    content: Text(
+                      success
+                          ? 'Report submitted successfully'
+                          : 'Failed to submit report. Please try again.',
+                    ),
                     backgroundColor: success ? Colors.green : Colors.red,
                   ),
                 );
@@ -2294,9 +2468,11 @@ class _ReceivedMessage extends StatelessWidget {
         // Avatar with online indicator (support agent icon for support chats)
         Stack(
           children: [
-             CircleAvatar(
+            CircleAvatar(
               radius: 20,
-              backgroundColor: isSupportChat ? const Color(0xFF2C5E4A) : Colors.grey.shade200,
+              backgroundColor: isSupportChat
+                  ? const Color(0xFF2C5E4A)
+                  : Colors.grey.shade200,
               child: Icon(
                 isSupportChat ? Icons.support_agent : Icons.person_outline,
                 color: isSupportChat ? Colors.white : Colors.black,
@@ -2322,7 +2498,10 @@ class _ReceivedMessage extends StatelessWidget {
         // Message bubble with constraints to prevent overflow
         Flexible(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 10.0,
+            ),
             decoration: BoxDecoration(
               color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(20.0),
@@ -2346,12 +2525,14 @@ class _MessageInputField extends StatelessWidget {
   final FocusNode focusNode;
   final VoidCallback onSend;
   final bool enabled;
+  final String? disabledHint;
 
   const _MessageInputField({
     required this.controller,
     required this.focusNode,
     required this.onSend,
     this.enabled = true,
+    this.disabledHint,
   });
 
   @override
@@ -2366,8 +2547,15 @@ class _MessageInputField extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.add, color: enabled ? Colors.grey : Colors.grey.shade400),
-            onPressed: enabled ? () { /* Handle add button press */ } : null,
+            icon: Icon(
+              Icons.add,
+              color: enabled ? Colors.grey : Colors.grey.shade400,
+            ),
+            onPressed: enabled
+                ? () {
+                    /* Handle add button press */
+                  }
+                : null,
           ),
           Expanded(
             child: TextField(
@@ -2376,8 +2564,12 @@ class _MessageInputField extends StatelessWidget {
               enabled: enabled,
               style: TextStyle(color: enabled ? Colors.black : Colors.grey),
               decoration: InputDecoration(
-                hintText: enabled ? 'Type a message...' : 'Negotiation expired',
-                hintStyle: TextStyle(color: enabled ? Colors.grey : Colors.grey.shade400),
+                hintText: enabled
+                    ? 'Type a message...'
+                    : (disabledHint ?? 'Messaging disabled'),
+                hintStyle: TextStyle(
+                  color: enabled ? Colors.grey : Colors.grey.shade400,
+                ),
                 border: InputBorder.none,
               ),
               onSubmitted: enabled ? (_) => onSend() : null,
@@ -2385,7 +2577,7 @@ class _MessageInputField extends StatelessWidget {
           ),
           IconButton(
             icon: Icon(
-              Icons.send, 
+              Icons.send,
               color: enabled ? const Color(0xFF2C5E4A) : Colors.grey.shade400,
             ),
             onPressed: enabled ? onSend : null,

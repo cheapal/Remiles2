@@ -11,6 +11,7 @@ class ChatMessage {
   final String? listingId; // Reference to the product listing
   final String? offerId; // Reference to an offer (for offer messages)
   final bool isRead;
+  final List<String> deletedBy; // UIDs of users who deleted this message
 
   ChatMessage({
     required this.id,
@@ -23,6 +24,7 @@ class ChatMessage {
     this.listingId,
     this.offerId,
     this.isRead = false,
+    this.deletedBy = const [],
   });
 
   factory ChatMessage.fromFirestore(DocumentSnapshot doc) {
@@ -41,6 +43,7 @@ class ChatMessage {
       listingId: data['listingId'],
       offerId: data['offerId'],
       isRead: data['isRead'] ?? false,
+      deletedBy: List<String>.from(data['deletedBy'] ?? []),
     );
   }
 
@@ -51,7 +54,9 @@ class ChatMessage {
       senderId: data['senderId'] ?? '',
       receiverId: data['receiverId'] ?? '',
       content: data['content'] ?? '',
-      timestamp: (data['timestamp'] as Timestamp).toDate(),
+      timestamp: data['timestamp'] is Timestamp
+          ? (data['timestamp'] as Timestamp).toDate()
+          : DateTime.parse(data['timestamp']),
       type: MessageType.values.firstWhere(
         (e) => e.toString().split('.').last == data['type'],
         orElse: () => MessageType.text,
@@ -59,6 +64,7 @@ class ChatMessage {
       listingId: data['listingId'],
       offerId: data['offerId'],
       isRead: data['isRead'] ?? false,
+      deletedBy: List<String>.from(data['deletedBy'] ?? []),
     );
   }
 
@@ -73,6 +79,7 @@ class ChatMessage {
       'listingId': listingId,
       'offerId': offerId,
       'isRead': isRead,
+      'deletedBy': deletedBy,
     };
   }
 }
@@ -91,10 +98,12 @@ class ChatConversation {
   final DateTime updatedAt;
   final Map<String, bool> unreadCount; // userId -> hasUnreadMessages
   final DateTime? negotiationStartTime; // When first offer was sent
-  final DateTime? negotiationExpiresAt; // 30 minutes from negotiationStartTime
+  final DateTime? negotiationExpiresAt; // 12 hours from negotiationStartTime
   final bool isNegotiationActive; // Whether negotiation is active
   final String? activeOfferId; // ID of the current active offer
   final bool isSupport; // Whether this is a support conversation
+  final Map<String, DateTime>
+  clearedAt; // userId -> timestamp when conversation was cleared
 
   ChatConversation({
     required this.id,
@@ -112,6 +121,7 @@ class ChatConversation {
     this.isNegotiationActive = false,
     this.activeOfferId,
     this.isSupport = false,
+    this.clearedAt = const {},
   });
 
   factory ChatConversation.fromFirestore(DocumentSnapshot doc) {
@@ -123,7 +133,7 @@ class ChatConversation {
       listingTitle: data['listingTitle'],
       listingImageUrl: data['listingImageUrl'],
       loadId: data['loadId'],
-      lastMessage: data['lastMessage'] != null 
+      lastMessage: data['lastMessage'] != null
           ? ChatMessage.fromMap(data['lastMessage'] as Map<String, dynamic>)
           : null,
       createdAt: (data['createdAt'] as Timestamp).toDate(),
@@ -138,6 +148,11 @@ class ChatConversation {
       isNegotiationActive: data['isNegotiationActive'] ?? false,
       activeOfferId: data['activeOfferId'],
       isSupport: data['isSupport'] ?? false,
+      clearedAt:
+          (data['clearedAt'] as Map<String, dynamic>?)?.map(
+            (key, value) => MapEntry(key, (value as Timestamp).toDate()),
+          ) ??
+          {},
     );
   }
 
@@ -161,6 +176,9 @@ class ChatConversation {
       'isNegotiationActive': isNegotiationActive,
       'activeOfferId': activeOfferId,
       'isSupport': isSupport,
+      'clearedAt': clearedAt.map(
+        (key, value) => MapEntry(key, Timestamp.fromDate(value)),
+      ),
     };
   }
 
@@ -187,14 +205,14 @@ class ChatConversation {
       if (participants.isEmpty) {
         return '';
       }
-      
+
       // Try to find any participant that's different from current user
       for (String participantId in participants) {
         if (participantId != currentUserId) {
           return participantId;
         }
       }
-      
+
       // If all participants are the same as current user (shouldn't happen), return empty string
       return '';
     }

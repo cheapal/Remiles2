@@ -10,6 +10,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import '../../../../../../providers/carrier_payments_provider.dart';
 import '../../../../../../providers/auth_provider.dart';
+import 'carrier_add_payment_method.dart';
 import '../../../../../../core/stripe_service.dart';
 import '../../common/widgets/top_navigation_bar.dart';
 
@@ -1237,6 +1238,72 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
                                   ],
                                 ),
 
+                              const SizedBox(height: 20),
+
+                              if (_hasStripeAccount && !_needsOnboarding)
+                                SizedBox(
+                                  width: double.infinity, // ✅ Full width
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(24),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const CarrierAddPaymentMethod(),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(24),
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF43A047), // fresh green
+                                            Color(
+                                              0xFF1B5E20,
+                                            ), // deep premium green
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(
+                                              0xFF43A047,
+                                            ).withOpacity(0.35),
+                                            blurRadius: 18,
+                                            offset: const Offset(0, 10),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: const [
+                                          Icon(
+                                            Icons.payment_rounded,
+                                            color: Colors.white,
+                                            size: 22,
+                                          ),
+                                          SizedBox(width: 10),
+                                          Text(
+                                            'Payment Methods',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16.5,
+                                              fontWeight: FontWeight.w600,
+                                              letterSpacing: 0.3,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(height: 20),
 
                               /// Actions: Search, Filter, Date, Print

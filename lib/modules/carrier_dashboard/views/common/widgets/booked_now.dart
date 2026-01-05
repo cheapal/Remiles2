@@ -485,7 +485,8 @@ class _BookedNowState extends State<BookedNow> {
 
             // Only show negotiate button for active/available loads
             if (_currentStatus == 'active' ||
-                _currentStatus == 'available') ...[
+                _currentStatus == 'available' ||
+                _isBookedByCurrentUser()) ...[
               const SizedBox(height: 20),
 
               SizedBox(
@@ -499,8 +500,12 @@ class _BookedNowState extends State<BookedNow> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    "Negotiate",
+                  child: Text(
+                    (_isBookedByCurrentUser() && _currentStatus == 'booked' ||
+                            _currentStatus == 'in-transit' ||
+                            _currentStatus == 'completed')
+                        ? 'Open Chat'
+                        : "Negotiate",
                     style: TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ),

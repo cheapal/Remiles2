@@ -940,9 +940,18 @@ class _ShipperDashboard2State extends State<ShipperDashboard2>
       children: [
         GestureDetector(
           onTap: () async {
+            DateTime initialDate = DateTime.now();
+            if (controller.text.isNotEmpty) {
+              try {
+                initialDate = DateFormat('yyyy-MM-dd').parse(controller.text);
+              } catch (e) {
+                initialDate = DateTime.now();
+              }
+            }
+
             final DateTime? picked = await showDatePicker(
               context: context,
-              initialDate: DateTime.now(),
+              initialDate: initialDate,
               firstDate: DateTime.now(),
               lastDate: DateTime(2100),
               builder: (context, child) {

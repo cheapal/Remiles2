@@ -44,38 +44,26 @@ class More extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: kIsWeb ? 100 : 20),
-                    if (isWide)
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildOptionCard(
-                              title: 'Analytics & Performance',
-                              icon: 'assets/performance_analytics.svg',
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: _buildOptionCard(
-                              title: 'CO₂ Carbon Footprint Tracking',
-                              icon: 'assets/eco.svg',
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      Column(
-                        children: [
-                          _buildOptionCard(
-                            title: 'Analytics & Performance',
-                            icon: 'assets/performance_analytics.svg',
-                          ),
-                          const SizedBox(height: 20),
-                          _buildOptionCard(
-                            title: 'CO₂ Carbon Footprint Tracking',
-                            icon: 'assets/eco.svg',
-                          ),
-                        ],
-                      ),
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: isWide ? 2 : 1,
+                      childAspectRatio: isWide ? 1.5 : 1.4,
+                      crossAxisSpacing: 20,
+                      mainAxisSpacing: 20,
+                      children: [
+                        _buildOptionCard(
+                          title: 'Analytics & Performance',
+                          icon: 'assets/performance_analytics.svg',
+                          isWide: isWide,
+                        ),
+                        _buildOptionCard(
+                          title: 'CO₂ Carbon Footprint Tracking',
+                          icon: 'assets/eco.svg',
+                          isWide: isWide,
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 40),
                   ],
                 ),
@@ -88,23 +76,27 @@ class More extends StatelessWidget {
   }
 }
 
-Widget _buildOptionCard({required String title, required String icon}) {
+Widget _buildOptionCard({
+  required String title,
+  required String icon,
+  required bool isWide,
+}) {
   return Container(
-    height: 184,
+    padding: const EdgeInsets.all(20),
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(26),
       boxShadow: [
         BoxShadow(
-          color: const Color(0xFF6CA78A).withOpacity(0.4),
-          blurRadius: 10,
+          color: const Color(0xFF6CA78A).withOpacity(0.25),
+          blurRadius: 15,
           spreadRadius: 0,
-          offset: const Offset(0, 7),
+          offset: const Offset(0, 8),
         ),
         BoxShadow(
-          color: primaryColor.withOpacity(0.1),
+          color: primaryColor.withOpacity(0.05),
           spreadRadius: 1,
-          blurRadius: 2,
+          blurRadius: 4,
           offset: const Offset(0, 2),
         ),
       ],
@@ -112,15 +104,23 @@ Widget _buildOptionCard({required String title, required String icon}) {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        SvgPicture.asset(icon, height: 80, width: 80),
+        Flexible(
+          child: SvgPicture.asset(
+            icon,
+            height: isWide ? 80 : 60,
+            width: isWide ? 80 : 60,
+          ),
+        ),
         const SizedBox(height: 15),
         Text(
           title,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
             fontFamily: 'Roboto',
             fontWeight: FontWeight.w800,
-            fontSize: 20,
+            fontSize: isWide ? 20 : 16,
             color: Colors.black,
           ),
         ),

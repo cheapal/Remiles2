@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:remiles/core/theme/colors.dart';
 import 'package:remiles/core/firebase_service.dart';
 import 'package:remiles/models/load_model.dart';
@@ -446,6 +447,14 @@ class _ManageLoadScreenState extends State<ManageLoadScreen>
                     ),
                   ),
                 ),
+                if (kIsWeb) ...[
+                  IconButton(
+                    onPressed: _refreshLoads,
+                    icon: const Icon(Icons.refresh),
+                    color: Colors.black.withOpacity(0.6),
+                    tooltip: 'Refresh',
+                  ),
+                ],
                 if (_searchQuery.isNotEmpty)
                   IconButton(
                     onPressed: () {
@@ -660,7 +669,12 @@ class _ManageLoadScreenState extends State<ManageLoadScreen>
     // Only show in recommended if match is above 20% threshold
     final topMatch = matchedLoads.first;
     if (topMatch.matchPercentage != null && topMatch.matchPercentage! >= 20.0) {
-      return [RecommendedLoad(load: topMatch)];
+      return [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: RecommendedLoad(load: topMatch),
+        ),
+      ];
     }
 
     return [];

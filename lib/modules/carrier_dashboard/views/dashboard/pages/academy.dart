@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../../../../core/firebase_service.dart';
 import '../../../../../../models/academy_content.dart';
@@ -11,7 +12,8 @@ class AcademyScreen extends StatefulWidget {
   State<AcademyScreen> createState() => _AcademyScreenState();
 }
 
-class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProviderStateMixin {
+class _AcademyScreenState extends State<AcademyScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
@@ -47,11 +49,9 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
   Future<void> _shareContent(AcademyContent content) async {
     try {
       final url = content.videoUrl ?? content.documentUrl ?? '';
-      final shareText = '${content.title}\n\n${content.description}\n\n${url.isNotEmpty ? url : ''}';
-      await Share.share(
-        shareText,
-        subject: content.title,
-      );
+      final shareText =
+          '${content.title}\n\n${content.description}\n\n${url.isNotEmpty ? url : ''}';
+      await Share.share(shareText, subject: content.title);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -68,12 +68,19 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
     if (content.contentType == 'video' && content.videoUrl != null) {
       // Open video in webview or external player
       if (await canLaunchUrl(Uri.parse(content.videoUrl!))) {
-        await launchUrl(Uri.parse(content.videoUrl!), mode: LaunchMode.externalApplication);
+        await launchUrl(
+          Uri.parse(content.videoUrl!),
+          mode: LaunchMode.externalApplication,
+        );
       }
-    } else if (content.contentType == 'document' && content.documentUrl != null) {
+    } else if (content.contentType == 'document' &&
+        content.documentUrl != null) {
       // Open document in webview
       if (await canLaunchUrl(Uri.parse(content.documentUrl!))) {
-        await launchUrl(Uri.parse(content.documentUrl!), mode: LaunchMode.externalApplication);
+        await launchUrl(
+          Uri.parse(content.documentUrl!),
+          mode: LaunchMode.externalApplication,
+        );
       }
     } else {
       // Show details dialog
@@ -89,14 +96,21 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
                 Text(content.description),
                 if (content.tags.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text('Tags:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Tags:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
-                    children: content.tags.map((tag) => Chip(
-                      label: Text(tag),
-                      backgroundColor: Colors.grey.shade200,
-                    )).toList(),
+                    children: content.tags
+                        .map(
+                          (tag) => Chip(
+                            label: Text(tag),
+                            backgroundColor: Colors.grey.shade200,
+                          ),
+                        )
+                        .toList(),
                   ),
                 ],
               ],
@@ -115,44 +129,76 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final screenW = media.size.width;
+    final bool isWide = screenW >= 900;
+
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF003D2B), // Dark green color
+        backgroundColor: const Color(0xFF003D2B),
         elevation: 0,
+        centerTitle: !isWide,
         title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text("Re-Miles Academy",style: TextStyle(color: Colors.white),),
-            Text("Learn about the app and its features",style: TextStyle(color: Colors.white,fontSize: 12),),
-          ],
-        ), //
-        leading: Text(''),// No title needed
-        // The TabBar is placed in the 'bottom' property of the AppBar
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          indicator: const BoxDecoration(
-            border: Border(
-              bottom: BorderSide(
+          crossAxisAlignment: isWide
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Text(
+              "Re-Miles Academy",
+              style: TextStyle(
                 color: Colors.white,
-                width: 4.0,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              "Learn about the app and its features",
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ],
+        ),
+        leading: isWide
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
+              ),
+        automaticallyImplyLeading: !isWide,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            alignment: Alignment.center,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: TabBar(
+                controller: _tabController,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                labelStyle: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                indicator: const BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(color: Colors.white, width: 4.0),
+                  ),
+                ),
+                tabs: const [
+                  Tab(text: 'VIDEOS'),
+                  Tab(text: 'FILES'),
+                ],
               ),
             ),
           ),
-          tabs: const [
-            Tab(text: 'VIDEOS'),
-            Tab(text: 'FILES'),
-          ],
         ),
       ),
-      // TabBarView holds the content for each tab
       body: TabBarView(
         controller: _tabController,
         children: [
-          // Videos tab
           _buildTabContent(contentType: 'video'),
-          // Playlists tab
           _buildTabContent(contentType: 'playlist'),
         ],
       ),
@@ -161,18 +207,28 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
 
   /// Builds the content layout for a single tab page.
   Widget _buildTabContent({required String contentType}) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
-      child: Column(
-        children: [
-          // Search Bar
-          _buildSearchBar(),
-          const SizedBox(height: 20),
-          // Content Grid
-          Expanded(
-            child: _buildContentGrid(contentType: contentType),
+    final media = MediaQuery.of(context);
+    final screenW = media.size.width;
+    final bool isWide = screenW >= 900;
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 1200),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(
+            isWide ? 40.0 : 16.0,
+            isWide ? 32.0 : 16.0,
+            isWide ? 40.0 : 16.0,
+            0,
           ),
-        ],
+          child: Column(
+            children: [
+              _buildSearchBar(),
+              SizedBox(height: isWide ? 32 : 20),
+              Expanded(child: _buildContentGrid(contentType: contentType)),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -251,19 +307,26 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
         }
 
         final allContent = snapshot.data ?? [];
-        
+
         // Filter content based on tab
         List<AcademyContent> filteredContent;
         if (contentType == 'playlist') {
           // Show documents in the FILES tab
-          filteredContent = allContent.where((content) => 
-            content.contentType == 'document' && _matchesSearch(content)
-          ).toList();
+          filteredContent = allContent
+              .where(
+                (content) =>
+                    content.contentType == 'document' &&
+                    _matchesSearch(content),
+              )
+              .toList();
         } else {
           // Show only videos in the VIDEOS tab
-          filteredContent = allContent.where((content) => 
-            content.contentType == 'video' && _matchesSearch(content)
-          ).toList();
+          filteredContent = allContent
+              .where(
+                (content) =>
+                    content.contentType == 'video' && _matchesSearch(content),
+              )
+              .toList();
         }
 
         if (filteredContent.isEmpty) {
@@ -272,7 +335,9 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
-                  _searchQuery.isNotEmpty ? Icons.search_off : Icons.video_library_outlined,
+                  _searchQuery.isNotEmpty
+                      ? Icons.search_off
+                      : Icons.video_library_outlined,
                   size: 64,
                   color: Colors.grey.shade400,
                 ),
@@ -281,22 +346,38 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
                   _searchQuery.isNotEmpty
                       ? 'No content found matching your search'
                       : 'No content available yet',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 16,
-                  ),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 16),
                 ),
               ],
             ),
           );
         }
 
+        final media = MediaQuery.of(context);
+        final screenW = media.size.width;
+        int crossAxisCount;
+        double childAspectRatio;
+
+        if (screenW >= 1200) {
+          crossAxisCount = 4;
+          childAspectRatio = 0.8;
+        } else if (screenW >= 900) {
+          crossAxisCount = 3;
+          childAspectRatio = 0.75;
+        } else if (screenW >= 600) {
+          crossAxisCount = 2;
+          childAspectRatio = 0.8;
+        } else {
+          crossAxisCount = 2;
+          childAspectRatio = 0.75;
+        }
+
         return GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16.0,
-            mainAxisSpacing: 16.0,
-            childAspectRatio: 0.75,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: screenW >= 900 ? 24.0 : 16.0,
+            mainAxisSpacing: screenW >= 900 ? 24.0 : 16.0,
+            childAspectRatio: childAspectRatio,
           ),
           itemCount: filteredContent.length,
           itemBuilder: (context, index) {
@@ -352,7 +433,9 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
                               content.thumbnailUrl!,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
-                                return _buildPlaceholderThumbnail(content.contentType);
+                                return _buildPlaceholderThumbnail(
+                                  content.contentType,
+                                );
                               },
                             )
                           : _buildPlaceholderThumbnail(content.contentType),
@@ -367,7 +450,9 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
                           ),
                           padding: const EdgeInsets.all(12.0),
                           child: Icon(
-                            content.contentType == 'video' ? Icons.play_arrow : Icons.description,
+                            content.contentType == 'video'
+                                ? Icons.play_arrow
+                                : Icons.description,
                             color: Colors.white,
                             size: 36,
                           ),
@@ -407,7 +492,10 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
             Expanded(
               flex: 1,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12.0,
+                  vertical: 8.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -450,9 +538,7 @@ class _AcademyScreenState extends State<AcademyScreen> with SingleTickerProvider
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade300,
-      ),
+      decoration: BoxDecoration(color: Colors.grey.shade300),
       child: Center(
         child: Icon(
           contentType == 'video' ? Icons.video_library : Icons.description,

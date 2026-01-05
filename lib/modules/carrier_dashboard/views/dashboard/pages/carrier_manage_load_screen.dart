@@ -1111,11 +1111,20 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
 
     final status = _selectedLoad!.status.toLowerCase();
 
+    // Check if waiting for escrow payment
+    bool isWaitingForEscrow =
+        (status == 'booked' || status == 'in-transit') &&
+        _escrowPaymentData?['status'] != 'deposited';
+
     // Determine which status pills should be active based on load status
-    bool enRouteActive = status == 'booked' || status == 'in-transit';
-    bool pickupActive = status == 'in-transit' || status == 'completed';
-    bool inTransitActive = status == 'in-transit';
-    bool deliveredActive = status == 'completed';
+    // All pills should be grey if waiting for escrow payment
+    bool enRouteActive =
+        !isWaitingForEscrow && (status == 'booked' || status == 'in-transit');
+    bool pickupActive =
+        !isWaitingForEscrow &&
+        (status == 'in-transit' || status == 'completed');
+    bool inTransitActive = !isWaitingForEscrow && status == 'in-transit';
+    bool deliveredActive = !isWaitingForEscrow && status == 'completed';
 
     return Row(
       children: [
@@ -2083,6 +2092,30 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
                                       },
                                     ),
                             ),
+                            // Refresh Button (Web only)
+                            if (kIsWeb) ...[
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8.0,
+                                ),
+                                child: ElevatedButton.icon(
+                                  onPressed: _loadBookedLoads,
+                                  icon: const Icon(Icons.refresh, size: 20),
+                                  label: const Text('Refresh'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: green,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                             // Support Button
                             IconButton(
                               onPressed: _showSupportDialog,

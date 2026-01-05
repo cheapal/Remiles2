@@ -3,13 +3,14 @@ import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navig
 import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:remiles/modules/shipper_dashboard/pages/shipper_market_place_product_page.dart';
 import 'package:remiles/modules/shipper_dashboard/pages/shipper_profile_create_listing.dart';
-import 'package:remiles/modules/shipper_dashboard/pages/shipper_profile_screen.dart';
+import 'package:remiles/modules/shipper_dashboard/pages/marketplace_user_profile.dart';
 import 'package:remiles/core/firebase_service.dart';
 import 'package:remiles/models/product_listing.dart';
 import 'package:remiles/models/shipper_model.dart';
 import 'package:remiles/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 // ===== Brand + layout constants (reuse across screens) =====
@@ -153,7 +154,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                                 style: TextStyle(
                                   fontFamily: 'Roboto',
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 32,
+                                  fontSize: kIsWeb ? 32 : 26,
                                   color: Colors.black,
                                   height: 1.1,
                                 ),
@@ -189,7 +190,7 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
-                                            const ShipperProfileScreen(),
+                                            const MarketplaceUserProfile(),
                                       ),
                                     );
                                   },
@@ -227,7 +228,30 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
                         const SizedBox(height: 14),
 
                         // Full-width search bar
-                        _searchBar(),
+                        Row(
+                          children: [
+                            Expanded(child: _searchBar()),
+                            if (kIsWeb) ...[
+                              const SizedBox(width: 12),
+                              ElevatedButton.icon(
+                                onPressed: _refreshListings,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Refresh'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: brandColor,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 18,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
 
                         const SizedBox(height: 16),
 
@@ -569,6 +593,26 @@ class _MarketplaceScreenState extends State<MarketplaceScreen>
               child: Text(
                 'No more listings to load',
                 style: TextStyle(color: Colors.grey, fontSize: 14),
+              ),
+            ),
+          ),
+
+        // Load More button for Web
+        if (kIsWeb && _hasMoreData && !_isLoadingMore)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Center(
+              child: ElevatedButton(
+                onPressed: _loadMoreListings,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: brandColor,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 12,
+                  ),
+                ),
+                child: const Text('Load More'),
               ),
             ),
           ),
@@ -1553,9 +1597,12 @@ class _SkeletonAdCard extends StatelessWidget {
                       _line(width: 58, height: 14, radius: 6),
                     ],
                   ),
+
                   const SizedBox(height: 8),
                   _line(width: double.infinity, height: 14, radius: 6),
                   const SizedBox(height: 6),
+
+                  const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: _line(width: 90, height: 12, radius: 6),

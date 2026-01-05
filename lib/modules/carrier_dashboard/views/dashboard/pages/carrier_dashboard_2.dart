@@ -603,65 +603,65 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
       ),
 
       // ======== Bottom Navigation ========
-      bottomNavigationBar: Container(
-        height: bottomNavHeight,
-        decoration: BoxDecoration(
-          color: const Color(0xFF064232),
-          image: isWide
-              ? null
-              : const DecorationImage(
-                  image: AssetImage('assets/nav_leather.png'),
-                  fit: BoxFit.cover,
-                ),
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(65),
-            topRight: Radius.circular(65),
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(50),
-            topRight: Radius.circular(50),
-          ),
-          child: BottomNavigationBar(
-            currentIndex: _selectedTab,
-            onTap: (index) {
-              setState(() {
-                _selectedTab = index;
-              });
-            },
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            type: BottomNavigationBarType.fixed,
-            selectedItemColor: const Color(0xFFFFFBDF),
-            unselectedItemColor: const Color(0xFFFFFBDF).withOpacity(0.6),
-            selectedLabelStyle: const TextStyle(fontSize: 11),
-            unselectedLabelStyle: const TextStyle(fontSize: 11),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.home, size: 26),
-                label: 'Home',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.shopping_cart, size: 29),
-                label: 'Manage Loads',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.storefront, size: 30.82),
-                label: 'Marketplace',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person, size: 31.37),
-                label: 'Profile',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.more_horiz, size: 25),
-                label: 'More',
-              ),
-            ],
-          ),
-        ),
-      ),
+      // bottomNavigationBar: Container(
+      //   height: bottomNavHeight,
+      //   decoration: BoxDecoration(
+      //     color: const Color(0xFF064232),
+      //     image: isWide
+      //         ? null
+      //         : const DecorationImage(
+      //             image: AssetImage('assets/nav_leather.png'),
+      //             fit: BoxFit.cover,
+      //           ),
+      //     borderRadius: const BorderRadius.only(
+      //       topLeft: Radius.circular(65),
+      //       topRight: Radius.circular(65),
+      //     ),
+      //   ),
+      //   child: ClipRRect(
+      //     borderRadius: const BorderRadius.only(
+      //       topLeft: Radius.circular(50),
+      //       topRight: Radius.circular(50),
+      //     ),
+      //     child: BottomNavigationBar(
+      //       currentIndex: _selectedTab,
+      //       onTap: (index) {
+      //         setState(() {
+      //           _selectedTab = index;
+      //         });
+      //       },
+      //       backgroundColor: Colors.transparent,
+      //       elevation: 0,
+      //       type: BottomNavigationBarType.fixed,
+      //       selectedItemColor: const Color(0xFFFFFBDF),
+      //       unselectedItemColor: const Color(0xFFFFFBDF).withOpacity(0.6),
+      //       selectedLabelStyle: const TextStyle(fontSize: 11),
+      //       unselectedLabelStyle: const TextStyle(fontSize: 11),
+      //       items: const [
+      //         BottomNavigationBarItem(
+      //           icon: Icon(Icons.home, size: 26),
+      //           label: 'Home',
+      //         ),
+      //         BottomNavigationBarItem(
+      //           icon: Icon(Icons.shopping_cart, size: 29),
+      //           label: 'Manage Loads',
+      //         ),
+      //         BottomNavigationBarItem(
+      //           icon: Icon(Icons.storefront, size: 30.82),
+      //           label: 'Marketplace',
+      //         ),
+      //         BottomNavigationBarItem(
+      //           icon: Icon(Icons.person, size: 31.37),
+      //           label: 'Profile',
+      //         ),
+      //         BottomNavigationBarItem(
+      //           icon: Icon(Icons.more_horiz, size: 25),
+      //           label: 'More',
+      //         ),
+      //       ],
+      //     ),
+      //   ),
+      // ),
     );
   }
 
@@ -1052,14 +1052,25 @@ class _CarrierDashboard2State extends State<CarrierDashboard2>
   }) {
     return GestureDetector(
       onTap: () async {
+        DateTime initialDate = DateTime.now();
+        if (controller.text.isNotEmpty) {
+          try {
+            initialDate = DateFormat('yyyy-MM-dd').parse(controller.text);
+          } catch (e) {
+            initialDate = DateTime.now();
+          }
+        }
+
         final DateTime? picked = await showDatePicker(
           context: context,
-          initialDate: DateTime.now(),
+          initialDate: initialDate,
           firstDate: DateTime(2000),
           lastDate: DateTime(2100),
         );
         if (picked != null) {
-          controller.text = DateFormat('yyyy-MM-dd').format(picked);
+          setState(() {
+            controller.text = DateFormat('yyyy-MM-dd').format(picked);
+          });
         }
       },
       child: Container(

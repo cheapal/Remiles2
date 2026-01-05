@@ -7,7 +7,7 @@ import 'package:flutter_svg/svg.dart';
 
 class RecommendedLoad extends StatefulWidget {
   final LoadModel load;
-  
+
   const RecommendedLoad({super.key, required this.load});
 
   @override
@@ -27,7 +27,7 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 0),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -55,11 +55,15 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
             /// Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children:  [
-                Text(
-                  "Recommended Load",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              children: [
+                const Expanded(
+                  child: Text(
+                    "Recommended Load",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   "${widget.load.matchPercentage?.toStringAsFixed(0) ?? '0'}% Match",
                   style: TextStyle(
@@ -78,12 +82,18 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
               children: [
                 Text(
                   "\$${widget.load.price.toStringAsFixed(0)}   ${widget.load.distance.toStringAsFixed(0)}(mi)",
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 Flexible(
                   child: Text(
                     "Load ID #${widget.load.id.isNotEmpty ? widget.load.id : 'N/A'}",
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -96,47 +106,112 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 6),
-                Text("From : ${widget.load.originCity}, ${widget.load.originState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                Expanded(
+                  child: Text(
+                    "From : ${widget.load.originCity}, ${widget.load.originState}",
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             Row(
               children: [
                 Icon(Icons.location_on, size: 18, color: primaryColor),
                 const SizedBox(width: 6),
-                 Text("To : ${widget.load.destinationCity}, ${widget.load.destinationState}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                Expanded(
+                  child: Text(
+                    "To : ${widget.load.destinationCity}, ${widget.load.destinationState}",
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             Row(
               children: [
-               SvgPicture.asset("assets/calender.svg",
-                    width: 18, height: 18, color: primaryColor),
+                SvgPicture.asset(
+                  "assets/calender.svg",
+                  width: 18,
+                  height: 18,
+                  color: primaryColor,
+                ),
                 const SizedBox(width: 6),
-                 Text("Pickup : ${_formatDate(widget.load.pickupDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                Expanded(
+                  child: Text(
+                    "Pickup : ${_formatDate(widget.load.pickupDate)}",
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             Row(
-              children:  [
-                SvgPicture.asset("assets/calender.svg",
-                    width: 18, height: 18, color: primaryColor),
+              children: [
+                SvgPicture.asset(
+                  "assets/calender.svg",
+                  width: 18,
+                  height: 18,
+                  color: primaryColor,
+                ),
                 const SizedBox(width: 6),
-                Text("Delivery : ${_formatDate(widget.load.deliveryDate)}", style: TextStyle(color: primaryColor,fontSize: 14,fontWeight: FontWeight.w700),),
+                Expanded(
+                  child: Text(
+                    "Delivery : ${_formatDate(widget.load.deliveryDate)}",
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
-            const Divider(height: 12,color: Colors.grey,),
+            const Divider(height: 12, color: Colors.grey),
             const SizedBox(height: 12),
 
             /// Weight
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children:  [
-                SvgPicture.asset("assets/truck.svg",
-                    width: 18, height: 18, color: primaryColor),
+              children: [
+                SvgPicture.asset(
+                  "assets/truck.svg",
+                  width: 18,
+                  height: 18,
+                  color: primaryColor,
+                ),
                 const SizedBox(width: 6),
-                Text("${widget.load.weight.toStringAsFixed(0)} lb",style: TextStyle(fontWeight: FontWeight.w800,color:primaryColor),),
+                Text(
+                  "${widget.load.weight.toStringAsFixed(0)} lb",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    color: primaryColor,
+                  ),
+                ),
                 const Spacer(),
                 Flexible(
-                  child: Text("Equipment: ${widget.load.equipmentNeeded}",style: TextStyle(fontWeight: FontWeight.w500,color:primaryColor), overflow: TextOverflow.ellipsis,),
+                  child: Text(
+                    "Equipment: ${widget.load.equipmentNeeded}",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      color: primaryColor,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -148,18 +223,20 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
               alignment: Alignment.center,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _currentStatus == 'booked' 
-                      ? Colors.blue 
+                  backgroundColor: _currentStatus == 'booked'
+                      ? Colors.blue
                       : (_isBooking ? Colors.grey : const Color(0xFFFFCA4D)),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                   shadowColor: Colors.black.withOpacity(1),
                   elevation: 1,
-                  padding:
-                    const EdgeInsets.symmetric(horizontal: 22, vertical: 0),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 22,
+                    vertical: 0,
+                  ),
                 ),
-                onPressed: _currentStatus == 'booked' 
+                onPressed: _currentStatus == 'booked'
                     ? () => _showLoadDetails(context)
                     : (_isBooking ? null : () => _bookLoad(context)),
                 child: _isBooking
@@ -168,15 +245,21 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : Text(
-                        _currentStatus == 'booked' ? "View Details" : "Instant Booking",
+                        _currentStatus == 'booked'
+                            ? "View Details"
+                            : "Instant Booking",
                         style: TextStyle(
-                          color: _currentStatus == 'booked' ? Colors.white : Colors.black,
+                          color: _currentStatus == 'booked'
+                              ? Colors.white
+                              : Colors.black,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14
+                          fontSize: 14,
                         ),
                       ),
               ),
@@ -189,8 +272,18 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
 
   String _formatDate(DateTime date) {
     final months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return '${months[date.month - 1]} ${date.day}, ${date.year}';
   }
@@ -243,7 +336,7 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
       setState(() {
         _isBooking = false;
       });
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: ${e.toString()}'),
@@ -264,9 +357,7 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
             borderRadius: BorderRadius.circular(16),
           ),
           insetPadding: const EdgeInsets.all(16),
-          child: SingleChildScrollView(
-            child: BookedNow(load: updatedLoad),
-          ),
+          child: SingleChildScrollView(child: BookedNow(load: updatedLoad)),
         );
       },
     );

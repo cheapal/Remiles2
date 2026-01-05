@@ -40,16 +40,23 @@ class _CanadianProvincesAutocompleteState
 
   List<String> _filteredProvinces = [];
   final FocusNode _focusNode = FocusNode();
+  bool _isSelecting = false;
 
   @override
   void initState() {
     super.initState();
     _focusNode.addListener(() {
-      if (!_focusNode.hasFocus) {
-        setState(() {
-          _filteredProvinces = [];
+      if (!_focusNode.hasFocus && !_isSelecting) {
+        // On web, clicking an item can cause focus loss before the tap is registered.
+        // We add a small delay to allow the tap event to fire.
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted && !_focusNode.hasFocus && !_isSelecting) {
+            setState(() {
+              _filteredProvinces = [];
+            });
+          }
         });
-      } else if (widget.controller.text.isEmpty) {
+      } else if (_focusNode.hasFocus && widget.controller.text.isEmpty) {
         setState(() {
           _filteredProvinces = List.from(_provinces);
         });
@@ -76,9 +83,11 @@ class _CanadianProvincesAutocompleteState
     if (query.isNotEmpty) {
       setState(() {
         _filteredProvinces = _provinces
-            .where((province) =>
-                province.toLowerCase().contains(query) ||
-                province.toLowerCase().startsWith(query))
+            .where(
+              (province) =>
+                  province.toLowerCase().contains(query) ||
+                  province.toLowerCase().startsWith(query),
+            )
             .toList();
       });
     } else {
@@ -112,8 +121,11 @@ class _CanadianProvincesAutocompleteState
             padding: const EdgeInsets.symmetric(horizontal: 15),
             child: Row(
               children: [
-                Icon(widget.icon,
-                    size: 24, color: const Color.fromRGBO(0, 0, 0, 0.45)),
+                Icon(
+                  widget.icon,
+                  size: 24,
+                  color: const Color.fromRGBO(0, 0, 0, 0.45),
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -160,24 +172,31 @@ class _CanadianProvincesAutocompleteState
               itemCount: _filteredProvinces.length,
               itemBuilder: (context, index) {
                 final province = _filteredProvinces[index];
-                return InkWell(
-                  onTap: () {
-                    widget.controller.removeListener(_onTextChanged);
-                    widget.controller.text = province;
-                    widget.controller.addListener(_onTextChanged);
-                    _focusNode.unfocus();
-                    setState(() {
-                      _filteredProvinces = [];
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    child: Text(
-                      province,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Color(0xFF000000),
+                return Listener(
+                  onPointerDown: (_) => _isSelecting = true,
+                  child: InkWell(
+                    onTap: () {
+                      _isSelecting = true;
+                      widget.controller.removeListener(_onTextChanged);
+                      widget.controller.text = province;
+                      widget.controller.addListener(_onTextChanged);
+                      _focusNode.unfocus();
+                      setState(() {
+                        _filteredProvinces = [];
+                        _isSelecting = false;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Text(
+                        province,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF000000),
+                        ),
                       ),
                     ),
                   ),

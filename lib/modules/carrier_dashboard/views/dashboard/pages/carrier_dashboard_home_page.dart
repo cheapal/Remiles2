@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:remiles/core/theme/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -347,7 +348,7 @@ class _CarrierDashboardHomeScreenState
                     GridView.count(
                       shrinkWrap: true,
                       crossAxisCount: isWide ? 4 : 2,
-                      childAspectRatio: isWide ? 1.3 : 1.6,
+                      childAspectRatio: isWide ? 1.3 : 1.1,
                       crossAxisSpacing: 16,
                       mainAxisSpacing: 16,
                       physics: const NeverScrollableScrollPhysics(),
@@ -441,13 +442,16 @@ class _CarrierDashboardHomeScreenState
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
-              fontSize: 12,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
           ),
         ],
@@ -532,10 +536,14 @@ class _CarrierDashboardHomeScreenState
 
     // Show only the top recommended load (highest match percentage)
     if (_recommendedLoads.isNotEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: RecommendedLoad(load: _recommendedLoads.first),
-      );
+      if (kIsWeb) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: RecommendedLoad(load: _recommendedLoads.first),
+        );
+      } else {
+        return RecommendedLoad(load: _recommendedLoads.first);
+      }
     }
 
     return const SizedBox.shrink();

@@ -15,14 +15,14 @@ import 'package:remiles/providers/auth_provider.dart';
 const Color brandColor = Color(0xFF064232);
 const Color brandGreen = Color(0xFF195529);
 
-class ShipperProfileScreen extends StatefulWidget {
-  const ShipperProfileScreen({super.key});
+class MarketplaceUserProfile extends StatefulWidget {
+  const MarketplaceUserProfile({super.key});
 
   @override
-  State<ShipperProfileScreen> createState() => _ShipperProfileScreenState();
+  State<MarketplaceUserProfile> createState() => _MarketplaceUserProfileState();
 }
 
-class _ShipperProfileScreenState extends State<ShipperProfileScreen>
+class _MarketplaceUserProfileState extends State<MarketplaceUserProfile>
     with TickerProviderStateMixin {
   int _selectedTab =
       0; // 0: My Listings, 1: Saved Items, 2: Inbox, 3: Reviews, 4: Recently Viewed
@@ -60,7 +60,7 @@ class _ShipperProfileScreenState extends State<ShipperProfileScreen>
     final bool isWide = screenW >= 900;
 
     return Scaffold(
-      backgroundColor: Colors.orange,
+      backgroundColor: backgroundColor,
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.light,
         child: SingleChildScrollView(

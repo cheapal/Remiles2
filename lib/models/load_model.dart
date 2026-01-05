@@ -29,6 +29,7 @@ class LoadModel {
   final int views;
   final double? matchPercentage; // calculated client-side
   final Map<String, dynamic>? additionalData;
+  final String? escrowPaymentStatus;
 
   LoadModel({
     required this.id,
@@ -59,36 +60,45 @@ class LoadModel {
     this.views = 0,
     this.matchPercentage,
     this.additionalData,
+    this.escrowPaymentStatus,
   });
 
   // Factory constructor from Firestore document
-  factory LoadModel.fromFirestore(DocumentSnapshot doc, {String? parentShipperUid}) {
+  factory LoadModel.fromFirestore(
+    DocumentSnapshot doc, {
+    String? parentShipperUid,
+  }) {
     try {
       final data = doc.data() as Map<String, dynamic>;
       // Use parentShipperUid if provided (from subcollection path), otherwise use data
       final shipperUid = parentShipperUid ?? data['shipperUid'] ?? '';
-      
+
       // Get description - check multiple possible field names
-      final description = data['description'] ?? 
-                         data['loadDescription'] ?? 
-                         data['notes'] ?? 
-                         data['details'] ?? 
-                         '';
-      
+      final description =
+          data['description'] ??
+          data['loadDescription'] ??
+          data['notes'] ??
+          data['details'] ??
+          '';
+
       // Get shipperName - check multiple possible field names
-      final shipperName = data['shipperName'] ?? 
-                         data['shipper_name'] ?? 
-                         data['companyName'] ?? 
-                         data['displayName'] ?? 
-                         '';
-      
+      final shipperName =
+          data['shipperName'] ??
+          data['shipper_name'] ??
+          data['companyName'] ??
+          data['displayName'] ??
+          '';
+
       return LoadModel(
         id: doc.id,
         shipperUid: shipperUid,
         shipperName: shipperName,
         title: data['title'] ?? '',
         description: description,
-        price: _parseDouble(data['price']) ?? _parseDouble(data['quoteBudget']) ?? 0.0,
+        price:
+            _parseDouble(data['price']) ??
+            _parseDouble(data['quoteBudget']) ??
+            0.0,
         distance: _parseDouble(data['distance']) ?? 0.0,
         originAddress: data['originAddress'] ?? '',
         originCity: data['originCity'] ?? '',
@@ -103,14 +113,19 @@ class LoadModel {
         deliveryDate: _parseDate(data['deliveryDate']) ?? DateTime.now(),
         status: data['status'] ?? 'available',
         bookedByCarrierId: data['bookedByCarrierId'],
-        bookedAt: data['bookedAt'] != null ? _parseDate(data['bookedAt']) : null,
-        completedAt: data['completedAt'] != null ? _parseDate(data['completedAt']) : null,
+        bookedAt: data['bookedAt'] != null
+            ? _parseDate(data['bookedAt'])
+            : null,
+        completedAt: data['completedAt'] != null
+            ? _parseDate(data['completedAt'])
+            : null,
         createdAt: _parseDate(data['createdAt']) ?? DateTime.now(),
         updatedAt: _parseDate(data['updatedAt']) ?? DateTime.now(),
         isActive: data['isActive'] ?? true,
         views: data['views'] ?? 0,
         matchPercentage: _parseDouble(data['matchPercentage']),
         additionalData: data['additionalData'],
+        escrowPaymentStatus: data['escrowPaymentStatus'],
       );
     } catch (e) {
       print('Error parsing LoadModel from Firestore document ${doc.id}: $e');
@@ -154,6 +169,7 @@ class LoadModel {
       views: json['views'] ?? 0,
       matchPercentage: _parseDouble(json['matchPercentage']),
       additionalData: json['additionalData'],
+      escrowPaymentStatus: json['escrowPaymentStatus'],
     );
   }
 
@@ -188,6 +204,7 @@ class LoadModel {
       'views': views,
       'matchPercentage': matchPercentage,
       'additionalData': additionalData,
+      'escrowPaymentStatus': escrowPaymentStatus,
     };
   }
 
@@ -214,13 +231,16 @@ class LoadModel {
       'status': status,
       'bookedByCarrierId': bookedByCarrierId,
       'bookedAt': bookedAt != null ? Timestamp.fromDate(bookedAt!) : null,
-      'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
+      'completedAt': completedAt != null
+          ? Timestamp.fromDate(completedAt!)
+          : null,
       'createdAt': Timestamp.fromDate(createdAt),
       'updatedAt': Timestamp.fromDate(updatedAt),
       'isActive': isActive,
       'views': views,
       'matchPercentage': matchPercentage,
       'additionalData': additionalData,
+      'escrowPaymentStatus': escrowPaymentStatus,
     };
   }
 
@@ -254,6 +274,7 @@ class LoadModel {
     int? views,
     double? matchPercentage,
     Map<String, dynamic>? additionalData,
+    String? escrowPaymentStatus,
   }) {
     return LoadModel(
       id: id ?? this.id,
@@ -284,13 +305,14 @@ class LoadModel {
       views: views ?? this.views,
       matchPercentage: matchPercentage ?? this.matchPercentage,
       additionalData: additionalData ?? this.additionalData,
+      escrowPaymentStatus: escrowPaymentStatus ?? this.escrowPaymentStatus,
     );
   }
 
   // Helper method to parse dates from various formats
   static DateTime? _parseDate(dynamic dateValue) {
     if (dateValue == null) return null;
-    
+
     try {
       if (dateValue is Timestamp) {
         return dateValue.toDate();
@@ -302,25 +324,25 @@ class LoadModel {
     } catch (e) {
       print('Error parsing date: $dateValue, error: $e');
     }
-    
+
     return null;
   }
 
   // Helper method to parse double values from various formats
   static double? _parseDouble(dynamic value) {
     if (value == null) return null;
-    
+
     try {
       // If it's already a number, convert it
       if (value is num) {
         return value.toDouble();
       }
-      
+
       // If it's a string, try to parse it
       if (value is String) {
         // Remove whitespace
         String cleaned = value.trim();
-        
+
         // Try direct parsing first
         try {
           return double.parse(cleaned);
@@ -329,7 +351,7 @@ class LoadModel {
           // Use regex to extract the first number (including decimals and optional negative sign)
           final RegExp numberPattern = RegExp(r'-?\d+(\.\d+)?');
           final Match? match = numberPattern.firstMatch(cleaned);
-          
+
           if (match != null) {
             return double.parse(match.group(0)!);
           }
@@ -338,7 +360,7 @@ class LoadModel {
     } catch (e) {
       print('Error parsing double: $value, error: $e');
     }
-    
+
     return null;
   }
 

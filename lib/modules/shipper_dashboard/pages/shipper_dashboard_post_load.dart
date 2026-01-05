@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_datetime_picker_plus/flutter_datetime_picker_plus.dart';
@@ -47,7 +48,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
 
   // State variables
   bool _isPosting = false;
-  bool _isSavingDraft = false;
+  bool _isDeleting = false;
   XFile? _additionalDocument;
   final ImagePicker _picker = ImagePicker();
   String _weightUnit = 'kg'; // Default weight unit
@@ -620,17 +621,34 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        if (widget.editLoadData != null) ...[
+                          _buildActionButton(
+                            "Delete",
+                            Colors.red,
+                            Colors.white,
+                            () => _deleteLoad(),
+                            width: 110.45,
+                            height: 42.55,
+                          ),
+                          const SizedBox(width: 15),
+                        ],
+                        /* 
                         _buildActionButton(
                           widget.editLoadData != null
-                              ? "Update Draft"
+                              ? "Delete"
                               : "Save As Draft",
-                          const Color(0xFF195529),
+                          widget.editLoadData != null
+                              ? Colors.red
+                              : const Color(0xFF195529),
                           Colors.white,
-                          () => _saveAsDraft(),
+                          () => widget.editLoadData != null
+                              ? _deleteLoad()
+                              : _saveAsDraft(),
                           width: 110.45,
                           height: 42.55,
                         ),
                         const SizedBox(width: 15),
+                        */
                         _buildActionButton(
                           widget.editLoadData != null ? "Update" : "Post",
                           const Color(0xFFFFCF5F),
@@ -704,73 +722,123 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
   ) {
     return GestureDetector(
       onTap: () {
-        showModalBottomSheet(
-          context: context,
-          backgroundColor: Colors.white,
-          isScrollControlled: true,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          builder: (BuildContext context) {
-            return DraggableScrollableSheet(
-              initialChildSize: 0.7,
-              minChildSize: 0.5,
-              maxChildSize: 0.95,
-              expand: false,
-              builder: (context, scrollController) {
-                return Column(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(top: 12, bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: scrollController,
-                        itemCount: options.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          final option = options[index];
-                          final isSelected = controller.text == option;
-                          return ListTile(
-                            title: Text(
-                              option,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isSelected
-                                    ? const Color(0xFF43975A)
-                                    : Colors.black,
-                              ),
-                            ),
-                            trailing: isSelected
-                                ? const Icon(
-                                    Icons.check,
-                                    color: Color(0xFF43975A),
-                                  )
-                                : null,
-                            onTap: () {
-                              setState(() {
-                                controller.text = option;
-                              });
-                              Navigator.pop(context);
-                            },
-                          );
+        if (kIsWeb) {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text(hintText),
+                content: SizedBox(
+                  width: 400,
+                  height: 400,
+                  child: ListView.builder(
+                    itemCount: options.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final option = options[index];
+                      final isSelected = controller.text == option;
+                      return ListTile(
+                        title: Text(
+                          option,
+                          style: TextStyle(
+                            color: isSelected
+                                ? const Color(0xFF43975A)
+                                : Colors.black,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check, color: Color(0xFF43975A))
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            controller.text = option;
+                          });
+                          Navigator.pop(context);
                         },
+                      );
+                    },
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ],
+              );
+            },
+          );
+        } else {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.white,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (BuildContext context) {
+              return DraggableScrollableSheet(
+                initialChildSize: 0.7,
+                minChildSize: 0.5,
+                maxChildSize: 0.95,
+                expand: false,
+                builder: (context, scrollController) {
+                  return Column(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 12, bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        );
+                      Expanded(
+                        child: ListView.builder(
+                          controller: scrollController,
+                          itemCount: options.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            final option = options[index];
+                            final isSelected = controller.text == option;
+                            return ListTile(
+                              title: Text(
+                                option,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? const Color(0xFF43975A)
+                                      : Colors.black,
+                                ),
+                              ),
+                              trailing: isSelected
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: Color(0xFF43975A),
+                                    )
+                                  : null,
+                              onTap: () {
+                                setState(() {
+                                  controller.text = option;
+                                });
+                                Navigator.pop(context);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          );
+        }
       },
       child: Container(
         width: double.infinity,
@@ -822,78 +890,132 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
   Widget _buildEquipmentDropdown(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        showModalBottomSheet(
-          context: context,
-          backgroundColor: Colors.white,
-          isScrollControlled: true,
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          builder: (BuildContext context) {
-            return DraggableScrollableSheet(
-              initialChildSize: 0.7,
-              minChildSize: 0.5,
-              maxChildSize: 0.95,
-              expand: false,
-              builder: (context, scrollController) {
-                return Column(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(top: 12, bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Expanded(
-                      child: ListView.builder(
-                        controller: scrollController,
-                        itemCount: _equipmentOptions.length,
-                        itemBuilder: (BuildContext context, int index) {
-                          final option = _equipmentOptions[index];
-                          final isSelected = _selectedEquipment == option;
-                          return ListTile(
-                            title: Text(
-                              option,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                                color: isSelected
-                                    ? const Color(0xFF43975A)
-                                    : Colors.black,
-                              ),
-                            ),
-                            trailing: isSelected
-                                ? const Icon(
-                                    Icons.check,
-                                    color: Color(0xFF43975A),
-                                  )
-                                : null,
-                            onTap: () {
-                              setState(() {
-                                _selectedEquipment = option;
-                                _equipmentNeededController.text = option;
-                                // Clear "Other" field if switching away from "Other"
-                                if (option != 'Other') {
-                                  _equipmentOtherController.clear();
-                                }
-                              });
-                              Navigator.pop(context);
-                            },
-                          );
+        if (kIsWeb) {
+          showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: const Text("Select Equipment Needed"),
+                content: SizedBox(
+                  width: 400,
+                  height: 400,
+                  child: ListView.builder(
+                    itemCount: _equipmentOptions.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final option = _equipmentOptions[index];
+                      final isSelected = _selectedEquipment == option;
+                      return ListTile(
+                        title: Text(
+                          option,
+                          style: TextStyle(
+                            color: isSelected
+                                ? const Color(0xFF43975A)
+                                : Colors.black,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check, color: Color(0xFF43975A))
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedEquipment = option;
+                            _equipmentNeededController.text = option;
+                            if (option != 'Other') {
+                              _equipmentOtherController.clear();
+                            }
+                          });
+                          Navigator.pop(context);
                         },
+                      );
+                    },
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close'),
+                  ),
+                ],
+              );
+            },
+          );
+        } else {
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.white,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            builder: (BuildContext context) {
+              return DraggableScrollableSheet(
+                initialChildSize: 0.7,
+                minChildSize: 0.5,
+                maxChildSize: 0.95,
+                expand: false,
+                builder: (context, scrollController) {
+                  return Column(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 12, bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        );
+                      Expanded(
+                        child: ListView.builder(
+                          controller: scrollController,
+                          itemCount: _equipmentOptions.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            final option = _equipmentOptions[index];
+                            final isSelected = _selectedEquipment == option;
+                            return ListTile(
+                              title: Text(
+                                option,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: isSelected
+                                      ? const Color(0xFF43975A)
+                                      : Colors.black,
+                                ),
+                              ),
+                              trailing: isSelected
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: Color(0xFF43975A),
+                                    )
+                                  : null,
+                              onTap: () {
+                                setState(() {
+                                  _selectedEquipment = option;
+                                  _equipmentNeededController.text = option;
+                                  // Clear "Other" field if switching away from "Other"
+                                  if (option != 'Other') {
+                                    _equipmentOtherController.clear();
+                                  }
+                                });
+                                Navigator.pop(context);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          );
+        }
       },
       child: Container(
         width: double.infinity,
@@ -1040,73 +1162,131 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
           ),
           GestureDetector(
             onTap: () {
-              showModalBottomSheet(
-                context: context,
-                backgroundColor: Colors.white,
-                isScrollControlled: true,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                builder: (BuildContext context) {
-                  return DraggableScrollableSheet(
-                    initialChildSize: 0.4,
-                    minChildSize: 0.3,
-                    maxChildSize: 0.6,
-                    expand: false,
-                    builder: (context, scrollController) {
-                      return Column(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 4,
-                            margin: const EdgeInsets.only(top: 12, bottom: 20),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[300],
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                          Expanded(
-                            child: ListView.builder(
-                              controller: scrollController,
-                              itemCount: _weightUnitOptions.length,
-                              itemBuilder: (BuildContext context, int index) {
-                                final unit = _weightUnitOptions[index];
-                                final isSelected = _weightUnit == unit;
-                                return ListTile(
-                                  title: Text(
-                                    unit,
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: isSelected
-                                          ? FontWeight.bold
-                                          : FontWeight.normal,
-                                      color: isSelected
-                                          ? const Color(0xFF43975A)
-                                          : Colors.black,
-                                    ),
-                                  ),
-                                  trailing: isSelected
-                                      ? const Icon(
-                                          Icons.check,
-                                          color: Color(0xFF43975A),
-                                        )
-                                      : null,
-                                  onTap: () {
-                                    setState(() {
-                                      _weightUnit = unit;
-                                    });
-                                    Navigator.pop(context);
-                                  },
-                                );
+              if (kIsWeb) {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: const Text("Select Weight Unit"),
+                      content: SizedBox(
+                        width: 400,
+                        height: 300,
+                        child: ListView.builder(
+                          itemCount: _weightUnitOptions.length,
+                          itemBuilder: (BuildContext context, int index) {
+                            final unit = _weightUnitOptions[index];
+                            final isSelected = _weightUnit == unit;
+                            return ListTile(
+                              title: Text(
+                                unit,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? const Color(0xFF43975A)
+                                      : Colors.black,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                ),
+                              ),
+                              trailing: isSelected
+                                  ? const Icon(
+                                      Icons.check,
+                                      color: Color(0xFF43975A),
+                                    )
+                                  : null,
+                              onTap: () {
+                                setState(() {
+                                  _weightUnit = unit;
+                                });
+                                Navigator.pop(context);
                               },
+                            );
+                          },
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Close'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              } else {
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Colors.white,
+                  isScrollControlled: true,
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(20),
+                    ),
+                  ),
+                  builder: (BuildContext context) {
+                    return DraggableScrollableSheet(
+                      initialChildSize: 0.4,
+                      minChildSize: 0.3,
+                      maxChildSize: 0.6,
+                      expand: false,
+                      builder: (context, scrollController) {
+                        return Column(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 4,
+                              margin: const EdgeInsets.only(
+                                top: 12,
+                                bottom: 20,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[300],
+                                borderRadius: BorderRadius.circular(2),
+                              ),
                             ),
-                          ),
-                        ],
-                      );
-                    },
-                  );
-                },
-              );
+                            Expanded(
+                              child: ListView.builder(
+                                controller: scrollController,
+                                itemCount: _weightUnitOptions.length,
+                                itemBuilder: (BuildContext context, int index) {
+                                  final unit = _weightUnitOptions[index];
+                                  final isSelected = _weightUnit == unit;
+                                  return ListTile(
+                                    title: Text(
+                                      unit,
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: isSelected
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                        color: isSelected
+                                            ? const Color(0xFF43975A)
+                                            : Colors.black,
+                                      ),
+                                    ),
+                                    trailing: isSelected
+                                        ? const Icon(
+                                            Icons.check,
+                                            color: Color(0xFF43975A),
+                                          )
+                                        : null,
+                                    onTap: () {
+                                      setState(() {
+                                        _weightUnit = unit;
+                                      });
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                );
+              }
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1388,7 +1568,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
     double? height,
     bool isPostLoad = false,
   }) {
-    final isLoading = isPostLoad ? _isPosting : _isSavingDraft;
+    final isLoading = isPostLoad ? _isPosting : _isDeleting;
 
     return GestureDetector(
       onTap: isLoading ? null : onPressed,
@@ -1474,106 +1654,64 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
     }
   }
 
-  Future<void> _saveAsDraft() async {
-    if (_isSavingDraft) return;
+  Future<void> _deleteLoad() async {
+    if (_isDeleting ||
+        widget.editLoadData == null ||
+        widget.editLoadData!['id'] == null)
+      return;
 
-    // Validate that at least one field is filled
-    if (!_validateDraftForm()) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Load'),
+        content: const Text(
+          'Are you sure you want to delete this load? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
 
-    setState(() => _isSavingDraft = true);
+    if (confirmed != true) return;
+
+    setState(() => _isDeleting = true);
     try {
       final authProvider = context.read<AuthProvider>();
       final shipper = authProvider.shipperUser;
 
       if (shipper != null) {
-        final loadData = _buildLoadData(isDraft: true);
-
-        // Check if we're editing an existing load
-        if (widget.editLoadData != null && widget.editLoadData!['id'] != null) {
-          // Editing existing load
-          final loadId = widget.editLoadData!['id'].toString();
-          loadData['id'] = loadId;
-
-          // Upload new document if provided
-          if (_additionalDocument != null) {
-            final documentUrl = await FirebaseService.uploadLoadDocument(
-              shipper.uid,
-              loadId,
-              _additionalDocument!,
-            );
-            if (documentUrl != null) {
-              loadData['additionalDocument'] = documentUrl;
-            }
-          } else if (_previousDocumentUrl != null) {
-            // Keep existing document if no new one uploaded
-            loadData['additionalDocument'] = _previousDocumentUrl;
-          }
-
-          await FirebaseService.updateShipperLoad(
-            shipper.uid,
-            loadId,
-            loadData,
-          ).timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw Exception(
-                'Network timeout. Please check your internet connection.',
-              );
-            },
-          );
-        } else {
-          // Creating new load
-          final loadId = DateTime.now().millisecondsSinceEpoch.toString();
-          loadData['id'] = loadId;
-
-          // Upload document if provided
-          if (_additionalDocument != null) {
-            final documentUrl = await FirebaseService.uploadLoadDocument(
-              shipper.uid,
-              loadId,
-              _additionalDocument!,
-            );
-            if (documentUrl != null) {
-              loadData['additionalDocument'] = documentUrl;
-            }
-          }
-
-          await FirebaseService.saveShipperLoad(shipper.uid, loadData).timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              throw Exception(
-                'Network timeout. Please check your internet connection.',
-              );
-            },
-          );
-        }
+        final loadId = widget.editLoadData!['id'].toString();
+        await FirebaseService.deleteLoad(shipper.uid, loadId);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.editLoadData != null
-                    ? 'Load draft updated successfully!'
-                    : 'Load saved as draft successfully',
-              ),
+            const SnackBar(
+              content: Text('Load deleted successfully'),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 3),
             ),
           );
+          Navigator.of(context).pop({'loadDeleted': true});
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to save draft: ${e.toString()}'),
+            content: Text('Failed to delete load: ${e.toString()}'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
           ),
         );
       }
     } finally {
-      if (mounted) setState(() => _isSavingDraft = false);
+      if (mounted) setState(() => _isDeleting = false);
     }
   }
 
@@ -1684,37 +1822,6 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
     } finally {
       if (mounted) setState(() => _isPosting = false);
     }
-  }
-
-  bool _validateDraftForm() {
-    // Check if at least one field has content
-    final hasContent =
-        _originAddressController.text.trim().isNotEmpty ||
-        _destinationAddressController.text.trim().isNotEmpty ||
-        _loadTypeController.text.trim().isNotEmpty ||
-        _loadSensitivityController.text.trim().isNotEmpty ||
-        _loadDescriptionController.text.trim().isNotEmpty ||
-        _declaredValueController.text.trim().isNotEmpty ||
-        _pickupDateTime != null ||
-        _weightController.text.trim().isNotEmpty ||
-        _deliveryWindowStart != null ||
-        _deliveryWindowEnd != null ||
-        _dimensionsController.text.trim().isNotEmpty ||
-        _equipmentNeededController.text.trim().isNotEmpty ||
-        (_selectedEquipment == 'Other' &&
-            _equipmentOtherController.text.trim().isNotEmpty) ||
-        _quoteBudgetController.text.trim().isNotEmpty ||
-        _additionalDocument != null;
-
-    if (!hasContent) {
-      _showAlertDialog(
-        context,
-        'Please fill in at least one field before saving as draft.',
-      );
-      return false;
-    }
-
-    return true;
   }
 
   bool _validateForm() {

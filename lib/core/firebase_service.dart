@@ -2862,6 +2862,42 @@ class FirebaseService {
     }
   }
 
+  static Future<void> deleteMessageForUser(
+    String messageId,
+    String userId,
+  ) async {
+    try {
+      await messages.doc(messageId).update({
+        'deletedBy': FieldValue.arrayUnion([userId]),
+      });
+    } catch (e) {
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to delete message for user',
+      );
+      rethrow;
+    }
+  }
+
+  static Future<void> clearConversationForUser(
+    String conversationId,
+    String userId,
+  ) async {
+    try {
+      await conversations.doc(conversationId).update({
+        'clearedAt.$userId': Timestamp.fromDate(DateTime.now()),
+      });
+    } catch (e) {
+      await recordError(
+        e,
+        StackTrace.current,
+        reason: 'Failed to clear conversation for user',
+      );
+      rethrow;
+    }
+  }
+
   // Support Chat functionality
   static const String supportUserId =
       'support_system'; // System support user ID
@@ -3235,7 +3271,7 @@ class FirebaseService {
   }) async {
     try {
       final now = DateTime.now();
-      final expiresAt = now.add(const Duration(minutes: 30));
+      final expiresAt = now.add(const Duration(hours: 12));
 
       // Create offer document
       final offerId = offers.doc().id;

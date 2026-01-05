@@ -10,12 +10,7 @@ class AddressComponents {
   final String? state;
   final String? zipCode;
 
-  AddressComponents({
-    this.address,
-    this.city,
-    this.state,
-    this.zipCode,
-  });
+  AddressComponents({this.address, this.city, this.state, this.zipCode});
 }
 
 /// Reusable Google Places Autocomplete widget
@@ -67,10 +62,16 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
     widget.controller.addListener(_onTextChanged);
     _focusNode.addListener(() {
       if (!_focusNode.hasFocus && !_isSelecting) {
-        setState(() {
-          _suggestions = [];
+        // On web, clicking an item can cause focus loss before the tap is registered.
+        // We add a small delay to allow the tap event to fire.
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted && !_focusNode.hasFocus && !_isSelecting) {
+            setState(() {
+              _suggestions = [];
+            });
+            _removeOverlay();
+          }
         });
-        _removeOverlay();
       }
     });
   }
@@ -83,26 +84,27 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
     _focusNode.dispose();
     super.dispose();
   }
-  
+
   void _removeOverlay() {
     _overlayEntry?.remove();
     _overlayEntry = null;
   }
-  
+
   void _showOverlay() {
     if (_suggestions.isEmpty) {
       _removeOverlay();
       return;
     }
-    
+
     // Remove existing overlay if it exists
     if (_overlayEntry != null) {
       _overlayEntry!.remove();
     }
-    
-    final RenderBox? renderBox = _fieldKey.currentContext?.findRenderObject() as RenderBox?;
+
+    final RenderBox? renderBox =
+        _fieldKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox == null) return;
-    
+
     _overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
         width: renderBox.size.width,
@@ -133,58 +135,65 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
                 itemCount: _suggestions.length,
                 itemBuilder: (context, index) {
                   final suggestion = _suggestions[index];
-                  return InkWell(
-                    onTap: () async {
-                      // Cancel any pending debounce timer immediately
-                      _debounceTimer?.cancel();
-                      
-                      // Set selecting flag immediately to prevent any new fetches
-                      _isSelecting = true;
-                      
-                      // Remove listener to prevent text change triggers
-                      widget.controller.removeListener(_onTextChanged);
-                      
-                      // Clear suggestions IMMEDIATELY and synchronously
-                      _removeOverlay();
-                      setState(() {
-                        _suggestions = [];
-                        _isLoading = false;
-                      });
-                      
-                      // Unfocus to close keyboard and dropdown
-                      _focusNode.unfocus();
-                      
-                      // Wait a frame to ensure UI updates
-                      await Future.delayed(Duration.zero);
-                      
-                      // Set the selected text
-                      widget.controller.text = suggestion.text;
-                      
-                      // Fetch place details to get address components
-                      if (widget.onAddressComponents != null) {
-                        final components = await _fetchPlaceDetails(suggestion.placeId);
-                        if (components != null && mounted) {
-                          widget.onAddressComponents!(components);
+                  return Listener(
+                    onPointerDown: (_) => _isSelecting = true,
+                    child: InkWell(
+                      onTap: () async {
+                        // Cancel any pending debounce timer immediately
+                        _debounceTimer?.cancel();
+
+                        // Set selecting flag immediately to prevent any new fetches
+                        _isSelecting = true;
+
+                        // Remove listener to prevent text change triggers
+                        widget.controller.removeListener(_onTextChanged);
+
+                        // Clear suggestions IMMEDIATELY and synchronously
+                        _removeOverlay();
+                        setState(() {
+                          _suggestions = [];
+                          _isLoading = false;
+                        });
+
+                        // Unfocus to close keyboard and dropdown
+                        _focusNode.unfocus();
+
+                        // Wait a frame to ensure UI updates
+                        await Future.delayed(Duration.zero);
+
+                        // Set the selected text
+                        widget.controller.text = suggestion.text;
+
+                        // Fetch place details to get address components
+                        if (widget.onAddressComponents != null) {
+                          final components = await _fetchPlaceDetails(
+                            suggestion.placeId,
+                          );
+                          if (components != null && mounted) {
+                            widget.onAddressComponents!(components);
+                          }
                         }
-                      }
-                      
-                      // Re-add listener AFTER everything is done
-                      await Future.delayed(Duration.zero);
-                      widget.controller.addListener(_onTextChanged);
-                      _isSelecting = false;
-                      
-                      if (widget.onPlaceSelected != null) {
-                        widget.onPlaceSelected!(suggestion.text);
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
-                      child: Text(
-                        suggestion.text,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF000000),
+
+                        // Re-add listener AFTER everything is done
+                        await Future.delayed(Duration.zero);
+                        widget.controller.addListener(_onTextChanged);
+                        _isSelecting = false;
+
+                        if (widget.onPlaceSelected != null) {
+                          widget.onPlaceSelected!(suggestion.text);
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        child: Text(
+                          suggestion.text,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF000000),
+                          ),
                         ),
                       ),
                     ),
@@ -196,23 +205,26 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
         ),
       ),
     );
-    
+
     Overlay.of(context).insert(_overlayEntry!);
   }
 
   void _onTextChanged() {
     if (_isSelecting) return;
-    
+
     // Cancel previous timer
     _debounceTimer?.cancel();
-    
+
     final query = widget.controller.text.trim();
     if (query.length > 2) {
       // Debounce: wait 500ms before fetching suggestions
       _debounceTimer = Timer(const Duration(milliseconds: 500), () {
         // Only fetch if query hasn't changed and widget is still mounted
         final currentQuery = widget.controller.text.trim();
-        if (mounted && !_isSelecting && currentQuery == query && currentQuery.length > 2) {
+        if (mounted &&
+            !_isSelecting &&
+            currentQuery == query &&
+            currentQuery.length > 2) {
           _fetchSuggestions(query);
         }
       });
@@ -230,7 +242,7 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
   Future<void> _fetchSuggestions(String query) async {
     // Prevent duplicate requests for the same query
     if (_isLoading || _isSelecting) return;
-    
+
     if (mounted) {
       setState(() {
         _isLoading = true;
@@ -252,7 +264,8 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': widget.apiKey,
-          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
+          'X-Goog-FieldMask':
+              'suggestions.placePrediction.placeId,suggestions.placePrediction.text',
         },
         body: json.encode(requestBody),
       );
@@ -273,11 +286,13 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
                     final placeId = (prediction['placeId'] ?? '') as String;
                     return _SuggestionItem(text: text, placeId: placeId);
                   })
-                  .where((item) => item.text.isNotEmpty && item.placeId.isNotEmpty)
+                  .where(
+                    (item) => item.text.isNotEmpty && item.placeId.isNotEmpty,
+                  )
                   .toList();
               _isLoading = false;
             });
-            
+
             // Show/update overlay based on suggestions
             WidgetsBinding.instance.addPostFrameCallback((_) {
               if (mounted) {
@@ -319,10 +334,10 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
   Future<AddressComponents?> _fetchPlaceDetails(String placeId) async {
     try {
       // Handle placeId that might already include "places/" prefix
-      final cleanPlaceId = placeId.startsWith('places/') 
-          ? placeId.substring(7) 
+      final cleanPlaceId = placeId.startsWith('places/')
+          ? placeId.substring(7)
           : placeId;
-      
+
       final url = Uri.parse(
         'https://places.googleapis.com/v1/places/$cleanPlaceId',
       );
@@ -339,7 +354,8 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final formattedAddress = data['formattedAddress'] as String? ?? '';
-        final addressComponents = data['addressComponents'] as List<dynamic>? ?? [];
+        final addressComponents =
+            data['addressComponents'] as List<dynamic>? ?? [];
 
         String? city;
         String? state;
@@ -348,11 +364,13 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
         for (var component in addressComponents) {
           final types = component['types'] as List<dynamic>? ?? [];
           // Try different field name variations for the new Places API v1
-          final longName = component['longText'] as String? ?? 
-                         component['longName'] as String? ?? 
-                         component['shortText'] as String? ?? 
-                         component['shortName'] as String? ?? 
-                         component['text'] as String? ?? '';
+          final longName =
+              component['longText'] as String? ??
+              component['longName'] as String? ??
+              component['shortText'] as String? ??
+              component['shortName'] as String? ??
+              component['text'] as String? ??
+              '';
 
           if (longName.isEmpty) continue;
 
@@ -372,7 +390,9 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
           zipCode: zipCode,
         );
       } else {
-        print('Error fetching place details: Status ${response.statusCode} - ${response.body}');
+        print(
+          'Error fetching place details: Status ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       print('Error fetching place details: $e');
@@ -407,8 +427,11 @@ class _GooglePlacesAutocompleteState extends State<GooglePlacesAutocomplete> {
               padding: const EdgeInsets.symmetric(horizontal: 15),
               child: Row(
                 children: [
-                  Icon(widget.icon,
-                      size: 24, color: const Color.fromRGBO(0, 0, 0, 0.45)),
+                  Icon(
+                    widget.icon,
+                    size: 24,
+                    color: const Color.fromRGBO(0, 0, 0, 0.45),
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: TextField(

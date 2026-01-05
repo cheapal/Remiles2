@@ -1,12 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum OfferStatus {
-  pending,
-  accepted,
-  rejected,
-  counterOffered,
-  expired
-}
+enum OfferStatus { pending, accepted, rejected, counterOffered, expired }
 
 class OfferModel {
   final String id;
@@ -19,8 +13,9 @@ class OfferModel {
   final OfferStatus status;
   final double? originalOfferAmount; // If this is a counter-offer
   final double? counterOfferAmount; // Shipper's counter-offer amount
-  final DateTime negotiationStartTime; // When first offer was sent (starts timer)
-  final DateTime expiresAt; // 30 minutes from negotiationStartTime
+  final DateTime
+  negotiationStartTime; // When first offer was sent (starts timer)
+  final DateTime expiresAt; // 12 hours from negotiationStartTime
   final DateTime? acceptedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -60,7 +55,8 @@ class OfferModel {
       counterOfferAmount: data['counterOfferAmount'] != null
           ? (data['counterOfferAmount'] as num).toDouble()
           : null,
-      negotiationStartTime: _parseDate(data['negotiationStartTime']) ?? DateTime.now(),
+      negotiationStartTime:
+          _parseDate(data['negotiationStartTime']) ?? DateTime.now(),
       expiresAt: _parseDate(data['expiresAt']) ?? DateTime.now(),
       acceptedAt: data['acceptedAt'] != null
           ? _parseDate(data['acceptedAt'])
@@ -86,7 +82,8 @@ class OfferModel {
       counterOfferAmount: data['counterOfferAmount'] != null
           ? (data['counterOfferAmount'] as num).toDouble()
           : null,
-      negotiationStartTime: _parseDate(data['negotiationStartTime']) ?? DateTime.now(),
+      negotiationStartTime:
+          _parseDate(data['negotiationStartTime']) ?? DateTime.now(),
       expiresAt: _parseDate(data['expiresAt']) ?? DateTime.now(),
       acceptedAt: data['acceptedAt'] != null
           ? _parseDate(data['acceptedAt'])
@@ -152,8 +149,9 @@ class OfferModel {
   }
 
   bool get isExpired => DateTime.now().isAfter(expiresAt);
-  bool get isActive => status == OfferStatus.pending || status == OfferStatus.counterOffered;
-  
+  bool get isActive =>
+      status == OfferStatus.pending || status == OfferStatus.counterOffered;
+
   Duration get timeRemaining {
     final now = DateTime.now();
     if (now.isAfter(expiresAt)) {
@@ -175,7 +173,7 @@ class OfferModel {
 
   static DateTime? _parseDate(dynamic dateValue) {
     if (dateValue == null) return null;
-    
+
     try {
       if (dateValue is Timestamp) {
         return dateValue.toDate();
@@ -187,7 +185,7 @@ class OfferModel {
     } catch (e) {
       print('Error parsing date: $dateValue, error: $e');
     }
-    
+
     return null;
   }
 
@@ -196,4 +194,3 @@ class OfferModel {
     return 'OfferModel(id: $id, loadId: $loadId, offerAmount: $offerAmount, status: $status)';
   }
 }
-

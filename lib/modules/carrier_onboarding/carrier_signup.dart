@@ -737,318 +737,330 @@ class _CarrierSignUpScreenState extends State<CarrierSignUpScreen> {
         : screenHeight / designH;
 
     return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: AnnotatedRegion<SystemUiOverlayStyle>(
-        value: SystemUiOverlayStyle.dark,
-        child: SafeArea(
-          top: false,
-          bottom: false,
-          child: Stack(
-            children: [
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-                color: const Color(0xFFFEFEF6),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    SizedBox(height: 40 * scale),
-                    SizedBox(
-                      width: 150 * scale,
-                      height: 150 * scale,
-                      child: Image.asset(
-                        'assets/remiles.png',
-                        fit: BoxFit.contain,
-                      ),
-                    ),
-                    SizedBox(height: 10 * scale),
-                    Text(
-                      'Carrier Sign up',
-                      style: TextStyle(
-                        fontSize: 24 * scale,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF000000),
-                      ),
-                    ),
-                    SizedBox(height: 31 * scale),
-                    Container(
-                      width: 330 * scale,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFFEF6),
-                        borderRadius: BorderRadius.circular(37 * scale),
-                      ),
-                      child: Form(
-                        key: _formKey,
-                        child: Column(
-                          children: [
-                            _buildInputField(
-                              scale: scale,
-                              hintText: "Company name or Full name",
-                              iconAsset: 'assets/user.png',
-                              controller: _companyNameController,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter company name';
-                                }
-                                return null;
-                              },
-                            ),
-                            SizedBox(height: 25 * scale),
-                            _buildInputField(
-                              scale: scale,
-                              hintText: "Email Address",
-                              iconAsset: 'assets/email.png',
-                              keyboardType: TextInputType.emailAddress,
-                              controller: _emailController,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter email address';
-                                }
-                                if (!RegExp(
-                                  r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                                ).hasMatch(value)) {
-                                  return 'Please enter a valid email';
-                                }
-                                return null;
-                              },
-                            ),
-                            SizedBox(height: 25 * scale),
-                            _buildPhoneInputField(
-                              scale: scale,
-                              hintText: "Contact Number",
-                              controller: _phoneController,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter contact number';
-                                }
-                                if (value.length < 10) {
-                                  return 'Please enter a valid phone number';
-                                }
-                                return null;
-                              },
-                            ),
-                            SizedBox(height: 25 * scale),
-                            _buildInputField(
-                              scale: scale,
-                              hintText: "Password",
-                              iconAsset: 'assets/password.png',
-                              obscureText: _obscurePassword,
-                              controller: _passwordController,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please enter password';
-                                }
-                                if (value.length < 6) {
-                                  return 'Password must be at least 6 characters';
-                                }
-                                return null;
-                              },
-                              onSuffixIconPressed: () {
-                                setState(() {
-                                  _obscurePassword = !_obscurePassword;
-                                });
-                              },
-                            ),
-                            SizedBox(height: 25 * scale),
-                            _buildInputField(
-                              scale: scale,
-                              hintText: "Confirm Password",
-                              iconAsset: 'assets/password.png',
-                              obscureText: _obscureConfirmPassword,
-                              controller: _confirmPasswordController,
-                              validator: (value) {
-                                if (value == null || value.isEmpty) {
-                                  return 'Please confirm password';
-                                }
-                                if (value != _passwordController.text) {
-                                  return 'Passwords do not match';
-                                }
-                                return null;
-                              },
-                              onSuffixIconPressed: () {
-                                setState(() {
-                                  _obscureConfirmPassword =
-                                      !_obscureConfirmPassword;
-                                });
-                              },
-                            ),
-                          ],
+      body: SingleChildScrollView(
+        child: SizedBox(
+          height: screenHeight,
+          child: AnnotatedRegion<SystemUiOverlayStyle>(
+            value: SystemUiOverlayStyle.dark,
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: double.infinity,
+                    color: const Color(0xFFFEFEF6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(height: 40 * scale),
+                        SizedBox(
+                          width: 150 * scale,
+                          height: 150 * scale,
+                          child: Image.asset(
+                            'assets/remiles.png',
+                            fit: BoxFit.contain,
+                          ),
                         ),
-                      ),
-                    ),
-                    SizedBox(height: 20 * scale),
-                    Container(
-                      width: 294 * scale,
-                      height: 45 * scale,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _agreeToTerms = !_agreeToTerms;
-                              });
-                            },
-                            child: Container(
-                              width: 20 * scale,
-                              height: 20 * scale,
-                              margin: EdgeInsets.only(
-                                right: 8 * scale,
-                                top: 2 * scale,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _agreeToTerms
-                                    ? const Color(0xFF4B744F)
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(4 * scale),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF1C6B4A,
-                                    ).withOpacity(0.95),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: _agreeToTerms
-                                  ? Icon(
-                                      Icons.check,
-                                      color: Colors.white,
-                                      size: 14 * scale,
-                                    )
-                                  : null,
-                            ),
+                        SizedBox(height: 10 * scale),
+                        Text(
+                          'Carrier Sign up',
+                          style: TextStyle(
+                            fontSize: 24 * scale,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF000000),
                           ),
-                          Expanded(
-                            child: Text(
-                              'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12 * scale,
-                                height: 14 / 12,
-                                color: const Color(0xFF7D8AB0),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Positioned(
-                top: 50 * scale,
-                left: 10 * scale,
-                child: IconButton(
-                  icon: Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.black,
-                    size: 40 * scale,
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                ),
-              ),
-              !kIsWeb
-                  ? Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: Image.asset(
-                        'assets/leather_up.png',
-                        fit: BoxFit.cover,
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-              Positioned(
-                bottom: 190 * scale,
-                right: 30 * scale,
-                child: Consumer2<AuthProvider, AppStateProvider>(
-                  builder: (context, authProvider, appStateProvider, child) {
-                    return GestureDetector(
-                      onTap: _handleSignup,
-                      child: Container(
-                        width: 110 * scale,
-                        height: 55 * scale,
-                        decoration: BoxDecoration(
-                          image: const DecorationImage(
-                            image: AssetImage('assets/signup_button.png'),
-                            fit: BoxFit.fill,
-                          ),
-                          borderRadius: BorderRadius.circular(24.5 * scale),
                         ),
-                        child: Align(
-                          alignment: Alignment(0, -0.2),
-                          child: authProvider.isLoading
-                              ? SizedBox(
+                        SizedBox(height: 31 * scale),
+                        Container(
+                          width: 330 * scale,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFEF6),
+                            borderRadius: BorderRadius.circular(37 * scale),
+                          ),
+                          child: Form(
+                            key: _formKey,
+                            child: Column(
+                              children: [
+                                _buildInputField(
+                                  scale: scale,
+                                  hintText: "Company name or Full name",
+                                  iconAsset: 'assets/user.png',
+                                  controller: _companyNameController,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter company name';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                SizedBox(height: 25 * scale),
+                                _buildInputField(
+                                  scale: scale,
+                                  hintText: "Email Address",
+                                  iconAsset: 'assets/email.png',
+                                  keyboardType: TextInputType.emailAddress,
+                                  controller: _emailController,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter email address';
+                                    }
+                                    if (!RegExp(
+                                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                    ).hasMatch(value)) {
+                                      return 'Please enter a valid email';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                SizedBox(height: 25 * scale),
+                                _buildPhoneInputField(
+                                  scale: scale,
+                                  hintText: "Contact Number",
+                                  controller: _phoneController,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter contact number';
+                                    }
+                                    if (value.length < 10) {
+                                      return 'Please enter a valid phone number';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                                SizedBox(height: 25 * scale),
+                                _buildInputField(
+                                  scale: scale,
+                                  hintText: "Password",
+                                  iconAsset: 'assets/password.png',
+                                  obscureText: _obscurePassword,
+                                  controller: _passwordController,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please enter password';
+                                    }
+                                    if (value.length < 6) {
+                                      return 'Password must be at least 6 characters';
+                                    }
+                                    return null;
+                                  },
+                                  onSuffixIconPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                                SizedBox(height: 25 * scale),
+                                _buildInputField(
+                                  scale: scale,
+                                  hintText: "Confirm Password",
+                                  iconAsset: 'assets/password.png',
+                                  obscureText: _obscureConfirmPassword,
+                                  controller: _confirmPasswordController,
+                                  validator: (value) {
+                                    if (value == null || value.isEmpty) {
+                                      return 'Please confirm password';
+                                    }
+                                    if (value != _passwordController.text) {
+                                      return 'Passwords do not match';
+                                    }
+                                    return null;
+                                  },
+                                  onSuffixIconPressed: () {
+                                    setState(() {
+                                      _obscureConfirmPassword =
+                                          !_obscureConfirmPassword;
+                                    });
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 20 * scale),
+                        Container(
+                          width: 294 * scale,
+                          height: 45 * scale,
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _agreeToTerms = !_agreeToTerms;
+                                  });
+                                },
+                                child: Container(
                                   width: 20 * scale,
                                   height: 20 * scale,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      Colors.white,
-                                    ),
+                                  margin: EdgeInsets.only(
+                                    right: 8 * scale,
+                                    top: 2 * scale,
                                   ),
-                                )
-                              : Text(
-                                  "Next",
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    shadows: [
-                                      Shadow(
+                                  decoration: BoxDecoration(
+                                    color: _agreeToTerms
+                                        ? const Color(0xFF4B744F)
+                                        : Colors.white,
+                                    borderRadius: BorderRadius.circular(
+                                      4 * scale,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
                                         color: const Color(
                                           0xFF1C6B4A,
                                         ).withOpacity(0.95),
-                                        offset: Offset(0, 2),
                                         blurRadius: 4,
+                                        offset: const Offset(0, 4),
                                       ),
                                     ],
                                   ),
+                                  child: _agreeToTerms
+                                      ? Icon(
+                                          Icons.check,
+                                          color: Colors.white,
+                                          size: 14 * scale,
+                                        )
+                                      : null,
                                 ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              // Error message display
-              Consumer2<AuthProvider, AppStateProvider>(
-                builder: (context, authProvider, appStateProvider, child) {
-                  final error =
-                      authProvider.errorMessage ??
-                      appStateProvider.errorMessage;
-                  if (error != null) {
-                    return Positioned(
-                      bottom: 250 * scale,
-                      left: 20 * scale,
-                      right: 20 * scale,
-                      child: Container(
-                        padding: EdgeInsets.all(12 * scale),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(8 * scale),
-                          border: Border.all(color: Colors.red.shade200),
-                        ),
-                        child: Text(
-                          error,
-                          style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontSize: 14 * scale,
+                              ),
+                              Expanded(
+                                child: Text(
+                                  'I have read and agree to the Re-Miles Terms of Service, User Agreement, and Privacy Policy.',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12 * scale,
+                                    height: 14 / 12,
+                                    color: const Color(0xFF7D8AB0),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          textAlign: TextAlign.center,
                         ),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    top: 50 * scale,
+                    left: 10 * scale,
+                    child: IconButton(
+                      icon: Icon(
+                        Icons.arrow_back_rounded,
+                        color: Colors.black,
+                        size: 40 * scale,
                       ),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                  !kIsWeb
+                      ? Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: Image.asset(
+                            'assets/leather_up.png',
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                  Positioned(
+                    bottom: 190 * scale,
+                    right: 30 * scale,
+                    child: Consumer2<AuthProvider, AppStateProvider>(
+                      builder:
+                          (context, authProvider, appStateProvider, child) {
+                            return GestureDetector(
+                              onTap: _handleSignup,
+                              child: Container(
+                                width: 110 * scale,
+                                height: 55 * scale,
+                                decoration: BoxDecoration(
+                                  image: const DecorationImage(
+                                    image: AssetImage(
+                                      'assets/signup_button.png',
+                                    ),
+                                    fit: BoxFit.fill,
+                                  ),
+                                  borderRadius: BorderRadius.circular(
+                                    24.5 * scale,
+                                  ),
+                                ),
+                                child: Align(
+                                  alignment: Alignment(0, -0.2),
+                                  child: authProvider.isLoading
+                                      ? SizedBox(
+                                          width: 20 * scale,
+                                          height: 20 * scale,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  Colors.white,
+                                                ),
+                                          ),
+                                        )
+                                      : Text(
+                                          "Next",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            shadows: [
+                                              Shadow(
+                                                color: const Color(
+                                                  0xFF1C6B4A,
+                                                ).withOpacity(0.95),
+                                                offset: Offset(0, 2),
+                                                blurRadius: 4,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            );
+                          },
+                    ),
+                  ),
+                  // Error message display
+                  Consumer2<AuthProvider, AppStateProvider>(
+                    builder: (context, authProvider, appStateProvider, child) {
+                      final error =
+                          authProvider.errorMessage ??
+                          appStateProvider.errorMessage;
+                      if (error != null) {
+                        return Positioned(
+                          bottom: 250 * scale,
+                          left: 20 * scale,
+                          right: 20 * scale,
+                          child: Container(
+                            padding: EdgeInsets.all(12 * scale),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8 * scale),
+                              border: Border.all(color: Colors.red.shade200),
+                            ),
+                            child: Text(
+                              error,
+                              style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontSize: 14 * scale,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

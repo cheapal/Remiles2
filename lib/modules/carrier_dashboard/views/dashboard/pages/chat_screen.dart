@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:remiles/core/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:remiles/core/theme/colors.dart';
@@ -69,6 +70,8 @@ class _ChatScreenState extends State<ChatScreen> {
   String? _loadShipperId; // Track shipper ID for the load
   String? _otherUserProfileImage; // Profile image of the other user
   Set<String> _sendingMessageIds = {}; // Track messages that are being sent
+  List<ChatMessage> _optimisticMessages =
+      []; // Optimistic messages not yet confirmed by Firestore
   StreamSubscription<QuerySnapshot>?
   _messagesSubscription; // Stream listener for real-time updates
   StreamSubscription<DocumentSnapshot>?
@@ -114,26 +117,29 @@ class _ChatScreenState extends State<ChatScreen> {
             if (mounted) {
               setState(() {
                 try {
-                  // Get real messages from Firestore
-                  final realMessages = snapshot.docs
-                      .map((doc) => ChatMessage.fromFirestore(doc))
-                      .toList();
-
-                  // Keep optimistic messages that are still sending
-                  final optimisticMessages = _messages
-                      .where((msg) => _sendingMessageIds.contains(msg.id))
-                      .toList();
-
-                  // Merge: real messages + optimistic messages
-                  // Remove optimistic messages that have been confirmed (same content and sender)
-                  final authProvider = Provider.of<AuthProvider>(
+                  final currentUserId = Provider.of<AuthProvider>(
                     context,
                     listen: false,
-                  );
-                  final currentUserId = authProvider.currentUser?.uid;
+                  ).currentUser?.uid;
+
+                  final realMessages = snapshot.docs
+                      .map((doc) => ChatMessage.fromFirestore(doc))
+                      .where((msg) => !msg.deletedBy.contains(currentUserId))
+                      .where((msg) {
+                        if (_conversation != null &&
+                            _conversation!.clearedAt.containsKey(
+                              currentUserId,
+                            )) {
+                          final clearedAt =
+                              _conversation!.clearedAt[currentUserId]!;
+                          return msg.timestamp.isAfter(clearedAt);
+                        }
+                        return true;
+                      })
+                      .toList();
 
                   final confirmedOptimisticIds = <String>{};
-                  for (final optimistic in optimisticMessages) {
+                  for (final optimistic in _optimisticMessages) {
                     // Check if a real message with same content and sender exists (within 5 seconds)
                     final matchingReal = realMessages
                         .where(
@@ -155,12 +161,12 @@ class _ChatScreenState extends State<ChatScreen> {
                   }
 
                   // Remove confirmed optimistic messages
-                  final remainingOptimistic = optimisticMessages
-                      .where((msg) => !confirmedOptimisticIds.contains(msg.id))
-                      .toList();
+                  _optimisticMessages.removeWhere(
+                    (msg) => confirmedOptimisticIds.contains(msg.id),
+                  );
 
                   // Combine and sort
-                  _messages = [...realMessages, ...remainingOptimistic];
+                  _messages = [...realMessages, ..._optimisticMessages];
                   _messages.sort((a, b) => a.timestamp.compareTo(b.timestamp));
 
                   // Remove confirmed optimistic IDs from sending set
@@ -932,6 +938,7 @@ class _ChatScreenState extends State<ChatScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: primaryColor,
                 foregroundColor: Colors.white,
+                fixedSize: const Size(100, 40),
               ),
               child: const Text('Book Now'),
             ),
@@ -1408,6 +1415,27 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             ),
+
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              if (value == 'clear') {
+                _showClearConversationDialog();
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'clear',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_sweep, color: Colors.red, size: 20),
+                    SizedBox(width: 8),
+                    Text('Clear Conversation'),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ],
       ),
       body: Column(
@@ -1612,12 +1640,15 @@ class _ChatScreenState extends State<ChatScreen> {
         final isSending = _sendingMessageIds.contains(message.id);
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
-          child: isMe
-              ? _SentMessage(text: message.content, isSending: isSending)
-              : _ReceivedMessage(
-                  text: message.content,
-                  isSupportChat: isSupportChat,
-                ),
+          child: GestureDetector(
+            onLongPress: () => _showMessageOptions(message),
+            child: isMe
+                ? _SentMessage(text: message.content, isSending: isSending)
+                : _ReceivedMessage(
+                    text: message.content,
+                    isSupportChat: isSupportChat,
+                  ),
+          ),
         );
       },
     );
@@ -2392,15 +2423,129 @@ class _ChatScreenState extends State<ChatScreen> {
                 );
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
             child: const Text('Submit Report'),
           ),
         ],
       ),
     );
+  }
+
+  void _showMessageOptions(ChatMessage message) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.copy),
+            title: const Text('Copy Text'),
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: message.content));
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Copied to clipboard')),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_outline, color: Colors.red),
+            title: const Text(
+              'Delete for me',
+              style: TextStyle(color: Colors.red),
+            ),
+            onTap: () {
+              Navigator.pop(context);
+              _confirmDeleteMessage(message);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteMessage(ChatMessage message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Message?'),
+        content: const Text(
+          'This message will be removed for you. Others will still be able to see it.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final user = Provider.of<AuthProvider>(
+                context,
+                listen: false,
+              ).currentUser;
+              if (user != null) {
+                await FirebaseService.deleteMessageForUser(
+                  message.id,
+                  user.uid,
+                );
+              }
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClearConversationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Conversation?'),
+        content: const Text(
+          'This will remove all current messages for you. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _clearConversation();
+            },
+            child: const Text('Clear', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _clearConversation() async {
+    final user = Provider.of<AuthProvider>(context, listen: false).currentUser;
+    if (user != null) {
+      try {
+        await FirebaseService.clearConversationForUser(
+          widget.conversationId,
+          user.uid,
+        );
+        if (mounted) {
+          setState(() {
+            _messages.clear();
+          });
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Conversation cleared')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to clear conversation')),
+          );
+        }
+      }
+    }
   }
 }
 
@@ -2408,6 +2553,7 @@ class _ChatScreenState extends State<ChatScreen> {
 class _SentMessage extends StatelessWidget {
   final String text;
   final bool isSending;
+
   const _SentMessage({required this.text, this.isSending = false});
 
   @override
@@ -2488,7 +2634,7 @@ class _ReceivedMessage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.green,
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.black, width: 2),
+                    border: Border.all(color: Colors.white, width: 2),
                   ),
                 ),
               ),
@@ -2503,7 +2649,7 @@ class _ReceivedMessage extends StatelessWidget {
               vertical: 10.0,
             ),
             decoration: BoxDecoration(
-              color: Colors.grey.shade200,
+              color: Colors.grey.shade100,
               borderRadius: BorderRadius.circular(20.0),
             ),
             child: Text(

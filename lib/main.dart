@@ -13,8 +13,8 @@ import 'core/stripe_service.dart';
 import 'package:provider/provider.dart';
 import 'modules/auth/pages/choose_role.dart';
 import 'firebase_options.dart';
-import 'core/auth_wrapper.dart';
 import 'core/app_check_wrapper.dart';
+import 'core/navigator_service.dart';
 import 'providers/auth_provider.dart';
 import 'providers/user_provider.dart';
 import 'providers/app_state_provider.dart';
@@ -26,23 +26,23 @@ import 'services/notification_service.dart';
 void main() async {
   // Ensure that plugin services are initialized
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     // Initialize Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    
+
     // Initialize Firebase Analytics according to official docs
     try {
       final analytics = FirebaseAnalytics.instance;
       await analytics.setAnalyticsCollectionEnabled(AppConfig.enableAnalytics);
-      
+
       // Set session timeout (30 minutes) - only on non-web platforms
       if (!kIsWeb) {
         await analytics.setSessionTimeoutDuration(const Duration(minutes: 30));
       }
-      
+
       if (AppConfig.enableDebugLogging) {
         print('Firebase Analytics initialized successfully');
         print('Analytics collection enabled: ${AppConfig.enableAnalytics}');
@@ -52,17 +52,21 @@ void main() async {
         print('Firebase Analytics initialization failed: $e');
       }
     }
-    
+
     // Initialize Firebase Crashlytics according to official docs
     try {
       final crashlytics = FirebaseCrashlytics.instance;
       // Crashlytics is not fully supported on Web; guard initialization there
       if (!kIsWeb) {
-        await crashlytics.setCrashlyticsCollectionEnabled(AppConfig.enableCrashlytics);
+        await crashlytics.setCrashlyticsCollectionEnabled(
+          AppConfig.enableCrashlytics,
+        );
         // Set user identifier for better crash reporting (web guarded)
-        await crashlytics.setUserIdentifier('app_user_${DateTime.now().millisecondsSinceEpoch}');
+        await crashlytics.setUserIdentifier(
+          'app_user_${DateTime.now().millisecondsSinceEpoch}',
+        );
       }
-      
+
       if (AppConfig.enableDebugLogging) {
         print('Firebase Crashlytics initialized successfully');
         print('Crashlytics collection enabled: ${AppConfig.enableCrashlytics}');
@@ -72,7 +76,7 @@ void main() async {
         print('Firebase Crashlytics initialization failed: $e');
       }
     }
-    
+
     // Initialize Stripe
     try {
       await StripeService.initialize();
@@ -84,7 +88,7 @@ void main() async {
         print('Stripe initialization error: $e');
       }
     }
-    
+
     // Initialize Notification Service
     try {
       await NotificationService().initialize();
@@ -96,12 +100,12 @@ void main() async {
         print('Notification service initialization error: $e');
       }
     }
-    
+
     // Test analytics and crashlytics only in debug mode
     if (AppConfig.enableTestEvents) {
       print('${AppConfig.versionInfo} - Running analytics test...');
       await FirebaseService.testAnalytics();
-      
+
       print('${AppConfig.versionInfo} - Checking crashlytics health...');
       final isCrashlyticsWorking = await FirebaseService.isCrashlyticsWorking();
       if (isCrashlyticsWorking) {
@@ -112,24 +116,23 @@ void main() async {
         print('Crashlytics health check failed');
       }
     }
-    
+
     // Set up error handlers
     FlutterError.onError = (errorDetails) {
       FirebaseCrashlytics.instance.recordFlutterFatalError(errorDetails);
     };
-    
+
     // Pass all uncaught asynchronous errors to Crashlytics
     PlatformDispatcher.instance.onError = (error, stack) {
       FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
       return true;
     };
-    
   } catch (e) {
     if (AppConfig.enableDebugLogging) {
       print('Firebase initialization error: $e');
     }
   }
-  
+
   // The main function is the entry point for all Flutter apps.
   // It calls the runApp() function, which takes the root widget of the app.
   runApp(const MyApp());
@@ -156,6 +159,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: MaterialApp(
+        navigatorKey: NavigatorService.navigatorKey,
         debugShowCheckedModeBanner: false,
         home: const AppCheckWrapper(),
         routes: {
@@ -164,12 +168,8 @@ class MyApp extends StatelessWidget {
           '/roleselection': (context) => const RoleSelectionScreen(),
         },
         title: 'Remiles App',
-        theme: ThemeData(
-          primarySwatch: Colors.green,
-          useMaterial3: true,
-        ),
+        theme: ThemeData(primarySwatch: Colors.green, useMaterial3: true),
       ),
     );
   }
 }
-

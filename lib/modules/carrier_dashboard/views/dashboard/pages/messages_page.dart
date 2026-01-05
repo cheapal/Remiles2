@@ -7,6 +7,7 @@ import 'package:remiles/models/offer_model.dart';
 import 'package:provider/provider.dart';
 import 'package:remiles/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 enum ConversationFilter {
   all,
@@ -79,7 +80,7 @@ class _MessagesPageState extends State<MessagesPage> {
   void _startListeningToConversations({bool showLoading = true}) {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
-    
+
     if (user == null) {
       if (mounted) {
         setState(() {
@@ -101,35 +102,35 @@ class _MessagesPageState extends State<MessagesPage> {
     _conversationsSubscription?.cancel();
 
     // Listen to real-time updates
-    _conversationsSubscription = FirebaseService.getUserConversationsStream(user.uid)
-        .listen(
-      (conversations) {
-        // Load offers and preload user names and load prices in parallel
-        Future.wait([
-          _loadOffersForConversations(conversations),
-          _preloadUserNames(conversations, user.uid),
-          _preloadLoadPrices(conversations),
-        ]).then((_) {
-          if (mounted) {
-            setState(() {
-              _allConversations = conversations;
-              _isLoading = false;
-              _hasLoadedInitial = true;
+    _conversationsSubscription =
+        FirebaseService.getUserConversationsStream(user.uid).listen(
+          (conversations) {
+            // Load offers and preload user names and load prices in parallel
+            Future.wait([
+              _loadOffersForConversations(conversations),
+              _preloadUserNames(conversations, user.uid),
+              _preloadLoadPrices(conversations),
+            ]).then((_) {
+              if (mounted) {
+                setState(() {
+                  _allConversations = conversations;
+                  _isLoading = false;
+                  _hasLoadedInitial = true;
+                });
+                _applyFilters();
+              }
             });
-            _applyFilters();
-          }
-        });
-      },
-      onError: (error) {
-        print('Error listening to conversations: $error');
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _hasLoadedInitial = true;
-          });
-        }
-      },
-    );
+          },
+          onError: (error) {
+            print('Error listening to conversations: $error');
+            if (mounted) {
+              setState(() {
+                _isLoading = false;
+                _hasLoadedInitial = true;
+              });
+            }
+          },
+        );
   }
 
   Future<void> _refreshConversations() async {
@@ -147,9 +148,12 @@ class _MessagesPageState extends State<MessagesPage> {
     _startListeningToConversations(showLoading: true);
   }
 
-  Future<void> _preloadUserNames(List<ChatConversation> conversations, String currentUserId) async {
+  Future<void> _preloadUserNames(
+    List<ChatConversation> conversations,
+    String currentUserId,
+  ) async {
     final userIdsToLoad = <String>{};
-    
+
     for (final conversation in conversations) {
       final otherUserId = conversation.getOtherParticipant(currentUserId);
       if (otherUserId.isNotEmpty && !_userNameCache.containsKey(otherUserId)) {
@@ -163,13 +167,18 @@ class _MessagesPageState extends State<MessagesPage> {
         final shipperDoc = await FirebaseService.shippers.doc(userId).get();
         if (shipperDoc.exists) {
           final data = shipperDoc.data() as Map<String, dynamic>?;
-          final name = data?['companyName'] ?? data?['displayName'] ?? data?['name'] ?? 'Shipper';
+          final name =
+              data?['companyName'] ??
+              data?['displayName'] ??
+              data?['name'] ??
+              'Shipper';
           return MapEntry(userId, name);
         } else {
           final carrierDoc = await FirebaseService.carriers.doc(userId).get();
           if (carrierDoc.exists) {
             final data = carrierDoc.data() as Map<String, dynamic>?;
-            final name = data?['companyName'] ?? data?['displayName'] ?? 'Carrier';
+            final name =
+                data?['companyName'] ?? data?['displayName'] ?? 'Carrier';
             return MapEntry(userId, name);
           }
         }
@@ -187,10 +196,10 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> _preloadLoadPrices(List<ChatConversation> conversations) async {
     final loadIdsToLoad = <String>{};
-    
+
     for (final conversation in conversations) {
-      if (conversation.loadId != null && 
-          conversation.loadId!.isNotEmpty && 
+      if (conversation.loadId != null &&
+          conversation.loadId!.isNotEmpty &&
           !_loadPriceCache.containsKey(conversation.loadId)) {
         loadIdsToLoad.add(conversation.loadId!);
       }
@@ -201,7 +210,7 @@ class _MessagesPageState extends State<MessagesPage> {
     // Load all shippers once
     try {
       final shippersSnapshot = await FirebaseService.shippers.get();
-      
+
       // Load all loads in parallel
       final loadFutures = loadIdsToLoad.map((loadId) async {
         for (final shipperDoc in shippersSnapshot.docs) {
@@ -228,9 +237,11 @@ class _MessagesPageState extends State<MessagesPage> {
     }
   }
 
-  Future<void> _loadOffersForConversations(List<ChatConversation> conversations) async {
+  Future<void> _loadOffersForConversations(
+    List<ChatConversation> conversations,
+  ) async {
     final offersToLoad = <String>{};
-    
+
     for (final conversation in conversations) {
       if (conversation.lastMessage?.type == MessageType.offer &&
           conversation.lastMessage?.offerId != null) {
@@ -242,12 +253,12 @@ class _MessagesPageState extends State<MessagesPage> {
     final offerFutures = offersToLoad
         .where((offerId) => !_offerCache.containsKey(offerId))
         .map((offerId) async {
-      final offer = await FirebaseService.getOfferById(offerId);
-      return MapEntry(offerId, offer);
-    });
+          final offer = await FirebaseService.getOfferById(offerId);
+          return MapEntry(offerId, offer);
+        });
 
     final offerResults = await Future.wait(offerFutures);
-    
+
     for (final entry in offerResults) {
       _offerCache[entry.key] = entry.value;
     }
@@ -261,28 +272,42 @@ class _MessagesPageState extends State<MessagesPage> {
       filtered = filtered.where((conv) {
         final title = _getConversationTitle(conv).toLowerCase();
         final lastMessage = conv.lastMessage?.content.toLowerCase() ?? '';
-        return title.contains(_searchQuery) || lastMessage.contains(_searchQuery);
+        return title.contains(_searchQuery) ||
+            lastMessage.contains(_searchQuery);
       }).toList();
     }
 
     // Apply filter type
     switch (_selectedFilter) {
       case ConversationFilter.unread:
-        final userId = Provider.of<AuthProvider>(context, listen: false).currentUser?.uid;
+        final userId = Provider.of<AuthProvider>(
+          context,
+          listen: false,
+        ).currentUser?.uid;
         if (userId != null) {
-          filtered = filtered.where((conv) => conv.unreadCount[userId] == true).toList();
+          filtered = filtered
+              .where((conv) => conv.unreadCount[userId] == true)
+              .toList();
         }
         break;
       case ConversationFilter.loadRelated:
-        filtered = filtered.where((conv) => conv.loadId != null && conv.loadId!.isNotEmpty).toList();
+        filtered = filtered
+            .where((conv) => conv.loadId != null && conv.loadId!.isNotEmpty)
+            .toList();
         break;
       case ConversationFilter.productInquiry:
-        filtered = filtered.where((conv) => conv.loadId == null || conv.loadId!.isEmpty).toList();
+        filtered = filtered
+            .where((conv) => conv.loadId == null || conv.loadId!.isEmpty)
+            .toList();
         break;
       case ConversationFilter.withOffers:
-        filtered = filtered.where((conv) => 
-          conv.lastMessage?.type == MessageType.offer &&
-          conv.lastMessage?.offerId != null).toList();
+        filtered = filtered
+            .where(
+              (conv) =>
+                  conv.lastMessage?.type == MessageType.offer &&
+                  conv.lastMessage?.offerId != null,
+            )
+            .toList();
         break;
       case ConversationFilter.expired:
         filtered = filtered.where((conv) {
@@ -305,7 +330,7 @@ class _MessagesPageState extends State<MessagesPage> {
 
   void _loadMoreConversations() {
     if (!_hasMore || _isLoading) return;
-    
+
     setState(() {
       _currentPage++;
     });
@@ -314,11 +339,15 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   List<ChatConversation> get _paginatedConversations {
-    final endIndex = ((_currentPage + 1) * _itemsPerPage).clamp(0, _filteredConversations.length);
+    final endIndex = ((_currentPage + 1) * _itemsPerPage).clamp(
+      0,
+      _filteredConversations.length,
+    );
     return _filteredConversations.sublist(0, endIndex);
   }
 
-  bool get _hasMorePages => _paginatedConversations.length < _filteredConversations.length;
+  bool get _hasMorePages =>
+      _paginatedConversations.length < _filteredConversations.length;
 
   @override
   Widget build(BuildContext context) {
@@ -331,7 +360,10 @@ class _MessagesPageState extends State<MessagesPage> {
           TopNavigationBar(context),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 20),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 20,
+              ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,10 +382,16 @@ class _MessagesPageState extends State<MessagesPage> {
                         ),
                       ),
                       IconButton(
-                        icon: Icon(Icons.filter_list),
+                        icon: const Icon(Icons.filter_list),
                         onPressed: _showFilterDialog,
                         tooltip: 'Filter',
                       ),
+                      if (kIsWeb)
+                        IconButton(
+                          icon: const Icon(Icons.refresh),
+                          onPressed: _refreshConversations,
+                          tooltip: 'Refresh',
+                        ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -388,9 +426,7 @@ class _MessagesPageState extends State<MessagesPage> {
                 },
               )
             : null,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.grey[100],
       ),
@@ -400,14 +436,12 @@ class _MessagesPageState extends State<MessagesPage> {
   Widget _buildConversationsList() {
     // Show loading only if we're loading and haven't loaded initial data yet
     if (_isLoading && !_hasLoadedInitial) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     final user = authProvider.currentUser;
-    
+
     if (user == null) {
       return Center(
         child: Column(
@@ -426,9 +460,7 @@ class _MessagesPageState extends State<MessagesPage> {
     // Don't load conversations in build method - it's already loaded in initState
     // Only show loading if initial load hasn't completed yet
     if (!_hasLoadedInitial) {
-      return const Center(
-        child: CircularProgressIndicator(),
-      );
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (_filteredConversations.isEmpty) {
@@ -439,7 +471,8 @@ class _MessagesPageState extends State<MessagesPage> {
             Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
-              _searchQuery.isNotEmpty || _selectedFilter != ConversationFilter.all
+              _searchQuery.isNotEmpty ||
+                      _selectedFilter != ConversationFilter.all
                   ? 'No conversations match your filters'
                   : 'No conversations yet',
               style: TextStyle(fontSize: 18, color: Colors.grey),
@@ -462,6 +495,24 @@ class _MessagesPageState extends State<MessagesPage> {
       itemCount: paginated.length + (_hasMorePages ? 1 : 0),
       itemBuilder: (context, index) {
         if (index >= paginated.length) {
+          if (kIsWeb) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: ElevatedButton(
+                  onPressed: _loadMoreConversations,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1E5B3D),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  child: const Text('Load More'),
+                ),
+              ),
+            );
+          }
           return const Center(
             child: Padding(
               padding: EdgeInsets.all(16.0),
@@ -472,28 +523,31 @@ class _MessagesPageState extends State<MessagesPage> {
 
         final conversation = paginated[index];
         final otherUserId = conversation.getOtherParticipant(user.uid);
-        
+
         if (otherUserId.isEmpty) {
           return const SizedBox.shrink();
         }
-        
-            return _ConversationTile(
-              conversation: conversation,
-              otherUserId: otherUserId,
-              currentUserId: user.uid,
-              offerCache: _offerCache,
-              onTap: _isNavigating 
-                  ? null 
-                  : () => _navigateToChat(conversation, otherUserId),
-            );
+
+        return _ConversationTile(
+          conversation: conversation,
+          otherUserId: otherUserId,
+          currentUserId: user.uid,
+          offerCache: _offerCache,
+          onTap: _isNavigating
+              ? null
+              : () => _navigateToChat(conversation, otherUserId),
+        );
       },
     );
   }
 
-  Future<void> _navigateToChat(ChatConversation conversation, String otherUserId) async {
+  Future<void> _navigateToChat(
+    ChatConversation conversation,
+    String otherUserId,
+  ) async {
     // Prevent multiple simultaneous navigations
     if (_isNavigating) return;
-    
+
     if (mounted) {
       setState(() {
         _isNavigating = true;
@@ -503,7 +557,7 @@ class _MessagesPageState extends State<MessagesPage> {
     try {
       // Get cached user name or use default
       String otherUserName = _userNameCache[otherUserId] ?? 'User';
-      
+
       // Get cached load price or use null
       String? loadId = conversation.loadId;
       double? loadPrice = loadId != null ? _loadPriceCache[loadId] : null;
@@ -606,7 +660,7 @@ class _ConversationTile extends StatelessWidget {
   String _getLastMessageText() {
     final lastMessage = conversation.lastMessage;
     if (lastMessage == null) return 'No messages yet';
-    
+
     // Check if it's an offer message and if the offer is expired
     if (lastMessage.type == MessageType.offer && lastMessage.offerId != null) {
       final offer = offerCache[lastMessage.offerId];
@@ -616,7 +670,7 @@ class _ConversationTile extends StatelessWidget {
       // Return the original content if not expired
       return lastMessage.content;
     }
-    
+
     return lastMessage.content;
   }
 
@@ -643,19 +697,13 @@ class _ConversationTile extends StatelessWidget {
       ),
       title: Text(
         _getConversationTitle(conversation),
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 16,
-        ),
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(
         _getLastMessageText(),
-        style: const TextStyle(
-          color: hintColor,
-          fontSize: 14,
-        ),
+        style: const TextStyle(color: hintColor, fontSize: 14),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
@@ -669,10 +717,7 @@ class _ConversationTile extends StatelessWidget {
             if (conversation.lastMessage != null)
               Text(
                 _formatTime(conversation.lastMessage!.timestamp),
-                style: const TextStyle(
-                  color: hintColor,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: hintColor, fontSize: 12),
               ),
             if (conversation.unreadCount[currentUserId] == true) ...[
               const SizedBox(height: 4),
@@ -703,7 +748,7 @@ class _ConversationTile extends StatelessWidget {
   String _formatTime(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
-    
+
     if (difference.inDays > 0) {
       return '${difference.inDays}d ago';
     } else if (difference.inHours > 0) {

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:remiles/providers/notification_provider.dart';
 import 'package:remiles/providers/auth_provider.dart';
 import 'package:remiles/models/notification_model.dart';
+import 'package:remiles/services/notification_service.dart';
 import 'package:intl/intl.dart';
 
 class NoNotificationPage extends StatefulWidget {
@@ -21,7 +22,10 @@ class _NoNotificationPageState extends State<NoNotificationPage> {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final firebaseUser = authProvider.firebaseUser;
       if (firebaseUser != null) {
-        final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
+        final notificationProvider = Provider.of<NotificationProvider>(
+          context,
+          listen: false,
+        );
         notificationProvider.initialize(firebaseUser.uid);
       }
     });
@@ -38,9 +42,7 @@ class _NoNotificationPageState extends State<NoNotificationPage> {
             child: Consumer<NotificationProvider>(
               builder: (context, notificationProvider, child) {
                 if (notificationProvider.isLoading) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return const Center(child: CircularProgressIndicator());
                 }
 
                 if (notificationProvider.notifications.isEmpty) {
@@ -74,7 +76,10 @@ class _NoNotificationPageState extends State<NoNotificationPage> {
                   children: [
                     if (notificationProvider.hasUnreadNotifications)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
                         color: Colors.blue.shade50,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -100,8 +105,13 @@ class _NoNotificationPageState extends State<NoNotificationPage> {
                         padding: const EdgeInsets.all(16),
                         itemCount: notificationProvider.notifications.length,
                         itemBuilder: (context, index) {
-                          final notification = notificationProvider.notifications[index];
-                          return _buildNotificationCard(context, notification, notificationProvider);
+                          final notification =
+                              notificationProvider.notifications[index];
+                          return _buildNotificationCard(
+                            context,
+                            notification,
+                            notificationProvider,
+                          );
                         },
                       ),
                     ),
@@ -121,14 +131,16 @@ class _NoNotificationPageState extends State<NoNotificationPage> {
     NotificationProvider provider,
   ) {
     final dateFormat = DateFormat('MMM d, y • h:mm a');
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: notification.isRead ? 1 : 3,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: notification.isRead ? Colors.transparent : Colors.blue.shade200,
+          color: notification.isRead
+              ? Colors.transparent
+              : Colors.blue.shade200,
           width: notification.isRead ? 0 : 1,
         ),
       ),
@@ -137,6 +149,7 @@ class _NoNotificationPageState extends State<NoNotificationPage> {
           if (!notification.isRead) {
             provider.markAsRead(notification.id);
           }
+          NotificationService().handleNotificationTap(notification);
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -161,8 +174,12 @@ class _NoNotificationPageState extends State<NoNotificationPage> {
                       notification.title,
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.bold,
-                        color: notification.isRead ? Colors.grey.shade800 : Colors.black,
+                        fontWeight: notification.isRead
+                            ? FontWeight.w500
+                            : FontWeight.bold,
+                        color: notification.isRead
+                            ? Colors.grey.shade800
+                            : Colors.black,
                       ),
                     ),
                     const SizedBox(height: 4),

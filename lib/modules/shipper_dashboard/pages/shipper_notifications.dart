@@ -4,13 +4,16 @@ import 'package:provider/provider.dart';
 import 'package:remiles/providers/notification_provider.dart';
 import 'package:remiles/providers/auth_provider.dart';
 import 'package:remiles/models/notification_model.dart';
+import 'package:remiles/services/notification_service.dart';
 import 'package:intl/intl.dart';
 
 void main() {
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: ShipperNotifications(),
-  ));
+  runApp(
+    const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: ShipperNotifications(),
+    ),
+  );
 }
 
 class ShipperNotifications extends StatefulWidget {
@@ -31,7 +34,10 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final firebaseUser = authProvider.firebaseUser;
       if (firebaseUser != null) {
-        final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
+        final notificationProvider = Provider.of<NotificationProvider>(
+          context,
+          listen: false,
+        );
         notificationProvider.initialize(firebaseUser.uid);
       }
     });
@@ -53,11 +59,14 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
               // Top section with background image and icons (unified)
               Padding(
                 padding: EdgeInsets.symmetric(
-                    horizontal: isTabletOrDesktop ? sidePadding : 0.0),
+                  horizontal: isTabletOrDesktop ? sidePadding : 0.0,
+                ),
                 child: Container(
                   width: double.infinity,
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 20,
+                  ),
                   decoration: BoxDecoration(
                     color: topPanelColor,
                     image: const DecorationImage(
@@ -96,7 +105,8 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
               Expanded(
                 child: Padding(
                   padding: EdgeInsets.symmetric(
-                      horizontal: isTabletOrDesktop ? 100.0 : 20.0),
+                    horizontal: isTabletOrDesktop ? 100.0 : 20.0,
+                  ),
                   child: Column(
                     children: [
                       const SizedBox(height: 20),
@@ -111,9 +121,7 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
                         ),
                       ),
                       const SizedBox(height: 20),
-                      Expanded(
-                        child: _buildNotificationsList(),
-                      ),
+                      Expanded(child: _buildNotificationsList()),
                     ],
                   ),
                 ),
@@ -124,7 +132,8 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
       ),
       bottomNavigationBar: Padding(
         padding: EdgeInsets.symmetric(
-            horizontal: isTabletOrDesktop ? sidePadding : 0.0),
+          horizontal: isTabletOrDesktop ? sidePadding : 0.0,
+        ),
         child: Container(
           height: 100,
           decoration: const BoxDecoration(
@@ -210,7 +219,7 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
     return Consumer<NotificationProvider>(
       builder: (context, notificationProvider, child) {
         final hasUnread = notificationProvider.hasUnreadNotifications;
-        
+
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 5.0),
           child: Stack(
@@ -258,22 +267,21 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
     return Consumer<NotificationProvider>(
       builder: (context, notificationProvider, child) {
         if (notificationProvider.isLoading) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (notificationProvider.notifications.isEmpty) {
-          return Center(
-            child: _buildNoNotificationsCard(),
-          );
+          return Center(child: _buildNoNotificationsCard());
         }
 
         return Column(
           children: [
             if (notificationProvider.hasUnreadNotifications)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
@@ -302,8 +310,13 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
               child: ListView.builder(
                 itemCount: notificationProvider.notifications.length,
                 itemBuilder: (context, index) {
-                  final notification = notificationProvider.notifications[index];
-                  return _buildNotificationCard(context, notification, notificationProvider);
+                  final notification =
+                      notificationProvider.notifications[index];
+                  return _buildNotificationCard(
+                    context,
+                    notification,
+                    notificationProvider,
+                  );
                 },
               ),
             ),
@@ -319,14 +332,16 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
     NotificationProvider provider,
   ) {
     final dateFormat = DateFormat('MMM d, y • h:mm a');
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: notification.isRead ? 1 : 3,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: notification.isRead ? Colors.transparent : Colors.blue.shade200,
+          color: notification.isRead
+              ? Colors.transparent
+              : Colors.blue.shade200,
           width: notification.isRead ? 0 : 1,
         ),
       ),
@@ -335,6 +350,7 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
           if (!notification.isRead) {
             provider.markAsRead(notification.id);
           }
+          NotificationService().handleNotificationTap(notification);
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
@@ -359,8 +375,12 @@ class _ShipperNotificationsState extends State<ShipperNotifications>
                       notification.title,
                       style: TextStyle(
                         fontSize: 16,
-                        fontWeight: notification.isRead ? FontWeight.w500 : FontWeight.bold,
-                        color: notification.isRead ? Colors.grey.shade800 : Colors.black,
+                        fontWeight: notification.isRead
+                            ? FontWeight.w500
+                            : FontWeight.bold,
+                        color: notification.isRead
+                            ? Colors.grey.shade800
+                            : Colors.black,
                       ),
                     ),
                     const SizedBox(height: 4),

@@ -5,10 +5,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'dart:convert';
 import '../models/notification_model.dart';
 import '../models/user_model.dart';
 import '../core/firebase_service.dart';
 import '../firebase_options.dart';
+import '../core/navigator_service.dart';
+import '../modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
+import '../modules/shipper_dashboard/pages/shipper_load_details_page.dart';
+import '../modules/carrier_dashboard/views/dashboard/pages/carrier_manage_load_screen.dart';
 import 'conversation_tracker.dart';
 
 /// Top-level function for handling background messages
@@ -16,15 +21,13 @@ import 'conversation_tracker.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Ensure Firebase is initialized in background isolate
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   debugPrint('Handling background message: ${message.messageId}');
   debugPrint('Message title: ${message.notification?.title}');
   debugPrint('Message body: ${message.notification?.body}');
   debugPrint('Message data: ${message.data}');
-  
+
   // Background messages are handled here
   // The notification is already sent by Cloud Functions
   // Here we can perform additional tasks like updating local database, etc.
@@ -37,8 +40,9 @@ class NotificationService {
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
-  
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
   String? _fcmToken;
   StreamSubscription<String>? _tokenSubscription;
   StreamSubscription<RemoteMessage>? _messageSubscription;
@@ -103,13 +107,15 @@ class NotificationService {
   /// Initialize local notifications plugin
   Future<void> _initializeLocalNotifications() async {
     try {
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
       );
-      
+
       const initSettings = InitializationSettings(
         android: androidSettings,
         iOS: iosSettings,
@@ -118,8 +124,18 @@ class NotificationService {
       await _localNotifications.initialize(
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
-          // Handle notification tap if needed
-          debugPrint('Notification tapped: ${response.payload}');
+          if (response.payload != null) {
+            try {
+              final Map<String, dynamic> data = jsonDecode(response.payload!);
+              _navigateToScreen(data);
+            } catch (e) {
+              debugPrint('Error parsing notification payload: $e');
+              // Fallback for old string payload
+              debugPrint(
+                'Notification tapped with raw payload: ${response.payload}',
+              );
+            }
+          }
         },
       );
 
@@ -132,9 +148,11 @@ class NotificationService {
         playSound: true,
         enableVibration: true,
       );
-      
+
       await _localNotifications
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
           ?.createNotificationChannel(androidChannel);
 
       _localNotificationsInitialized = true;
@@ -193,22 +211,24 @@ class NotificationService {
   /// Handle foreground messages
   void _handleForegroundMessage(RemoteMessage message) {
     debugPrint('Received foreground message: ${message.messageId}');
-    
+
     // Check if this is a message notification for the currently open conversation
     final messageType = message.data['type'] as String?;
     final conversationId = message.data['conversationId'] as String?;
-    
+
     // Skip showing notification if it's a message for the currently open conversation
-    if (messageType == 'message' && 
-        conversationId != null && 
+    if (messageType == 'message' &&
+        conversationId != null &&
         ConversationTracker.isConversationOpen(conversationId)) {
-      debugPrint('Skipping notification for open conversation: $conversationId');
+      debugPrint(
+        'Skipping notification for open conversation: $conversationId',
+      );
       return;
     }
-    
+
     // Show local notification for foreground messages
     _showLocalNotification(message);
-    
+
     _handleMessage(message);
   }
 
@@ -221,9 +241,10 @@ class NotificationService {
 
     try {
       final notification = message.notification;
-      
+
       // Use notification title/body if available, otherwise use data
-      final title = notification?.title ?? message.data['title'] ?? 'New Notification';
+      final title =
+          notification?.title ?? message.data['title'] ?? 'New Notification';
       final body = notification?.body ?? message.data['body'] ?? '';
 
       const androidDetails = AndroidNotificationDetails(
@@ -247,14 +268,16 @@ class NotificationService {
       );
 
       // Generate a unique notification ID based on message ID or timestamp
-      final notificationId = message.messageId?.hashCode ?? DateTime.now().millisecondsSinceEpoch.hashCode;
-      
+      final notificationId =
+          message.messageId?.hashCode ??
+          DateTime.now().millisecondsSinceEpoch.hashCode;
+
       await _localNotifications.show(
         notificationId.abs(),
         title,
         body,
         details,
-        payload: message.data.toString(),
+        payload: jsonEncode(message.data),
       );
 
       debugPrint('Local notification shown: $title - $body');
@@ -267,11 +290,100 @@ class NotificationService {
   void _handleMessage(RemoteMessage message) {
     debugPrint('Handling message: ${message.messageId}');
     debugPrint('Message data: ${message.data}');
-    debugPrint('Message notification: ${message.notification?.title}');
 
-    // The notification is already saved to Firestore by Cloud Functions
-    // Here we just need to handle any app-specific logic
-    // The NotificationProvider will automatically update via Firestore listener
+    _navigateToScreen(message.data);
+  }
+
+  /// Handle tapping on a notification in the UI
+  void handleNotificationTap(NotificationModel notification) {
+    final Map<String, dynamic> data = notification.data != null
+        ? Map.from(notification.data!)
+        : {};
+
+    // Ensure type and relatedId are available in the data map
+    data['type'] = notification.type.toString().split('.').last;
+    if (notification.relatedId != null) {
+      if (notification.type == NotificationType.message) {
+        data['conversationId'] ??= notification.relatedId;
+      } else {
+        data['loadId'] ??= notification.relatedId;
+      }
+    }
+
+    _navigateToScreen(data);
+  }
+
+  /// Navigate to appropriate screen based on notification data
+  Future<void> _navigateToScreen(Map<String, dynamic> data) async {
+    final type = data['type'] as String?;
+    debugPrint('Navigating to screen for notification type: $type');
+
+    if (type == 'message') {
+      final conversationId = data['conversationId'] as String?;
+      if (conversationId != null) {
+        NavigatorService.push(
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversationId,
+              otherUserId: data['senderId'],
+              otherUserName: data['senderName'],
+              loadId: data['loadId'],
+              listingId: data['listingId'],
+            ),
+          ),
+        );
+      }
+    } else if (type == 'offerAccepted' ||
+        type == 'offerReceived' ||
+        type == 'counterOfferReceived' ||
+        type == 'offerRejected' ||
+        type == 'orderStatus' ||
+        type == 'paymentReceived' ||
+        type == 'paymentFailed') {
+      final loadId = data['loadId'] as String?;
+      if (loadId != null) {
+        _navigateToLoadDetails(loadId);
+      }
+    }
+  }
+
+  /// Navigate to load details, fetching data if necessary
+  Future<void> _navigateToLoadDetails(String loadId) async {
+    try {
+      final userData = await FirebaseService.getCurrentUserData();
+      if (userData == null) return;
+
+      if (userData.role == UserRole.shipper) {
+        // Find the load in shipper's collection
+        final loadDoc = await FirebaseFirestore.instance
+            .collection('shippers')
+            .doc(userData.uid)
+            .collection('loads')
+            .doc(loadId)
+            .get();
+
+        if (loadDoc.exists) {
+          final loadData = loadDoc.data();
+          if (loadData != null) {
+            loadData['id'] = loadDoc.id;
+            NavigatorService.push(
+              MaterialPageRoute(
+                builder: (context) => ShipperLoadDetailsPage(load: loadData),
+              ),
+            );
+          }
+        }
+      } else if (userData.role == UserRole.carrier) {
+        NavigatorService.push(
+          MaterialPageRoute(
+            builder: (context) =>
+                CarrierManageLoadScreen(initialLoadId: loadId),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error navigating to load details: $e');
+    }
   }
 
   /// Create a notification in Firestore (for local notifications)
@@ -309,7 +421,7 @@ class NotificationService {
     try {
       await _messaging.deleteToken();
       _fcmToken = null;
-      
+
       final user = FirebaseService.currentUser;
       if (user != null) {
         await _firestore.collection('users').doc(user.uid).update({

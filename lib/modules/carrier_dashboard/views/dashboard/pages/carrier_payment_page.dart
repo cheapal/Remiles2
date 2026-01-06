@@ -1143,101 +1143,121 @@ class _CarrierPaymentPageState extends State<CarrierPaymentPage> {
                                   ),
                                 )
                               else if (!_hasStripeAccount || _needsOnboarding)
-                                Column(
-                                  children: [
-                                    if (_needsOnboarding && _hasStripeAccount)
-                                      Container(
-                                        margin: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        padding: const EdgeInsets.all(12),
-                                        decoration: BoxDecoration(
-                                          color: Colors.orange.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.orange.shade300,
-                                            width: 1,
-                                          ),
-                                        ),
-                                        child: Row(
+                                Container(
+                                  margin: const EdgeInsets.only(bottom: 20),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0FDF4),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color(0xFFBBF7D0),
+                                      width: 1,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.05),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.account_balance_wallet_outlined,
+                                        color: Color(0xFF166534),
+                                        size: 28,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
                                           children: [
-                                            Icon(
-                                              Icons.warning_amber_rounded,
-                                              color: Colors.orange.shade700,
-                                              size: 20,
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Expanded(
-                                              child: Text(
-                                                'Your payment account needs activation. Please complete onboarding.',
-                                                style: TextStyle(
-                                                  color: Colors.orange.shade900,
-                                                  fontSize: 12,
+                                            Row(
+                                              children: [
+                                                const Text(
+                                                  'Payment Setup Required',
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                    color: Color(0xFF166534),
+                                                  ),
                                                 ),
+                                                const SizedBox(width: 4),
+                                                Tooltip(
+                                                  triggerMode:
+                                                      TooltipTriggerMode.tap,
+                                                  message:
+                                                      'Setting up your Stripe account is essential to receive payments directly for the loads you deliver. It ensures a secure and automated payout process.',
+                                                  child: const Icon(
+                                                    Icons.info_outline,
+                                                    size: 16,
+                                                    color: Color(0xFF166534),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              _hasStripeAccount
+                                                  ? 'Please complete your payment account activation.'
+                                                  : 'Please setup your payment account to receive payouts.',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF166534),
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                    Container(
-                                      width: double.infinity,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(24),
-                                        border: Border.all(
-                                          color: const Color(0xFF43975A),
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: OutlinedButton.icon(
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 16,
-                                            horizontal: 20,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              24,
-                                            ),
-                                          ),
-                                          side: BorderSide.none,
-                                        ),
+                                      const SizedBox(width: 4),
+                                      TextButton(
                                         onPressed: _isSettingUp
                                             ? null
                                             : _setupStripeConnectAccount,
-                                        icon: _isSettingUp
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 8,
+                                          ),
+                                          backgroundColor: const Color(
+                                            0xFF166534,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                        ),
+                                        child: _isSettingUp
                                             ? const SizedBox(
-                                                width: 24,
-                                                height: 24,
+                                                width: 16,
+                                                height: 16,
                                                 child: CircularProgressIndicator(
                                                   strokeWidth: 2,
                                                   valueColor:
                                                       AlwaysStoppedAnimation<
                                                         Color
-                                                      >(Color(0xFF43975A)),
+                                                      >(Colors.white),
                                                 ),
                                               )
-                                            : const Icon(
-                                                Icons.account_balance_wallet,
-                                                color: Color(0xFF43975A),
+                                            : Text(
+                                                _hasStripeAccount
+                                                    ? 'Complete'
+                                                    : 'Setup Now',
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 12,
+                                                ),
                                               ),
-                                        label: Text(
-                                          _isSettingUp
-                                              ? 'Setting up...'
-                                              : (_hasStripeAccount
-                                                    ? 'Complete Onboarding'
-                                                    : 'Setup Payment Account'),
-                                          style: const TextStyle(
-                                            color: Color(0xFF43975A),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-
                               const SizedBox(height: 20),
 
                               if (_hasStripeAccount && !_needsOnboarding)

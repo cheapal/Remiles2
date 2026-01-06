@@ -16,6 +16,7 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../core/firebase_service.dart';
+import '../../../providers/payment_methods_provider.dart';
 
 import '../../carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 
@@ -1153,6 +1154,12 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
     _loadCarbonFootprintInterest();
     _loadLoadStats();
     _loadLoads();
+    // Load payment methods to check if any exist
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<PaymentMethodsProvider>().loadPaymentMethods();
+      }
+    });
   }
 
   Future<void> _loadCarbonFootprintInterest() async {
@@ -1593,6 +1600,119 @@ class _ShipperDashboardHomePageState extends State<ShipperDashboardHomePage> {
                     ],
                   ),
                   const SizedBox(height: 20),
+                  // Payment Method Alert Strip
+                  Consumer<PaymentMethodsProvider>(
+                    builder: (context, paymentProvider, child) {
+                      if (!paymentProvider.isLoading &&
+                          paymentProvider.paymentMethods.isEmpty) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 20),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF4E5),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFFFFD580),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.warning_amber_rounded,
+                                color: Color(0xFFE67E22),
+                                size: 28,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Text(
+                                          'Payment Method Required',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: Color(0xFF856404),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Tooltip(
+                                          triggerMode: TooltipTriggerMode.tap,
+                                          message:
+                                              'Adding a payment method is important because it allows for seamless booking of loads and ensures carriers are paid promptly through our secure escrow system.',
+                                          child: const Icon(
+                                            Icons.info_outline,
+                                            size: 16,
+                                            color: Color(0xFFE67E22),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const Text(
+                                      'Please add a payment method to book loads.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Color(0xFF856404),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          const PaymentMethodsPage(),
+                                    ),
+                                  ).then((_) {
+                                    // Refresh when returning
+                                    context
+                                        .read<PaymentMethodsProvider>()
+                                        .loadPaymentMethods(forceRefresh: true);
+                                  });
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  backgroundColor: const Color(0xFFE67E22),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'Add Now',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
                   // Loads Summary
                   const Text(
                     'Loads Summary',

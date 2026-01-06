@@ -541,7 +541,7 @@ class _AcademyScreenState extends State<AcademyScreen>
       decoration: BoxDecoration(color: Colors.grey.shade300),
       child: Center(
         child: Icon(
-          contentType == 'video' ? Icons.video_library : Icons.description,
+          contentType == 'video' ? Icons.play_arrow : Icons.description,
           size: 48,
           color: Colors.grey.shade600,
         ),

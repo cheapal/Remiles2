@@ -9,6 +9,7 @@ import '../../common/widgets/recommended_load.dart';
 import 'manage_load.dart';
 import 'carrier_payment_page.dart';
 import 'package:remiles/core/firebase_service.dart';
+import 'package:remiles/core/stripe_service.dart';
 import 'package:remiles/models/load_model.dart';
 import 'package:remiles/models/carrier_model.dart';
 import 'dart:io';
@@ -30,10 +31,36 @@ class _CarrierDashboardHomeScreenState
   bool _isLoading = false;
   String? _error;
 
+  // Stripe status
+  bool _hasStripeAccount = false;
+  bool _needsOnboarding = false;
+  bool _isCheckingStripe = true;
+
   @override
   void initState() {
     super.initState();
     _loadRecommendedLoads();
+    _checkStripeStatus();
+  }
+
+  Future<void> _checkStripeStatus() async {
+    try {
+      final status = await StripeService.getConnectAccountStatus();
+      if (mounted) {
+        setState(() {
+          _hasStripeAccount = status['hasAccount'] as bool? ?? false;
+          _needsOnboarding = status['needsOnboarding'] as bool? ?? false;
+          _isCheckingStripe = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking stripe status: $e');
+      if (mounted) {
+        setState(() {
+          _isCheckingStripe = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadRecommendedLoads() async {
@@ -263,6 +290,115 @@ class _CarrierDashboardHomeScreenState
                       ],
                     ),
 
+                    const SizedBox(height: 20),
+                    // Stripe Onboarding Alert Strip
+                    if (!_isCheckingStripe &&
+                        (!_hasStripeAccount || _needsOnboarding))
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 20),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: const Color(0xFFBBF7D0),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.account_balance_wallet_outlined,
+                              color: Color(0xFF166534),
+                              size: 28,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        'Payment Setup Required',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: Color(0xFF166534),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Tooltip(
+                                        waitDuration: const Duration(
+                                          seconds: 0,
+                                        ),
+                                        triggerMode: TooltipTriggerMode.tap,
+                                        message:
+                                            'Setting up your Stripe account is essential to receive payments directly for the loads you deliver. It ensures a secure and automated payout process.',
+                                        child: const Icon(
+                                          Icons.info_outline,
+                                          size: 16,
+                                          color: Color(0xFF166534),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  Text(
+                                    _hasStripeAccount
+                                        ? 'Please complete your payment account activation.'
+                                        : 'Please setup your payment account to receive payouts.',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF166534),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        const CarrierPaymentPage(),
+                                  ),
+                                ).then((_) => _checkStripeStatus());
+                              },
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 8,
+                                ),
+                                backgroundColor: const Color(0xFF166534),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: Text(
+                                _hasStripeAccount ? 'Complete' : 'Setup Now',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     const SizedBox(height: 20),
 
                     /// Carrier Preferences

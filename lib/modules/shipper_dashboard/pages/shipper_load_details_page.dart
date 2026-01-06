@@ -888,10 +888,15 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
   }
 
   Widget _buildStatusPills(String status) {
-    bool enRouteActive = status == 'booked' || status == 'in-transit';
-    bool pickupActive = status == 'in-transit' || status == 'completed';
-    bool inTransitActive = status == 'in-transit';
-    bool deliveredActive = status == 'completed';
+    // Check if escrow payment is done
+    final isEscrowDeposited = _escrowPaymentData?['status'] == 'deposited';
+
+    bool enRouteActive =
+        isEscrowDeposited && (status == 'booked' || status == 'in-transit');
+    bool pickupActive =
+        isEscrowDeposited && (status == 'in-transit' || status == 'completed');
+    bool inTransitActive = isEscrowDeposited && (status == 'in-transit');
+    bool deliveredActive = isEscrowDeposited && (status == 'completed');
 
     return Row(
       children: [

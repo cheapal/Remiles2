@@ -866,7 +866,7 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                             const SizedBox(width: 5),
                             Flexible(
                               child: Text(
-                                'From: ${load['originAddress'] ?? 'N/A'}',
+                                'From: ${load['originCity'] != null && load['originState'] != null ? '${load['originCity']}, ${load['originState']}' : (load['originAddress'] ?? 'N/A')}',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -887,7 +887,7 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                             const SizedBox(width: 5),
                             Flexible(
                               child: Text(
-                                'To: ${load['destinationAddress'] ?? 'N/A'}',
+                                'To: ${load['destinationCity'] != null && load['destinationState'] != null ? '${load['destinationCity']}, ${load['destinationState']}' : (load['destinationAddress'] ?? 'N/A')}',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -1088,8 +1088,8 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                     '${load['weight'] ?? 'N/A'} lb',
                   ),
                   _buildCardTextWithIcon(
-                    Icons.monitor_weight_outlined,
-                    '\$${load['quoteBudget'] ?? 'N/A'}',
+                    Icons.monetization_on,
+                    '${load['quoteBudget'] ?? 'N/A'}',
                   ),
                   _buildCardTextWithIcon(
                     Icons.route_outlined,
@@ -1278,41 +1278,60 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
     }
   }
 
+  DateTime? _parseDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    if (value is Timestamp) return value.toDate();
+    return null;
+  }
+
   String _formatDate(dynamic dateValue, {bool includeTime = false}) {
-    if (dateValue == null) return 'N/A';
+    final date = _parseDateTime(dateValue);
+    if (date == null) return 'N/A';
 
-    try {
-      DateTime date;
-      if (dateValue is String) {
-        date = DateTime.parse(dateValue);
-      } else if (dateValue is DateTime) {
-        date = dateValue;
-      } else {
-        return 'N/A';
-      }
+    final mm = date.month.toString().padLeft(2, '0');
+    final dd = date.day.toString().padLeft(2, '0');
+    final yyyy = date.year.toString();
 
-      if (includeTime) {
-        return '${date.day}/${date.month}/${date.year} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-      } else {
-        return '${date.day}/${date.month}/${date.year}';
-      }
-    } catch (e) {
-      return 'N/A';
+    if (includeTime) {
+      final hh = date.hour.toString().padLeft(2, '0');
+      final min = date.minute.toString().padLeft(2, '0');
+      return '$mm/$dd/$yyyy - $hh:$min';
+    } else {
+      return '$mm/$dd/$yyyy';
     }
   }
 
   String _formatDeliveryWindow(Map<String, dynamic> load) {
-    // Try new DateTime fields first
-    if (load['deliveryWindowStart'] != null &&
-        load['deliveryWindowEnd'] != null) {
-      final startDate = _formatDate(load['deliveryWindowStart']);
-      final endDate = _formatDate(load['deliveryWindowEnd']);
-      return '$startDate - $endDate';
+    final startVal = load['deliveryWindowStart'];
+    final endVal = load['deliveryWindowEnd'];
+
+    if (startVal != null && endVal != null) {
+      final start = _parseDateTime(startVal);
+      final end = _parseDateTime(endVal);
+
+      if (start != null && end != null) {
+        final datePart = _formatDate(start);
+        final startTime =
+            '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
+        final endTime =
+            '${end.hour.toString().padLeft(2, '0')}:${end.minute.toString().padLeft(2, '0')}';
+
+        // Check if they are different days, though requested format implies same day
+        if (start.year != end.year ||
+            start.month != end.month ||
+            start.day != end.day) {
+          return '${_formatDate(start, includeTime: true)} - ${_formatDate(end, includeTime: true)}';
+        }
+
+        return '$datePart - $endTime';
+      }
     }
 
-    // Fallback to old string field
+    // Fallback to old string field or single field
     if (load['deliveryWindow'] != null) {
-      return _formatDate(load['deliveryWindow']);
+      return _formatDate(load['deliveryWindow'], includeTime: true);
     }
 
     return 'N/A';

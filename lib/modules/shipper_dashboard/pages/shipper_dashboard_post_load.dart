@@ -548,7 +548,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
                     const SizedBox(height: 25),
                     _buildNumericInputField(
                       context,
-                      "Declared Value (For Insurance) (CAD)",
+                      "\$ Declared Value (For Insurance) (CAD) ",
                       _declaredValueController,
                     ),
                     const SizedBox(height: 25),
@@ -608,7 +608,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
                     const SizedBox(height: 25),
                     _buildNumericInputField(
                       context,
-                      "Quote/Budget (CAD)",
+                      "\$ Quote/Budget (CAD)",
                       _quoteBudgetController,
                     ),
                     const SizedBox(height: 25),

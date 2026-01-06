@@ -3,11 +3,10 @@ import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navig
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-
 // Identity colors (same as other Manage Loads screens)
- const Color topPanelColor = Color(0xFF386544);
- const Color brandGreen = Color(0xFF195529);
- const Color aiGradientEnd = Color(0xFF0B7B29);
+const Color topPanelColor = Color(0xFF386544);
+const Color brandGreen = Color(0xFF195529);
+const Color aiGradientEnd = Color(0xFF0B7B29);
 
 class ShipperLoadAiMatch extends StatefulWidget {
   const ShipperLoadAiMatch({super.key});
@@ -18,10 +17,9 @@ class ShipperLoadAiMatch extends StatefulWidget {
 
 class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
     with TickerProviderStateMixin {
-
-
   int _selectedTab = 1; // Manage Loads
-  int _statusIndex = 0; // 0: In-Transit (active), 1: Cancelled Loads, 2: Completed Loads
+  int _statusIndex =
+      0; // 0: In-Transit (active), 1: Cancelled Loads, 2: Completed Loads
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +34,7 @@ class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
           child: Column(
             children: [
               // ===== Top leather bar (same identity) =====
-             TopNavigationBar(context),
+              TopNavigationBar(context),
 
               // Padding(
               //   padding: EdgeInsets.symmetric(horizontal: isWide ? sidePadding : 0.0),
@@ -79,7 +77,9 @@ class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
 
               // ===== Main content =====
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: isWide ? 100.0 : 20.0),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isWide ? 100.0 : 20.0,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -104,9 +104,17 @@ class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
                     // Big buttons row: Available Loads | My Bookings
                     Row(
                       children: [
-                        bigButton('Available Loads', bg: Colors.white, textColor: Colors.black),
+                        bigButton(
+                          'Available Loads',
+                          bg: Colors.white,
+                          textColor: Colors.black,
+                        ),
                         const SizedBox(width: 10),
-                        bigButton('My Bookings', bg: Colors.white, textColor: Colors.black),
+                        bigButton(
+                          'My Bookings',
+                          bg: Colors.white,
+                          textColor: Colors.black,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -239,9 +247,8 @@ class _ShipperLoadAiMatchState extends State<ShipperLoadAiMatch>
       ),
     );
   }
-
-
 }
+
 Widget searchBar({required String hint, bool showTrail = true}) {
   return Container(
     height: 36,
@@ -277,10 +284,12 @@ Widget searchBar({required String hint, bool showTrail = true}) {
           ),
         ),
         const SizedBox(width: 6),
-        showTrail? Padding(
-          padding: EdgeInsets.only(right: 10),
-          child: Icon(Icons.tune, size: 18, color: Colors.black),
-        ):Text(""),
+        showTrail
+            ? Padding(
+                padding: EdgeInsets.only(right: 10),
+                child: Icon(Icons.tune, size: 18, color: Colors.black),
+              )
+            : Text(""),
       ],
     ),
   );
@@ -354,19 +363,19 @@ Widget filterStatusPill(String text, int index, {bool active = false}) {
 
 // ===== AI Match Load Card =====
 Widget aiMatchCard(
-    BuildContext context, {
-      required bool recommended,
-      required int matchPercent,
-      required String loadId,
-      required String from,
-      required String to,
-      required String pickup,
-      required String delivery,
-      required String weight,
-      required String docs,
-      required String equipment,
-      String? status,
-    }) {
+  BuildContext context, {
+  required bool recommended,
+  required int matchPercent,
+  required String loadId,
+  required String from,
+  required String to,
+  required String pickup,
+  required String delivery,
+  required String weight,
+  required String docs,
+  required String equipment,
+  String? status,
+}) {
   return Container(
     width: double.infinity,
     padding: const EdgeInsets.all(16),
@@ -394,26 +403,30 @@ Widget aiMatchCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (recommended) ...[
-                    const Text(
-                      'Recommended Load',
-                      style: TextStyle(
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.3,
-                        height: 1.05,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                  ],
+                  ///todo: remove recommended - add back later
+                  // if (recommended) ...[
+                  //   const Text(
+                  //     'Recommended Load',
+                  //     style: TextStyle(
+                  //       fontStyle: FontStyle.italic,
+                  //       fontWeight: FontWeight.w700,
+                  //       fontSize: 14.3,
+                  //       height: 1.05,
+                  //       color: Colors.black,
+                  //     ),
+                  //   ),
+                  //   const SizedBox(height: 6),
+                  // ],
                   detail(icon: Icons.location_on, text: 'From : $from'),
                   const SizedBox(height: 6),
                   detail(icon: Icons.location_on, text: 'To : $to'),
                   const SizedBox(height: 6),
                   detail(icon: Icons.calendar_today, text: 'Pickup : $pickup'),
                   const SizedBox(height: 6),
-                  detail(icon: Icons.calendar_today, text: 'Delivery : $delivery'),
+                  detail(
+                    icon: Icons.calendar_today,
+                    text: 'Delivery : $delivery',
+                  ),
                 ],
               ),
             ),
@@ -433,15 +446,18 @@ Widget aiMatchCard(
                   ),
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '$matchPercent% Match',
-                  style: const TextStyle(
-                    color: Color(0xFF0D7729),
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18.59,
-                    height: 1.05,
-                  ),
-                ),
+
+                ///todo: enable match in future
+
+                // Text(
+                //   '$matchPercent% Match',
+                //   style: const TextStyle(
+                //     color: Color(0xFF0D7729),
+                //     fontWeight: FontWeight.w700,
+                //     fontSize: 18.59,
+                //     height: 1.05,
+                //   ),
+                // ),
               ],
             ),
           ],
@@ -457,7 +473,7 @@ Widget aiMatchCard(
               child: Text(
                 weight,
                 textAlign: TextAlign.left,
-                style:  TextStyle(
+                style: TextStyle(
                   fontSize: 14.3,
                   fontWeight: FontWeight.w600,
                   color: primaryColor,
@@ -481,7 +497,7 @@ Widget aiMatchCard(
               child: Text(
                 docs,
                 textAlign: TextAlign.right,
-                style:  TextStyle(
+                style: TextStyle(
                   fontSize: 14.3,
                   fontWeight: FontWeight.w600,
                   color: primaryColor,
@@ -521,7 +537,7 @@ Widget statusPill(String status) {
     height: 38.37,
     alignment: Alignment.center,
     decoration: BoxDecoration(
-      gradient:  LinearGradient(
+      gradient: LinearGradient(
         colors: [start, end],
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
@@ -556,7 +572,7 @@ Widget detail({required IconData icon, required String text}) {
       Expanded(
         child: Text(
           text,
-          style:  TextStyle(
+          style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: primaryColor,

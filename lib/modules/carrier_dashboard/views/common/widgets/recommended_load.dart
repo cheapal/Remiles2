@@ -2,8 +2,9 @@ import 'package:remiles/core/theme/colors.dart';
 import 'package:remiles/core/firebase_service.dart';
 import 'package:remiles/models/load_model.dart';
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/booked_now.dart';
+import 'package:remiles/modules/carrier_dashboard/views/dashboard/pages/chat_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class RecommendedLoad extends StatefulWidget {
   final LoadModel load;
@@ -26,245 +27,247 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 0),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.green.shade200, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: primaryColor.withOpacity(0.2),
-              spreadRadius: 2,
-              blurRadius: 5,
-              offset: const Offset(0, 3), // changes position of shadow
-            ),
-            BoxShadow(
-              color: Colors.white,
-              spreadRadius: -2,
-              blurRadius: 5,
-              offset: const Offset(-3, -3), // changes position of shadow
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            /// Header
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Expanded(
-                  child: Text(
-                    "Recommended Load",
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
+    return GestureDetector(
+      onTap: _currentStatus == 'booked'
+          ? () => _showLoadDetails(context)
+          : (_isBooking ? null : () => _bookLoad(context)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 0),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            // border: Border.all(color: Colors.green.shade200, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: primaryColor.withOpacity(0.45),
+                spreadRadius: 2,
+                blurRadius: 15,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: Text(
+                      "Recommended Load",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  "${widget.load.matchPercentage?.toStringAsFixed(0) ?? '0'}% Match",
-                  style: TextStyle(
-                    fontSize: 17,
-                    color: primaryColor,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(width: 8),
+                  Text(
+                    "${widget.load.matchPercentage?.toStringAsFixed(0) ?? '0'}% Match",
+                    style: TextStyle(
+                      fontSize: 17,
+                      color: primaryColor,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                ],
+              ),
+              const SizedBox(height: 12),
 
-            /// Price and Load ID
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  "\$${widget.load.price.toStringAsFixed(0)}   ${widget.load.distance.toStringAsFixed(0)}(mi)",
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Flexible(
-                  child: Text(
-                    "Load ID #${widget.load.id.isNotEmpty ? widget.load.id : 'N/A'}",
+              /// Price and Load ID
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    "\$${widget.load.price.toStringAsFixed(0)}   ${widget.load.distance.toStringAsFixed(0)}(mi)",
                     style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                  Flexible(
+                    child: Text(
+                      "Load ID #${widget.load.id.isNotEmpty ? widget.load.id : 'N/A'}",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
 
-            /// From/To
-            Row(
-              children: [
-                Icon(Icons.location_on, size: 18, color: primaryColor),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    "From : ${widget.load.originCity}, ${widget.load.originState}",
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+              /// From/To
+              Row(
+                children: [
+                  Icon(Icons.location_on, size: 18, color: primaryColor),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      "From : ${widget.load.originAddress.isNotEmpty ? widget.load.originAddress : (widget.load.originCity.isNotEmpty || widget.load.originState.isNotEmpty ? '${widget.load.originCity}, ${widget.load.originState}' : 'N/A')}",
+                      style: TextStyle(
+                        color: primaryColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                Icon(Icons.location_on, size: 18, color: primaryColor),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    "To : ${widget.load.destinationCity}, ${widget.load.destinationState}",
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                ],
+              ),
+              Row(
+                children: [
+                  Icon(Icons.location_on, size: 18, color: primaryColor),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      "To : ${widget.load.destinationAddress.isNotEmpty ? widget.load.destinationAddress : (widget.load.destinationCity.isNotEmpty || widget.load.destinationState.isNotEmpty ? '${widget.load.destinationCity}, ${widget.load.destinationState}' : 'N/A')}",
+                      style: TextStyle(
+                        color: primaryColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                SvgPicture.asset(
-                  "assets/calender.svg",
-                  width: 18,
-                  height: 18,
-                  color: primaryColor,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    "Pickup : ${_formatDate(widget.load.pickupDate)}",
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            Row(
-              children: [
-                SvgPicture.asset(
-                  "assets/calender.svg",
-                  width: 18,
-                  height: 18,
-                  color: primaryColor,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    "Delivery : ${_formatDate(widget.load.deliveryDate)}",
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Divider(height: 12, color: Colors.grey),
-            const SizedBox(height: 12),
-
-            /// Weight
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                SvgPicture.asset(
-                  "assets/truck.svg",
-                  width: 18,
-                  height: 18,
-                  color: primaryColor,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  "${widget.load.weight.toStringAsFixed(0)} lb",
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
+                ],
+              ),
+              Row(
+                children: [
+                  SvgPicture.asset(
+                    "assets/calender.svg",
+                    width: 18,
+                    height: 18,
                     color: primaryColor,
                   ),
-                ),
-                const Spacer(),
-                Flexible(
-                  child: Text(
-                    "Equipment: ${widget.load.equipmentNeeded}",
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      "Pickup : ${_formatDate(widget.load.pickupDate)}",
+                      style: TextStyle(
+                        color: primaryColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  SvgPicture.asset(
+                    "assets/calender.svg",
+                    width: 18,
+                    height: 18,
+                    color: primaryColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      "Delivery : ${_formatDate(widget.load.deliveryDate)}",
+                      style: TextStyle(
+                        color: primaryColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 12, color: Colors.grey),
+              const SizedBox(height: 12),
+
+              /// Weight
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  SvgPicture.asset(
+                    "assets/truck.svg",
+                    width: 18,
+                    height: 18,
+                    color: primaryColor,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    "${widget.load.weight.toStringAsFixed(0)} lb",
                     style: TextStyle(
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w800,
                       color: primaryColor,
                     ),
-                    overflow: TextOverflow.ellipsis,
                   ),
-                ),
-              ],
-            ),
+                  const Spacer(),
+                  Flexible(
+                    child: Text(
+                      "Equipment: ${widget.load.equipmentNeeded}",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: primaryColor,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
 
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-            /// Instant Booking or View Details
-            Align(
-              alignment: Alignment.center,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _currentStatus == 'booked'
-                      ? Colors.blue
-                      : (_isBooking ? Colors.grey : const Color(0xFFFFCA4D)),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+              /// Instant Booking or View Details
+              Align(
+                alignment: Alignment.center,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _currentStatus == 'booked'
+                        ? Colors.blue
+                        : (_isBooking ? Colors.grey : const Color(0xFFFFCA4D)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    shadowColor: Colors.black.withOpacity(1),
+                    elevation: 1,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 0,
+                    ),
                   ),
-                  shadowColor: Colors.black.withOpacity(1),
-                  elevation: 1,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 22,
-                    vertical: 0,
-                  ),
-                ),
-                onPressed: _currentStatus == 'booked'
-                    ? () => _showLoadDetails(context)
-                    : (_isBooking ? null : () => _bookLoad(context)),
-                child: _isBooking
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+                  onPressed: _currentStatus == 'booked'
+                      ? () => _showLoadDetails(context)
+                      : (_isBooking ? null : () => _bookLoad(context)),
+                  child: _isBooking
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          _currentStatus == 'booked'
+                              ? "View Details"
+                              : "Instant Booking",
+                          style: TextStyle(
+                            color: _currentStatus == 'booked'
+                                ? Colors.white
+                                : Colors.black,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
                         ),
-                      )
-                    : Text(
-                        _currentStatus == 'booked'
-                            ? "View Details"
-                            : "Instant Booking",
-                        style: TextStyle(
-                          color: _currentStatus == 'booked'
-                              ? Colors.white
-                              : Colors.black,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -318,12 +321,18 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
       });
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Load booked successfully!'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        // Navigate to chat after successful booking
+        if (context.mounted) {
+          await _navigateToChat();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Load booked successfully!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -343,6 +352,37 @@ class _RecommendedLoadState extends State<RecommendedLoad> {
           backgroundColor: Colors.red,
         ),
       );
+    }
+  }
+
+  Future<void> _navigateToChat() async {
+    try {
+      final user = FirebaseService.currentUser;
+      if (user == null) return;
+
+      final conversationId = await FirebaseService.createLoadConversation(
+        loadId: widget.load.id,
+        carrierUid: user.uid,
+        shipperUid: widget.load.shipperUid,
+      );
+
+      if (mounted) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatScreen(
+              conversationId: conversationId,
+              otherUserId: widget.load.shipperUid,
+              otherUserName: widget.load.shipperName,
+              listingId: null,
+              loadId: widget.load.id,
+              loadPrice: widget.load.price,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error navigating to chat: $e');
     }
   }
 

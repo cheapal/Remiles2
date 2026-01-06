@@ -223,7 +223,7 @@ class _BookedNowState extends State<BookedNow> {
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    "From : ${widget.load.originAddress}",
+                    "From : ${widget.load.originAddress.isNotEmpty ? widget.load.originAddress : (widget.load.originCity.isNotEmpty || widget.load.originState.isNotEmpty ? '${widget.load.originCity}, ${widget.load.originState}' : 'N/A')}",
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -244,7 +244,7 @@ class _BookedNowState extends State<BookedNow> {
                 SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    "To : ${widget.load.destinationAddress}",
+                    "To : ${widget.load.destinationAddress.isNotEmpty ? widget.load.destinationAddress : (widget.load.destinationCity.isNotEmpty || widget.load.destinationState.isNotEmpty ? '${widget.load.destinationCity}, ${widget.load.destinationState}' : 'N/A')}",
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
@@ -439,49 +439,45 @@ class _BookedNowState extends State<BookedNow> {
             const SizedBox(height: 20),
 
             /// Accept Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed:
-                    (_currentStatus == 'active' ||
-                            _currentStatus == 'available') &&
-                        !_isBooking
-                    ? _bookLoad
-                    : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor:
-                      (_currentStatus == 'active' ||
-                          _currentStatus == 'available')
-                      ? primaryColor
-                      : Colors.grey,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            if (_currentStatus == 'active' || _currentStatus == 'available')
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _bookLoad,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor:
+                        (_currentStatus == 'active' ||
+                            _currentStatus == 'available')
+                        ? primaryColor
+                        : Colors.grey,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                child: _isBooking
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
+                  child: _isBooking
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          (_currentStatus == 'active' ||
+                                  _currentStatus == 'available')
+                              ? "Accept"
+                              : "Already ${_currentStatus.toUpperCase()}",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
                           ),
                         ),
-                      )
-                    : Text(
-                        (_currentStatus == 'active' ||
-                                _currentStatus == 'available')
-                            ? "Accept"
-                            : "Already ${_currentStatus.toUpperCase()}",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.white,
-                        ),
-                      ),
+                ),
               ),
-            ),
 
             // Only show negotiate button for active/available loads
             if (_currentStatus == 'active' ||

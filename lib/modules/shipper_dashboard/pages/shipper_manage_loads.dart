@@ -1003,6 +1003,7 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             const Icon(
                               Icons.calendar_today,
@@ -1024,6 +1025,7 @@ class _ShipperManageLoadsScreenState extends State<ShipperManageLoadsScreen>
                         ),
                         const SizedBox(height: 4),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             const Icon(
                               Icons.calendar_today,

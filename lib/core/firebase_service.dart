@@ -413,51 +413,80 @@ class FirebaseService {
   // Sign in with Google
   static Future<UserCredential?> signInWithGoogle() async {
     try {
-      // Web client ID for Google Sign-In (use the web client ID from Google Console / Firebase)
-      const String clientId =
-          '60865903848-qufrm62v42k4kuh30jr022dr2mjcim5i.apps.googleusercontent.com';
+      if (kIsWeb) {
+        // For web, use Firebase Auth's native Google Sign-In provider
+        // This uses signInWithPopup internally and is the recommended approach
+        // It doesn't require the google_sign_in package and handles idToken automatically
+        final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+        googleProvider.addScope('email');
+        googleProvider.addScope('profile');
+        
+        // Sign in with popup (native Firebase Auth method for web)
+        final userCredential = await _auth.signInWithPopup(googleProvider);
 
-      // Platform-aware GoogleSignIn: web uses clientId, others use severClientId
-      final GoogleSignIn googleSignIn = kIsWeb
-          ? GoogleSignIn(scopes: ['email', 'profile'], clientId: clientId)
-          : GoogleSignIn(
-              scopes: ['email', 'profile'],
-              serverClientId: clientId,
-            );
+        // Log successful sign in
+        await logEvent(
+          'login',
+          parameters: _convertParameters({'method': 'google', 'success': 'true'}),
+        );
 
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+        return userCredential;
+      } else {
+        // For mobile (iOS/Android), use google_sign_in package
+        const String clientId =
+            '60865903848-qufrm62v42k4kuh30jr022dr2mjcim5i.apps.googleusercontent.com';
 
-      if (googleUser == null) {
-        // User canceled the sign-in
-        return null;
+        final GoogleSignIn googleSignIn = GoogleSignIn(
+          scopes: ['email', 'profile', 'openid'],
+          serverClientId: clientId,
+        );
+
+        // Trigger the authentication flow
+        final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+        if (googleUser == null) {
+          // User canceled the sign-in
+          return null;
+        }
+
+        // Obtain the auth details from the request
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        // Check if idToken is available (required for Firebase Auth)
+        if (googleAuth.idToken == null) {
+          throw Exception('Failed to obtain Google ID token. Please try again.');
+        }
+
+        // Create a new credential
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
+        );
+
+        // Sign in to Firebase with the Google credential
+        final userCredential = await _auth.signInWithCredential(credential);
+
+        // Log successful sign in
+        await logEvent(
+          'login',
+          parameters: _convertParameters({'method': 'google', 'success': 'true'}),
+        );
+
+        return userCredential;
       }
-
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-
-      // Check if idToken is available (required for Firebase Auth)
-      if (googleAuth.idToken == null) {
-        throw Exception('Failed to obtain Google ID token');
-      }
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Sign in to Firebase with the Google credential
-      final userCredential = await _auth.signInWithCredential(credential);
-
-      // Log successful sign in
+    } on FirebaseAuthException catch (e) {
+      // Handle Firebase Auth specific errors
       await logEvent(
         'login',
-        parameters: _convertParameters({'method': 'google', 'success': 'true'}),
+        parameters: _convertParameters({
+          'method': 'google',
+          'success': 'false',
+          'error': e.code,
+        }),
       );
-
-      return userCredential;
+      await recordError(e, StackTrace.current, reason: 'Google sign in failed: ${e.code}');
+      rethrow;
     } catch (e) {
       // Log failed sign in
       await logEvent(

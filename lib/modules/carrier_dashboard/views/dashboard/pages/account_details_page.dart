@@ -453,6 +453,9 @@ class _AccountDetailsPageState extends State<AccountDetailsPage> {
             if (value == null || value.trim().isEmpty) {
               return 'Please enter a phone number';
             }
+            if (value.trim().length < 10) {
+              return 'Phone number must be at least 10 digits';
+            }
             if (_isPhoneAvailable == false) {
               return 'Phone number is already in use';
             }

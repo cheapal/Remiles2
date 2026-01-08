@@ -65,12 +65,16 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
 
   // Delivery confirmation data
   Map<String, dynamic>? _deliveryConfirmationData;
+  String? _lastDeliveryConfirmationLoadId; // Track which load ID we last loaded delivery confirmation data for
 
   // Escrow payment data
   Map<String, dynamic>? _escrowPaymentData;
   bool _isLoadingEscrow = false;
   String?
   _lastEscrowLoadId; // Track which load ID we last loaded escrow data for
+
+  // Refresh state
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -86,6 +90,34 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
   void dispose() {
     _mapController?.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshData() async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    try {
+      final loadId = widget.load['id']?.toString();
+      
+      // Reload all data
+      await Future.wait([
+        _loadCarrierInfo(forceReload: true),
+        _loadMapLocations(),
+        _loadDeliveryConfirmationData(loadId, forceReload: true),
+        _loadEscrowPaymentData(forceReload: true),
+      ]);
+    } catch (e) {
+      print('Error refreshing data: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
   }
 
   void _initializeLoadDocument() {
@@ -286,7 +318,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     }
   }
 
-  Future<void> _loadCarrierInfo([Map<String, dynamic>? loadData]) async {
+  Future<void> _loadCarrierInfo({Map<String, dynamic>? loadData, bool forceReload = false}) async {
     final load = loadData ?? widget.load;
     final bookedByCarrierId = load['bookedByCarrierId'];
     if (bookedByCarrierId == null || bookedByCarrierId.toString().isEmpty) {
@@ -300,8 +332,8 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
       return;
     }
 
-    // Don't reload if it's the same carrier
-    if (_carrier?.uid == bookedByCarrierId.toString()) {
+    // Don't reload if it's the same carrier (unless forced)
+    if (!forceReload && _carrier?.uid == bookedByCarrierId.toString()) {
       return;
     }
 
@@ -518,9 +550,16 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
               final currentLoadId = currentLoad['id']?.toString();
               if (currentLoadId != null) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _loadDeliveryConfirmationData(currentLoadId);
-                  // Only reload escrow data if load ID actually changed or we haven't loaded it yet
+                  // Only reload delivery confirmation data if load ID actually changed or we haven't loaded it yet
                   final previousLoadId = widget.load['id']?.toString();
+                  if (currentLoadId != previousLoadId ||
+                      _lastDeliveryConfirmationLoadId != currentLoadId) {
+                    _loadDeliveryConfirmationData(
+                      currentLoadId,
+                      forceReload: currentLoadId != previousLoadId,
+                    );
+                  }
+                  // Only reload escrow data if load ID actually changed or we haven't loaded it yet
                   if (currentLoadId != previousLoadId ||
                       _lastEscrowLoadId != currentLoadId) {
                     _loadEscrowPaymentData(
@@ -537,19 +576,19 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
                   newCarrierId != currentCarrierId &&
                   newCarrierId.isNotEmpty) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _loadCarrierInfo(currentLoad);
+                  _loadCarrierInfo(loadData: currentLoad);
                 });
               } else if (newCarrierId == null || newCarrierId.isEmpty) {
                 // Clear carrier if no longer booked
                 if (_carrier != null) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _loadCarrierInfo(currentLoad);
+                    _loadCarrierInfo(loadData: currentLoad);
                   });
                 }
               }
             }
 
-            return _buildContent(context, currentLoad, loadIdShort);
+            return _buildContent(context, currentLoad, loadIdShort, isStreamBuilder: true);
           },
         ),
       );
@@ -558,45 +597,66 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     // Fallback if no document reference
     return Scaffold(
       backgroundColor: const Color(0xFFFFFEF6),
-      body: _buildContent(context, widget.load, loadIdShort),
+      body: _buildContent(context, widget.load, loadIdShort, isStreamBuilder: false),
     );
   }
 
   Widget _buildContent(
     BuildContext context,
     Map<String, dynamic> load,
-    String loadIdShort,
-  ) {
+    String loadIdShort, {
+    bool isStreamBuilder = true,
+  }) {
     final status = load['status']?.toString().toLowerCase() ?? '';
 
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          TopNavigationBar(context),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 25),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.black),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                    const SizedBox(width: 10),
-                    const Text(
-                      'Load Details',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.black,
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh even when content doesn't scroll
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            TopNavigationBar(context),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 25),
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.black),
+                        onPressed: () => Navigator.of(context).pop(),
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 10),
+                      const Expanded(
+                        child: Text(
+                          'Load Details',
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.black,
+                          ),
+                        ),
+                      ),
+                      // Refresh button for web only
+                      if (kIsWeb)
+                        IconButton(
+                          icon: _isRefreshing
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.refresh, color: Colors.black),
+                          onPressed: _isRefreshing ? null : _refreshData,
+                          tooltip: 'Refresh',
+                        ),
+                    ],
+                  ),
                 const SizedBox(height: 25),
 
                 // Escrow Payment Section (at top)
@@ -883,6 +943,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -1354,7 +1415,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
                       ? 'Payment Released'
                       : (paidAmount != null
                             ? 'Payment Pending'
-                            : 'No Payment Set'),
+                            : 'Confirm Payment'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1364,7 +1425,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
                 Text(
                   paidAmount != null
                       ? '\$${paidAmount.toStringAsFixed(2)}'
-                      : 'N/A',
+                      : '',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -2138,13 +2199,19 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
     }
   }
 
-  Future<void> _loadDeliveryConfirmationData(String? loadId) async {
+  Future<void> _loadDeliveryConfirmationData(String? loadId, {bool forceReload = false}) async {
     if (loadId == null) {
       if (mounted) {
         setState(() {
           _deliveryConfirmationData = null;
+          _lastDeliveryConfirmationLoadId = null;
         });
       }
+      return;
+    }
+
+    // Don't reload if we already loaded data for this exact load ID (unless forced)
+    if (_lastDeliveryConfirmationLoadId == loadId && !forceReload) {
       return;
     }
 
@@ -2162,6 +2229,7 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
           } else {
             _deliveryConfirmationData = null;
           }
+          _lastDeliveryConfirmationLoadId = loadId; // Remember we loaded for this load ID
         });
       }
     } catch (e) {
@@ -2169,6 +2237,8 @@ class _ShipperLoadDetailsPageState extends State<ShipperLoadDetailsPage> {
       if (mounted) {
         setState(() {
           _deliveryConfirmationData = null;
+          _lastDeliveryConfirmationLoadId =
+              loadId; // Still remember even on error to prevent retry loops
         });
       }
     }

@@ -34,6 +34,8 @@ class BottomNavigationBarTab extends StatelessWidget {
           BottomNavigationBarItem(
             icon: SvgPicture.asset("assets/home.svg", width: 24, height: 24),
             label: "Home",
+            tooltip: "Home",
+            
           ),
           BottomNavigationBarItem(
             icon: SvgPicture.asset(
@@ -42,6 +44,7 @@ class BottomNavigationBarTab extends StatelessWidget {
               height: 24,
             ),
             label: "Manage Loads",
+            tooltip: "Manage Loads",
           ),
           BottomNavigationBarItem(
             icon: SvgPicture.asset(
@@ -50,6 +53,7 @@ class BottomNavigationBarTab extends StatelessWidget {
               height: 24,
             ),
             label: "Marketplace",
+            tooltip: "Marketplace",
           ),
           BottomNavigationBarItem(
             icon: SvgPicture.asset(
@@ -58,6 +62,7 @@ class BottomNavigationBarTab extends StatelessWidget {
               height: 24,
             ),
             label: "Profile",
+            tooltip: "Profile",
           ),
           BottomNavigationBarItem(
             icon: SvgPicture.asset(
@@ -67,6 +72,7 @@ class BottomNavigationBarTab extends StatelessWidget {
               height: 24,
             ),
             label: "More",
+            tooltip: "More",
           ),
         ],
       ),

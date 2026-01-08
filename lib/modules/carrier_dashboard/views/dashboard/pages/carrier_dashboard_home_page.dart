@@ -36,11 +36,18 @@ class _CarrierDashboardHomeScreenState
   bool _needsOnboarding = false;
   bool _isCheckingStripe = true;
 
+  // Stats data
+  double _totalRevenue = 0.0;
+  int _deliveriesCompleted = 0;
+  int _specialOffersCount = 0;
+  bool _isLoadingStats = true;
+
   @override
   void initState() {
     super.initState();
     _loadRecommendedLoads();
     _checkStripeStatus();
+    _loadStats();
   }
 
   Future<void> _checkStripeStatus() async {
@@ -103,6 +110,123 @@ class _CarrierDashboardHomeScreenState
         _error = errorMessage;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadStats() async {
+    setState(() {
+      _isLoadingStats = true;
+    });
+
+    try {
+      final user = FirebaseService.currentUser;
+      if (user == null) {
+        setState(() {
+          _isLoadingStats = false;
+        });
+        return;
+      }
+
+      // Load revenue from transfers collection
+      double totalRevenue = 0.0;
+      try {
+        final transfersSnapshot = await FirebaseService.firestore
+            .collection('transfers')
+            .where('carrierId', isEqualTo: user.uid)
+            .where('status', isEqualTo: 'completed')
+            .get();
+
+        for (final doc in transfersSnapshot.docs) {
+          final data = doc.data() as Map<String, dynamic>;
+          final amountInCents = data['amountInCents'] as int?;
+          final amountDollars = data['amount'] as num?;
+          
+          if (amountInCents != null) {
+            totalRevenue += amountInCents / 100.0;
+          } else if (amountDollars != null) {
+            // If amount is already in dollars and > 1000, assume it's in cents
+            if (amountDollars > 1000) {
+              totalRevenue += amountDollars.toDouble() / 100.0;
+            } else {
+              totalRevenue += amountDollars.toDouble();
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error loading revenue from transfers: $e');
+        // Try fallback: get revenue from delivery confirmations
+        try {
+          final confirmationsSnapshot = await FirebaseService.firestore
+              .collection('delivery_confirmations')
+              .where('carrierId', isEqualTo: user.uid)
+              .where('paymentReleased', isEqualTo: true)
+              .get();
+
+          for (final doc in confirmationsSnapshot.docs) {
+            final data = doc.data() as Map<String, dynamic>;
+            final paymentAmount = data['paymentAmount'];
+            if (paymentAmount != null) {
+              if (paymentAmount is num) {
+                totalRevenue += paymentAmount.toDouble();
+              } else {
+                final parsed = double.tryParse(paymentAmount.toString());
+                if (parsed != null) {
+                  totalRevenue += parsed;
+                }
+              }
+            }
+          }
+        } catch (e2) {
+          debugPrint('Error loading revenue from delivery confirmations: $e2');
+        }
+      }
+
+      // Load completed deliveries count
+      int deliveriesCompleted = 0;
+      try {
+        final bookedLoads = await FirebaseService.getCarrierBookedLoads(
+          carrierUid: user.uid,
+          status: 'completed',
+          limit: 1000, // Get all completed loads
+        );
+        deliveriesCompleted = bookedLoads['totalCount'] as int? ?? 
+                             (bookedLoads['loads'] as List<LoadModel>?)?.length ?? 0;
+      } catch (e) {
+        debugPrint('Error loading completed deliveries: $e');
+      }
+
+      // Load special offers (recommended loads with good match percentage > 70%)
+      int specialOffersCount = 0;
+      try {
+        final result = await FirebaseService.getAvailableLoadsForCarrier(
+          carrierUid: user.uid,
+          searchQuery: '',
+          limit: 1000, // Get all available loads to count special offers
+        );
+        
+        final allLoads = List<LoadModel>.from(result['loads']);
+        specialOffersCount = allLoads
+            .where((load) => (load.matchPercentage ?? 0) >= 70.0)
+            .length;
+      } catch (e) {
+        debugPrint('Error loading special offers: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _totalRevenue = totalRevenue;
+          _deliveriesCompleted = deliveriesCompleted;
+          _specialOffersCount = specialOffersCount;
+          _isLoadingStats = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading stats: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingStats = false;
+        });
+      }
     }
   }
 
@@ -493,28 +617,37 @@ class _CarrierDashboardHomeScreenState
                           icon: Icons.attach_money_outlined,
                           iconBgColor: const Color(0xFFBFF497),
                           iconColor: Colors.black87,
-                          value: '2,000',
+                          value: _isLoadingStats
+                              ? '...'
+                              : '\$${_totalRevenue.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')}',
                           label: 'Total Revenue',
+                          isLoading: _isLoadingStats,
                         ),
                         _buildSummaryCard(
                           icon: Icons.check_circle_outline,
                           iconBgColor: const Color(0xFFFFE0B3),
                           iconColor: Colors.black87,
-                          value: '50',
+                          value: _isLoadingStats
+                              ? '...'
+                              : '$_deliveriesCompleted',
                           label: 'Loads Delivered',
+                          isLoading: _isLoadingStats,
                         ),
                         _buildSummaryCard(
                           icon: Icons.card_giftcard,
                           iconBgColor: const Color(0xFFD1E9FF),
                           iconColor: Colors.black87,
-                          value: '12',
+                          value: _isLoadingStats
+                              ? '...'
+                              : '$_specialOffersCount',
                           label: 'Special Offers',
+                          isLoading: _isLoadingStats,
                         ),
                         _buildSummaryCard(
                           icon: Icons.star,
                           iconBgColor: const Color(0xFFFEF3C7),
                           iconColor: Colors.amber.shade700,
-                          value: '4.8/5',
+                          value: _deliveriesCompleted > 0 ? '0/5' : '0/5',
                           label: 'Carrier Ratings',
                         ),
                       ],
@@ -536,6 +669,7 @@ class _CarrierDashboardHomeScreenState
     required Color iconColor,
     required String value,
     required String label,
+    bool isLoading = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
@@ -568,14 +702,20 @@ class _CarrierDashboardHomeScreenState
           const SizedBox(height: 12),
           FittedBox(
             fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: isLoading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : Text(
+                    value,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
           ),
           const SizedBox(height: 4),
           FittedBox(

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:remiles/modules/carrier_dashboard/views/common/widgets/top_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -570,6 +572,19 @@ class CarrierContactSupportPage extends StatelessWidget {
                   _openSupportChat(context);
                 },
               ),
+
+              const SizedBox(height: 30),
+              _buildContactCard(
+                Icons.web_outlined,
+                'Visit Our Website',
+                'www.remileslogistics.ca',
+                'Visit our website to learn more about Remiles',
+                () {
+                  // android ios web
+                 
+                  launchUrl(Uri.parse('https://www.remileslogistics.ca'));
+                }
+              )
             ],
           ),
         ),

@@ -62,7 +62,7 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
                       letterSpacing: -0.5,
                     ),
                   ),
-                  const SizedBox(width: 24),
+                  const SizedBox(width: 4),
                   Text(
                     "${widget.load.distance.toStringAsFixed(0)} (mi)",
                     style: const TextStyle(
@@ -242,32 +242,36 @@ class _LoadCardInfoState extends State<LoadCardInfo> {
     );
   }
 
-  Widget _buildInfoRow(
-    IconData icon,
-    String text, {
-    bool isSvg = false,
-    String? svgPath,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (isSvg && svgPath != null)
-          SvgPicture.asset(svgPath, width: 18, height: 18, color: primaryColor)
-        else
-          Icon(icon, size: 18, color: primaryColor),
-        const SizedBox(width: 8),
-        Text(
+ Widget _buildInfoRow(
+  IconData icon,
+  String text, {
+  bool isSvg = false,
+  String? svgPath,
+}) {
+  return Row(
+    mainAxisSize: MainAxisSize.max,
+    crossAxisAlignment: CrossAxisAlignment.center,
+    children: [
+      if (isSvg && svgPath != null)
+        SvgPicture.asset(svgPath, width: 18, height: 18, color: primaryColor)
+      else
+        Icon(icon, size: 18, color: primaryColor),
+      const SizedBox(width: 4),
+      Expanded(
+        child: Text(
           text,
           style: TextStyle(
             color: primaryColor,
-            fontSize: 16,
-            fontWeight: FontWeight.w800,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-      ],
-    );
-  }
-
+      ),
+    ],
+  );
+}
   Color _getMatchColor(double percentage) {
     if (percentage >= 90) return Colors.green;
     if (percentage >= 70) return Colors.orange;

@@ -10,6 +10,7 @@ import 'package:google_polyline_algorithm/google_polyline_algorithm.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:remiles/core/theme/colors.dart';
 import 'package:signature/signature.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -91,6 +92,9 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
 
   // Description read more state
   bool _isDescriptionExpanded = false;
+
+  // Refresh state
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -190,7 +194,7 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
     }
   }
 
-  void _updateLoadData() async {
+  Future<void> _updateLoadData() async {
     if (_selectedLoad == null) return;
 
     final load = _selectedLoad!;
@@ -260,6 +264,53 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
 
     // Initialize map with new load data
     _initializeMap();
+  }
+
+  Future<void> _refreshData() async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    try {
+      // Store the currently selected load ID before refresh
+      final selectedLoadId = _selectedLoad?.id;
+      
+      // Reload booked loads
+      await _loadBookedLoads();
+      
+      // If a load was selected, try to find it in the updated list and reload its data
+      if (selectedLoadId != null) {
+        try {
+          final updatedLoad = _bookedLoads.firstWhere(
+            (load) => load.id == selectedLoadId,
+          );
+          
+          setState(() {
+            _selectedLoad = updatedLoad;
+          });
+          
+          // Reload all data for the selected load using the existing method
+          await _updateLoadData();
+        } catch (e) {
+          // Load no longer exists in the list, clear selection
+          if (mounted) {
+            setState(() {
+              _selectedLoad = null;
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print('Error refreshing data: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadPickupConfirmationData() async {
@@ -1974,7 +2025,7 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // screenshot background is dark/black
+     backgroundColor: backgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -1988,8 +2039,11 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
                   horizontal: 18.0,
                   vertical: 20,
                 ),
-                child: SingleChildScrollView(
-                  child: Column(
+                child: RefreshIndicator(
+                  onRefresh: _refreshData,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(), // Enable pull-to-refresh even when content doesn't scroll
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Load ID Dropdown and Support Button
@@ -2099,8 +2153,17 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
                                   horizontal: 8.0,
                                 ),
                                 child: ElevatedButton.icon(
-                                  onPressed: _loadBookedLoads,
-                                  icon: const Icon(Icons.refresh, size: 20),
+                                  onPressed: _isRefreshing ? null : _refreshData,
+                                  icon: _isRefreshing
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Icon(Icons.refresh, size: 20),
                                   label: const Text('Refresh'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: green,
@@ -3026,8 +3089,10 @@ class _CarrierManageLoadScreenState extends State<CarrierManageLoadScreen> {
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+       
+      ],
+    ),
       ),
     );
   }

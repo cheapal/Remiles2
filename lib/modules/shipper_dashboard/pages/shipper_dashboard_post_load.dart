@@ -300,6 +300,22 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
     super.dispose();
   }
 
+  // Helper: determine if the current edit load is deletable (within 72 hours of creation)
+  bool _canDeleteLoad(Map<String, dynamic>? editLoadData) {
+    if (editLoadData == null) return false;
+    final createdAtRaw = editLoadData['createdAt'];
+    if (createdAtRaw == null) return true;
+    try {
+      final DateTime createdAt =
+          (createdAtRaw is DateTime) ? createdAtRaw : DateTime.parse(createdAtRaw.toString());
+      final hoursElapsed = DateTime.now().difference(createdAt).inHours;
+      return hoursElapsed <= 72;
+    } catch (_) {
+      // If we can't parse the timestamp, allow delete by default to avoid blocking UX
+      return true;
+    }
+  }
+
   // Date/Time picker methods
   Future<void> _selectPickupDateTime() async {
     DatePicker.showDateTimePicker(
@@ -413,6 +429,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
   @override
   Widget build(BuildContext context) {
     final bool isTabletOrDesktop = MediaQuery.of(context).size.width > 600;
+    final bool canDeleteLoad = _canDeleteLoad(widget.editLoadData);
 
     return Scaffold(
       // appBar: AppBar(
@@ -624,9 +641,9 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
                         if (widget.editLoadData != null) ...[
                           _buildActionButton(
                             "Delete",
-                            Colors.red,
+                            canDeleteLoad ? Colors.red : Colors.grey,
                             Colors.white,
-                            () => _deleteLoad(),
+                            canDeleteLoad ? () => _deleteLoad() : null,
                             width: 110.45,
                             height: 42.55,
                           ),
@@ -1563,7 +1580,7 @@ class _ShipperDashboardPostLoadState extends State<ShipperDashboardPostLoad>
     String text,
     Color bgColor,
     Color textColor,
-    VoidCallback onPressed, {
+    VoidCallback? onPressed, {
     double? width,
     double? height,
     bool isPostLoad = false,

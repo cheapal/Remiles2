@@ -615,6 +615,20 @@ class ShipperContactSupportPage extends StatelessWidget {
                   _openSupportChat(context);
                 },
               ),
+
+              const SizedBox(height: 30),
+              _buildContactCard(
+                context,
+                Icons.web_outlined,
+                'Visit Our Website',
+                'www.remileslogistics.ca',
+                'Visit our website to learn more about Remiles',
+                () {
+                  // android ios web
+                 
+                  launchUrl(Uri.parse('https://www.remileslogistics.ca'));
+                }
+              ),
               const SizedBox(height: 30),
               const Text(
                 'Frequently Asked Questions',

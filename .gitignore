@@ -107,3 +107,5 @@ GoogleService-Info.plist
 
 # Coverage reports
 coverage/
+config.bat
+node_modules
